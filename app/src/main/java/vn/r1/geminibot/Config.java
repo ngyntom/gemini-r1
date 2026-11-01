@@ -90,7 +90,8 @@ public class Config {
         } catch (NumberFormatException e) {
             c.ttsRate = 1;
         }
-        c.led = !"0".equals(p.getString("led", "1").trim());
+        // Mặc định tắt: trên R1 thử nghiệm, kernel bỏ qua mọi lệnh đèn sau khi khởi động xong
+        c.led = "1".equals(p.getString("led", "1").trim());
         c.wakeSound = p.getString("wake_sound", "chime").trim().toLowerCase();
         c.wakeReply = p.getString("wake_reply", "Dạ?").trim();
         if (c.wakeReply.isEmpty()) c.wakeReply = "Dạ?";

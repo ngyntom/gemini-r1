@@ -8,6 +8,7 @@ import java.text.SimpleDateFormat;
 import java.util.ArrayDeque;
 import java.util.Date;
 import java.util.Locale;
+import java.util.TimeZone;
 
 /** Log + trạng thái hiện tại của bot, để Web UI hiển thị. */
 final class BotLog {
@@ -15,6 +16,7 @@ final class BotLog {
     private static final int MAX_LINES = 200;
     private static final ArrayDeque<String> lines = new ArrayDeque<>();
     private static final SimpleDateFormat TIME = new SimpleDateFormat("HH:mm:ss", Locale.ROOT);
+    static { TIME.setTimeZone(TimeZone.getTimeZone("Asia/Ho_Chi_Minh")); } // loa reset về giờ Thượng Hải
 
     /** starting | no_key | idle | listening | thinking | speaking | paused | error */
     static volatile String state = "starting";

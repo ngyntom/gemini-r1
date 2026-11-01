@@ -97,7 +97,9 @@ final class LocalAnswer implements VoiceRecorder.FrameSink {
 
     /** Câu trả lời nếu cả câu là hỏi giờ / ngày / thứ, ngược lại null. */
     static String answer(String question) {
-        String q = VoskWakeWord.normalize(question);
+        // Tiếng ding-dong ở đầu bản thu thành "[unk]" -> bỏ các [unk] ở đầu câu; [unk] giữa / cuối
+        // câu nghĩa là có từ khác (vd. "mấy giờ [trận đấu]") nên vẫn gửi Gemini
+        String q = VoskWakeWord.normalize(question).replaceFirst("^(unk\\s*)+", "");
         if (q.isEmpty() || q.contains("unk")) return null;
         StringBuilder core = new StringBuilder();
         for (String w : q.split(" ")) {

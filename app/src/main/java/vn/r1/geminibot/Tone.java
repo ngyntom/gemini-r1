@@ -7,12 +7,16 @@ final class Tone {
 
     private Tone() {}
 
+    /** Ampli của R1 tắt khi rảnh và mất ~0.5 s để bật: phát im lặng trước, không thì mất cả tiếng ding. */
+    private static final int LEAD_MS = 500;
+
     private static byte[] chime() {
         double[][] notes = {{988, 110}, {1319, 260}}; // {Hz, ms}
-        int total = 0;
+        int lead = RATE * LEAD_MS / 1000;
+        int total = lead;
         for (double[] n : notes) total += (int) (RATE * n[1] / 1000);
         byte[] pcm = new byte[total * 2];
-        int pos = 0;
+        int pos = lead;
         for (double[] note : notes) {
             int n = (int) (RATE * note[1] / 1000);
             int attack = RATE / 400; // 2.5 ms, tránh tiếng "tách"

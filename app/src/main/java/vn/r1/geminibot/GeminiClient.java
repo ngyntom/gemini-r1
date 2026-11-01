@@ -114,7 +114,8 @@ public class GeminiClient {
         StringBuilder sb = new StringBuilder(cfg.persona);
         SimpleDateFormat now = new SimpleDateFormat("EEEE, dd/MM/yyyy, HH:mm", new Locale("vi", "VN"));
         now.setTimeZone(TimeZone.getTimeZone("Asia/Ho_Chi_Minh"));
-        sb.append("\n\nThời gian hiện tại (giờ Việt Nam): ").append(now.format(new Date())).append('.');
+        sb.append("\n\nThời gian hiện tại (giờ Việt Nam): ").append(now.format(new Date()))
+          .append(". Khi được hỏi giờ / ngày, luôn dùng thời gian này, không lặp lại giờ trong các câu trả lời trước.");
         sb.append("\n\nMỗi tin nhắn của người dùng là một đoạn ghi âm từ micro của loa, ")
           .append("thu ngay sau khi họ gọi bạn bằng từ đánh thức (hoặc ngay sau khi bạn vừa trả lời). ")
           .append("Trả về JSON: \"heard\" = nội dung bạn nghe được (chép lại nguyên văn), ")

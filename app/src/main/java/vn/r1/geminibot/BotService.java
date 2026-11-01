@@ -215,6 +215,7 @@ public class BotService extends Service {
                             followUp = true;
                             continue;
                         }
+                        if (!heard.isEmpty()) BotLog.i("Vosk nghe: " + heard + " (không phải hỏi giờ)");
                     }
                     BotLog.state = "thinking";
                     BotLog.i("Thu được " + (wav.length - 44) / 32 + " ms audio, gửi Gemini...");
