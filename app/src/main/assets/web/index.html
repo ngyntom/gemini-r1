@@ -148,7 +148,7 @@
       <div>
         <label>Đèn LED theo trạng thái</label>
         <select data-k="led">
-          <option value="1">Bật (nghe / nói sáng trắng, nghĩ nhấp nháy)</option>
+          <option value="1">Bật (nghe: thở xanh, nghĩ: sao chổi, nói: xanh lá, lỗi: đỏ)</option>
           <option value="0">Tắt</option>
         </select>
       </div>
@@ -158,6 +158,7 @@
       <button onclick="post('/api/led',{state:'listening'})">Nghe</button>
       <button onclick="post('/api/led',{state:'thinking'})">Nghĩ</button>
       <button onclick="post('/api/led',{state:'speaking'})">Nói</button>
+      <button onclick="post('/api/led',{state:'error'})">Lỗi</button>
       <button onclick="post('/api/led',{state:''})">Theo bot</button>
     </div>
     <p class="muted gtts" style="margin:10px 0 0">Cloud TTS cần bật "Cloud Text-to-Speech API" trong Google Cloud cho project của key. Lỗi thì bot tự dùng Gemini TTS.</p>

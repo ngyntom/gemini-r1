@@ -17,6 +17,20 @@ android {
         ndk { abiFilters 'armeabi-v7a' }
     }
 
+    // Khoá ký cố định trong repo (app/debug.keystore) để bản mới luôn cài đè được lên bản cũ.
+    // Chưa có file thì dùng khoá debug mặc định (~/.android/debug.keystore).
+    def repoKey = file('debug.keystore')
+    if (repoKey.exists()) {
+        signingConfigs {
+            debug {
+                storeFile repoKey
+                storePassword 'android'
+                keyAlias 'androiddebugkey'
+                keyPassword 'android'
+            }
+        }
+    }
+
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_1_8
         targetCompatibility JavaVersion.VERSION_1_8

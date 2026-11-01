@@ -121,6 +121,8 @@ public class GeminiClient {
                         .put("parameters", answerSchema)))));
         body.put("toolConfig", new JSONObject().put("functionCallingConfig", new JSONObject().put("mode", "ANY")));
 
+        boolean called = false;
+        boolean nagged = false;
         for (int round = 0; round < 4; round++) {
             JSONObject content = post(cfg, cfg.model, body).getJSONArray("candidates")
                     .getJSONObject(0).getJSONObject("content");
@@ -137,6 +139,7 @@ public class GeminiClient {
                     respond = args;
                     continue;
                 }
+                called = true;
                 JSONObject result;
                 try {
                     String dataJson = args.optString("data_json", "").trim();
@@ -152,6 +155,19 @@ public class GeminiClient {
                 responses.put(new JSONObject().put("functionResponse", new JSONObject()
                         .put("name", fc.optString("name")).put("response", result)));
             }
+            // Gemini hay trả lời "Đã tắt đèn…" mà quên gọi ha_call -> bắt gọi thật (một lần)
+            if (respond != null && !called && !nagged && claimsAction(respond.optString("reply"))) {
+                nagged = true;
+                BotLog.w("Gemini báo đã điều khiển nhưng chưa gọi Home Assistant, yêu cầu gọi lại");
+                contents.put(content);
+                contents.put(new JSONObject().put("role", "user").put("parts", new JSONArray()
+                        .put(new JSONObject().put("functionResponse", new JSONObject()
+                                .put("name", "respond")
+                                .put("response", new JSONObject().put("ok", false).put("error",
+                                        "Chưa gọi ha_call nên thiết bị CHƯA được điều khiển. Hãy gọi ha_call với "
+                                                + "entity_id đúng rồi mới respond; không tìm thấy thiết bị thì nói rõ."))))));
+                continue;
+            }
             // Đã có câu trả lời và mọi lệnh đều chạy được -> xong. Lệnh lỗi thì để Gemini nói lại cho đúng.
             if (respond != null && allOk) return answer(respond);
             if (responses.length() == 0) {
@@ -166,6 +182,12 @@ public class GeminiClient {
             contents.put(new JSONObject().put("role", "user").put("parts", responses));
         }
         throw new Exception("Gemini gọi Home Assistant quá nhiều lần");
+    }
+
+    /** Câu trả lời có vẻ báo đã điều khiển thiết bị ("Đã bật…", "Đã tắt…", "Đã mở…"). */
+    private static boolean claimsAction(String reply) {
+        String r = reply.toLowerCase(new Locale("vi", "VN"));
+        return r.matches("(?s)(.*[\\s,.!])?đã\\s+(bật|tắt|mở|đóng|chỉnh|đặt|chạy|kích hoạt|khoá|khóa|dừng|tăng|giảm).*");
     }
 
     private static Answer answer(JSONObject j) {

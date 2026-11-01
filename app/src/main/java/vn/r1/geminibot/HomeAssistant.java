@@ -26,7 +26,8 @@ final class HomeAssistant {
     /** Chỉ đọc trạng thái (hỏi nhiệt độ, cửa đang mở không…). */
     private static final Set<String> READ_ONLY = new HashSet<>(Arrays.asList(
             "sensor", "binary_sensor", "weather", "person", "device_tracker", "sun"));
-    private static final int MAX_ENTITIES = 300;
+    /** Thiết bị điều khiển được luôn đưa trước; cảm biến chỉ lấp phần còn lại. */
+    private static final int MAX_ENTITIES = 400;
 
     private HomeAssistant() {}
 
@@ -35,11 +36,24 @@ final class HomeAssistant {
         JSONArray states = new JSONArray(request(cfg, "GET", "/api/states", null));
         StringBuilder sb = new StringBuilder();
         int n = 0;
-        for (int i = 0; i < states.length() && n < MAX_ENTITIES; i++) {
-            JSONObject s = states.getJSONObject(i);
-            String id = s.optString("entity_id");
-            String domain = id.contains(".") ? id.substring(0, id.indexOf('.')) : "";
-            if (!CONTROL.contains(domain) && !READ_ONLY.contains(domain)) continue;
+        for (int pass = 0; pass < 2; pass++) {
+            for (int i = 0; i < states.length() && n < MAX_ENTITIES; i++) {
+                JSONObject s = states.getJSONObject(i);
+                String id = s.optString("entity_id");
+                String domain = id.contains(".") ? id.substring(0, id.indexOf('.')) : "";
+                if (!(pass == 0 ? CONTROL : READ_ONLY).contains(domain)) continue;
+                // Cảm biến mất kết nối chỉ làm dài danh sách
+                if (pass == 1 && ("unavailable".equals(s.optString("state")) || "unknown".equals(s.optString("state")))) continue;
+                appendEntity(sb, s, id, domain);
+                ids.add(id);
+                n++;
+            }
+        }
+        return sb.toString();
+    }
+
+    private static void appendEntity(StringBuilder sb, JSONObject s, String id, String domain) {
+        {
             JSONObject a = s.optJSONObject("attributes");
             if (a == null) a = new JSONObject();
             sb.append(id).append(" | ").append(a.optString("friendly_name", id))
@@ -54,10 +68,7 @@ final class HomeAssistant {
                 sb.append(", đặt ").append(a.optString("temperature"));
             }
             sb.append('\n');
-            ids.add(id);
-            n++;
         }
-        return sb.toString();
     }
 
     /** Gọi một lệnh, trả về mô tả kết quả để gửi lại cho Gemini. */

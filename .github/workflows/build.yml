@@ -26,3 +26,9 @@ jobs:
         with:
           name: gemini-r1-apk
           path: app/build/outputs/apk/debug/*.apk
+      # Repo chưa có app/debug.keystore: xuất khoá vừa dùng để tải lên repo một lần (khoá debug, không bí mật)
+      - if: hashFiles('app/debug.keystore') == ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: debug-keystore
+          path: ~/.android/debug.keystore
