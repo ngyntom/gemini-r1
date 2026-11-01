@@ -178,6 +178,13 @@ public class GeminiClient {
                 a.reply = t.trim();
                 return a;
             }
+            // Gemini cần đúng một functionResponse cho mỗi functionCall, kể cả respond bị bỏ qua
+            if (respond != null) {
+                responses.put(new JSONObject().put("functionResponse", new JSONObject()
+                        .put("name", "respond")
+                        .put("response", new JSONObject().put("ok", false)
+                                .put("error", "Có lệnh Home Assistant bị lỗi; trả lời lại theo kết quả thật."))));
+            }
             contents.put(content);
             contents.put(new JSONObject().put("role", "user").put("parts", responses));
         }
