@@ -118,8 +118,9 @@
       <div>
         <label>Bộ đọc</label>
         <select data-k="tts_engine" onchange="showTts()">
-          <option value="google">Google Cloud TTS (nhanh)</option>
-          <option value="gemini">Gemini TTS</option>
+          <option value="gfree">Google Dịch (nhanh, miễn phí, không cần key)</option>
+          <option value="google">Google Cloud TTS (nhanh, cần key Cloud)</option>
+          <option value="gemini">Gemini TTS (tự nhiên, chậm ~3–4 s)</option>
         </select>
       </div>
       <div class="gtts">
@@ -151,6 +152,13 @@
           <option value="0">Tắt</option>
         </select>
       </div>
+    </div>
+    <div class="row" style="margin-top:12px">
+      <span class="muted">Thử đèn:</span>
+      <button onclick="post('/api/led',{state:'listening'})">Nghe</button>
+      <button onclick="post('/api/led',{state:'thinking'})">Nghĩ</button>
+      <button onclick="post('/api/led',{state:'speaking'})">Nói</button>
+      <button onclick="post('/api/led',{state:''})">Theo bot</button>
     </div>
     <p class="muted gtts" style="margin:10px 0 0">Cloud TTS cần bật "Cloud Text-to-Speech API" trong Google Cloud cho project của key. Lỗi thì bot tự dùng Gemini TTS.</p>
   </section>

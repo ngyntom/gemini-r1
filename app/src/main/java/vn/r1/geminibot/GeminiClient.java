@@ -82,10 +82,8 @@ public class GeminiClient {
     /** Trả về PCM 16-bit mono 24 kHz. */
     public byte[] tts(Config cfg, String say) throws Exception {
         // Model TTS đôi khi trả lời câu đó thay vì đọc (HTTP 400) -> nói rõ là chỉ đọc, thử lại một lần
-        // Gemini TTS không có tham số tốc độ -> dặn bằng lời
-        String pace = cfg.ttsRate >= 1.15f ? "nhanh, " : cfg.ttsRate <= 0.85f ? "chậm rãi, " : "";
         try {
-            return ttsOnce(cfg, "Đọc to " + pace + "nguyên văn đoạn sau: " + say);
+            return ttsOnce(cfg, "Đọc to nguyên văn đoạn sau: " + say);
         } catch (Exception e) {
             if (!String.valueOf(e.getMessage()).contains("HTTP 400")) throw e;
             return ttsOnce(cfg, "Read the following Vietnamese text aloud exactly as written, "

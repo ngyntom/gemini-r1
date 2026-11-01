@@ -9,6 +9,8 @@
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <!-- Đọc model microWakeWord tự huấn luyện từ /sdcard -->
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
+    <!-- /sdcard của R1 (/mnt/internal_sd) không dùng FUSE: ghi cả thư mục riêng của app cũng cần quyền này -->
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
 
     <application
         android:label="Gemini R1"

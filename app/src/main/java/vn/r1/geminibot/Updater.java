@@ -21,8 +21,6 @@ import java.util.Arrays;
  * script gỡ bản cũ rồi cài lại, và chép lại cài đặt (kể cả API key) bằng run-as.
  */
 final class Updater {
-    /** Đường dẫn bộ nhớ ngoài của app, nhìn từ shell (app thấy /storage/emulated/0/...). */
-    private static final String SD = "/sdcard/Android/data/vn.r1.geminibot/cache";
     private static final String PREFS = "gemini_r1.xml";
 
     private Updater() {}
@@ -45,6 +43,8 @@ final class Updater {
         boolean sameKey = neu.signatures != null && Arrays.equals(neu.signatures, cur.signatures);
 
         File dir = apk.getParentFile();
+        // R1 không có FUSE (/sdcard -> /mnt/internal_sd), shell thấy đúng đường dẫn như app
+        String SD = dir.getAbsolutePath();
         File prefsCopy = new File(dir, "prefs.xml");
         prefsCopy.delete();
         if (!sameKey) {

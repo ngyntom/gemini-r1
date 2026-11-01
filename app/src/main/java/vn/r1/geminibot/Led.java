@@ -13,7 +13,10 @@ final class Led {
     private static final String RING = "24 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31 32 33 34 35 36 37 38 39";
 
     private static volatile boolean enabled = true;
+    /** Trạng thái thử từ Web UI (/api/led), null = theo bot. */
+    static volatile String test;
     private static String shown = "";
+    private static String lastError = "";
 
     private Led() {}
 
@@ -26,16 +29,24 @@ final class Led {
         Thread t = new Thread(() -> {
             while (true) {
                 try {
-                    String want = enabled ? effect(BotLog.state) : off();
+                    String st = test != null ? test : BotLog.state;
+                    String want = enabled || test != null ? effect(st) : off();
                     if (!want.equals(shown)) {
-                        LocalAdb.shell("echo '" + want + "' > " + DEV, 3000);
+                        String out = LocalAdb.shell("echo '" + want + "' > " + DEV + " && echo OK", 3000);
+                        if (!out.contains("OK")) throw new Exception("ghi đèn lỗi: " + out.trim());
                         shown = want;
+                        if (!lastError.isEmpty()) BotLog.i("Đèn LED hoạt động lại");
+                        lastError = "";
                     }
                     Thread.sleep(150);
                 } catch (InterruptedException e) {
                     return;
                 } catch (Exception e) {
-                    // adbd bận (máy tính đang nối adb) -> thử lại sau
+                    // adbd bận (máy tính đang nối adb) -> thử lại sau; chỉ ghi log khi lỗi đổi
+                    if (!String.valueOf(e).equals(lastError)) {
+                        lastError = String.valueOf(e);
+                        BotLog.w("Đèn LED: " + lastError);
+                    }
                     try {
                         Thread.sleep(5000);
                     } catch (InterruptedException ie) {

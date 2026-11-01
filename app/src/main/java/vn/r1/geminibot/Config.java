@@ -33,7 +33,7 @@ public class Config {
     public String persona;
     /** Hệ số khuếch đại micro (1 = giữ nguyên), cho mic thu nhỏ. */
     public float micGain;
-    /** "google" (Cloud TTS, nhanh) hoặc "gemini". */
+    /** "gfree" (Google Dịch, miễn phí), "google" (Cloud TTS, cần key Cloud) hoặc "gemini". */
     public String ttsEngine;
     public String googleVoice;
     /** Key riêng cho Cloud TTS; rỗng = dùng api_key. */
@@ -77,7 +77,7 @@ public class Config {
         } catch (NumberFormatException e) {
             c.micGain = 1;
         }
-        c.ttsEngine = p.getString("tts_engine", "google").trim().toLowerCase();
+        c.ttsEngine = p.getString("tts_engine", "gfree").trim().toLowerCase();
         c.googleVoice = p.getString("google_voice", "vi-VN-Neural2-A").trim();
         c.googleTtsKey = p.getString("google_tts_key", "").trim();
         try {

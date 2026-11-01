@@ -34,6 +34,7 @@ import java.util.Map;
  *   POST /api/volume {level}    âm lượng 0..max
  *   POST /api/upload?name=x.tflite   (body = file) tải model microWakeWord lên loa
  *   POST /api/install           (body = file APK) cập nhật app
+ *   POST /api/led    {state}    thử đèn LED
  */
 class WebServer {
     static final int PORT = 8088;
@@ -181,6 +182,9 @@ class WebServer {
                 }
                 if (path.equals("/api/ask")) bot.askTextAsync(req.optString("text", ""));
                 else bot.sayAsync(req.optString("text", ""));
+                break;
+            case "/api/led": // thử đèn: {state: listening|thinking|speaking|error|idle}, rỗng = theo bot
+                Led.test = req.optString("state", "").isEmpty() ? null : req.optString("state");
                 break;
             case "/api/listen":
                 bot.triggerListen();

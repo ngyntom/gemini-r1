@@ -213,7 +213,8 @@ public class BotService extends Service {
             String prev = BotLog.state;
             BotLog.state = "speaking";
             try {
-                PcmPlayer.play(synth(cfg, say), TTS_RATE);
+                PcmPlayer.Pcm p = synth(cfg, say);
+                PcmPlayer.play(p.data, p.rate);
             } catch (Throwable e) {
                 BotLog.e("TTS lỗi", e);
             } finally {
@@ -222,22 +223,33 @@ public class BotService extends Service {
         }
     }
 
-    /** Google Cloud TTS (nhanh); lỗi (vd. chưa bật API) thì dùng Gemini TTS. */
-    private byte[] synth(Config cfg, String say) throws Exception {
-        if ("google".equals(cfg.ttsEngine)) {
+    /**
+     * gfree = giọng Google Dịch (miễn phí), google = Cloud TTS (cần key Cloud), gemini = Gemini TTS.
+     * Lỗi thì lùi về Gemini TTS. Cloud TTS tự chỉnh tốc độ, các bộ còn lại dùng TimeStretch.
+     */
+    private PcmPlayer.Pcm synth(Config cfg, String say) throws Exception {
+        long t0 = System.currentTimeMillis();
+        if ("google".equals(cfg.ttsEngine) || "gfree".equals(cfg.ttsEngine)) {
             try {
-                long t0 = System.currentTimeMillis();
-                byte[] pcm = GoogleTts.synth(cfg, say, TTS_RATE);
-                BotLog.i("Google TTS: " + (System.currentTimeMillis() - t0) + " ms");
-                return pcm;
+                PcmPlayer.Pcm p;
+                if ("google".equals(cfg.ttsEngine)) {
+                    p = new PcmPlayer.Pcm(GoogleTts.synth(cfg, say, TTS_RATE), TTS_RATE);
+                } else {
+                    p = FreeGoogleTts.synth(getCacheDir(), say);
+                    p = new PcmPlayer.Pcm(TimeStretch.apply(p.data, p.rate, cfg.ttsRate), p.rate);
+                }
+                BotLog.i(cfg.ttsEngine + " TTS: " + (System.currentTimeMillis() - t0) + " ms");
+                return p;
             } catch (Exception e) {
-                BotLog.e("Google TTS lỗi, dùng Gemini TTS", e);
+                String m = String.valueOf(e.getMessage());
+                BotLog.w("TTS " + cfg.ttsEngine + " lỗi, dùng Gemini TTS: "
+                        + (m.length() > 160 ? m.substring(0, 160) + "…" : m));
+                t0 = System.currentTimeMillis();
             }
         }
-        long t0 = System.currentTimeMillis();
-        byte[] pcm = gemini.tts(cfg, say);
+        byte[] pcm = TimeStretch.apply(gemini.tts(cfg, say), TTS_RATE, cfg.ttsRate);
         BotLog.i("Gemini TTS: " + (System.currentTimeMillis() - t0) + " ms");
-        return pcm;
+        return new PcmPlayer.Pcm(pcm, TTS_RATE);
     }
 
     @Override

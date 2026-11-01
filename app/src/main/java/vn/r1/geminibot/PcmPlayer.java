@@ -8,6 +8,17 @@ import android.media.AudioTrack;
 public final class PcmPlayer {
     private PcmPlayer() {}
 
+    /** PCM 16-bit mono kèm tần số lấy mẫu. */
+    public static final class Pcm {
+        final byte[] data;
+        final int rate;
+
+        Pcm(byte[] data, int rate) {
+            this.data = data;
+            this.rate = rate;
+        }
+    }
+
     public static void play(byte[] pcm, int rate) throws InterruptedException {
         if (pcm == null || pcm.length < 2) return;
         int minBuf = AudioTrack.getMinBufferSize(rate, AudioFormat.CHANNEL_OUT_MONO,
