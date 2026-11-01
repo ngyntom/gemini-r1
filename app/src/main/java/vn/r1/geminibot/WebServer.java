@@ -163,10 +163,13 @@ class WebServer {
                 BotLog.i("Đã lưu cấu hình từ Web UI");
                 break;
             case "/api/say":
-                bot.sayAsync(req.optString("text", ""));
-                break;
             case "/api/ask":
-                bot.askTextAsync(req.optString("text", ""));
+                if (Config.load(bot).apiKey.isEmpty()) {
+                    sendJson(s, 400, new JSONObject().put("error", "Chưa có API key"));
+                    return;
+                }
+                if (path.equals("/api/ask")) bot.askTextAsync(req.optString("text", ""));
+                else bot.sayAsync(req.optString("text", ""));
                 break;
             case "/api/listen":
                 bot.triggerListen();

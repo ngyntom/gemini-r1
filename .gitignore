@@ -1,0 +1,9 @@
+.gradle/
+build/
+local.properties
+# Tải tự động khi build
+.cxx/
+app/.cxx/
+app/src/main/assets/model-vn/
+app/src/main/assets/mww/
+app/src/main/cpp/third_party/

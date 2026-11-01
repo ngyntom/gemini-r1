@@ -11,8 +11,8 @@ android {
         // Phicomm R1 chạy Android 5.1 (API 22)
         minSdk 21
         targetSdk 22
-        versionCode 3
-        versionName '1.2'
+        versionCode 4
+        versionName '1.3'
         // R1 dùng chip RK3229 (ARMv7) – bỏ các ABI khác cho APK nhẹ
         ndk { abiFilters 'armeabi-v7a' }
     }
@@ -43,7 +43,8 @@ android {
 dependencies {
     implementation 'com.alphacephei:vosk-android:0.3.47@aar'
     implementation 'net.java.dev.jna:jna:5.13.0@aar'
-    implementation 'org.tensorflow:tensorflow-lite:2.14.0'
+    // 2.12+ cần Android 6 (__register_atfork, strtod_l); 2.11.0 là bản mới nhất chạy được trên R1 (API 22)
+    implementation 'org.tensorflow:tensorflow-lite:2.11.0'
 }
 
 def fetchFile = { String url, File dest ->

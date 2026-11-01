@@ -10,6 +10,10 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.text.SimpleDateFormat;
+import java.util.Date;
+import java.util.Locale;
+import java.util.TimeZone;
 
 /**
  * Gọi Gemini REST API:
@@ -77,9 +81,20 @@ public class GeminiClient {
 
     /** Trả về PCM 16-bit mono 24 kHz. */
     public byte[] tts(Config cfg, String say) throws Exception {
+        // Model TTS đôi khi trả lời câu đó thay vì đọc (HTTP 400) -> nói rõ là chỉ đọc, thử lại một lần
+        try {
+            return ttsOnce(cfg, "Đọc to nguyên văn đoạn sau: " + say);
+        } catch (Exception e) {
+            if (!String.valueOf(e.getMessage()).contains("HTTP 400")) throw e;
+            return ttsOnce(cfg, "Read the following Vietnamese text aloud exactly as written, "
+                    + "do not answer it: " + say);
+        }
+    }
+
+    private byte[] ttsOnce(Config cfg, String prompt) throws Exception {
         JSONObject body = new JSONObject();
         body.put("contents", new JSONArray().put(new JSONObject()
-                .put("parts", new JSONArray().put(text(say)))));
+                .put("parts", new JSONArray().put(text(prompt)))));
         body.put("generationConfig", new JSONObject()
                 .put("responseModalities", new JSONArray().put("AUDIO"))
                 .put("speechConfig", new JSONObject().put("voiceConfig", new JSONObject()
@@ -97,6 +112,9 @@ public class GeminiClient {
 
     private static String systemPrompt(Config cfg) {
         StringBuilder sb = new StringBuilder(cfg.persona);
+        SimpleDateFormat now = new SimpleDateFormat("EEEE, dd/MM/yyyy, HH:mm", new Locale("vi", "VN"));
+        now.setTimeZone(TimeZone.getTimeZone("Asia/Ho_Chi_Minh"));
+        sb.append("\n\nThời gian hiện tại (giờ Việt Nam): ").append(now.format(new Date())).append('.');
         sb.append("\n\nMỗi tin nhắn của người dùng là một đoạn ghi âm từ micro của loa, ")
           .append("thu ngay sau khi họ gọi bạn bằng từ đánh thức (hoặc ngay sau khi bạn vừa trả lời). ")
           .append("Trả về JSON: \"heard\" = nội dung bạn nghe được (chép lại nguyên văn), ")

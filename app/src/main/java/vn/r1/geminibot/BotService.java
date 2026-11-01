@@ -79,8 +79,10 @@ public class BotService extends Service {
                 BotLog.lastReply = a.reply;
                 BotLog.i("Trả lời: " + a.reply);
                 if (!a.reply.isEmpty()) speak(cfg, a.reply);
-            } catch (Exception e) {
+            } catch (Throwable e) {
                 BotLog.e("Lỗi hỏi Gemini", e);
+            } finally {
+                if ("thinking".equals(BotLog.state)) BotLog.state = "idle";
             }
         }).start();
     }
@@ -176,11 +178,18 @@ public class BotService extends Service {
                     followUp = true;
                 } catch (InterruptedException e) {
                     return;
-                } catch (Exception e) {
+                } catch (Throwable e) {
+                    // Bắt cả Error (vd. UnsatisfiedLinkError) để luồng không chết âm thầm
                     BotLog.state = "error";
                     BotLog.e("Lỗi", e);
                     recorder.close(); // mở lại mic ở vòng sau
-                    Thread.sleep(3000);
+                    if (e instanceof Error) {
+                        if (wake != null) wake.close();
+                        wake = null;
+                        Thread.sleep(30000);
+                    } else {
+                        Thread.sleep(3000);
+                    }
                 }
             }
         } catch (InterruptedException ignored) {
@@ -196,7 +205,7 @@ public class BotService extends Service {
             BotLog.state = "speaking";
             try {
                 PcmPlayer.play(gemini.tts(cfg, say), TTS_RATE);
-            } catch (Exception e) {
+            } catch (Throwable e) {
                 BotLog.e("TTS lỗi", e);
             } finally {
                 BotLog.state = prev;

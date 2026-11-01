@@ -232,9 +232,14 @@ async function refresh() {
 
 function togglePause() { post('/api/pause', { paused: !paused }).then(refresh); }
 
+let sending = false;
 function sendText(path) {
-  const t = $('text').value.trim(); if (!t) return;
-  post(path, { text: t }).then(() => { toast(path.endsWith('ask') ? 'Đã gửi câu hỏi' : 'Đang đọc'); $('text').value = ''; });
+  const t = $('text').value.trim(); if (!t || sending) return;
+  sending = true;
+  post(path, { text: t })
+    .then(() => { toast(path.endsWith('ask') ? 'Đã gửi câu hỏi' : 'Đang đọc'); $('text').value = ''; })
+    .catch(() => {})
+    .finally(() => { sending = false; });
 }
 
 async function save() {
@@ -260,7 +265,10 @@ async function upload() {
 
 $('vol').addEventListener('input', () => { volDragging = true; $('volLabel').textContent = $('vol').value + '/' + $('vol').max; });
 $('vol').addEventListener('change', () => { post('/api/volume', { level: +$('vol').value }).finally(() => volDragging = false); });
-$('text').addEventListener('keydown', e => { if (e.key === 'Enter') sendText('/api/ask'); });
+// Bộ gõ tiếng Việt có thể bắn Enter 2 lần khi đang ghép chữ -> bỏ qua lúc isComposing
+$('text').addEventListener('keydown', e => {
+  if (e.key === 'Enter' && !e.isComposing && e.keyCode !== 229) { e.preventDefault(); sendText('/api/ask'); }
+});
 
 refresh();
 setInterval(refresh, 1500);

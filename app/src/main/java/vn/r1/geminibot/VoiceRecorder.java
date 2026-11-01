@@ -22,6 +22,7 @@ public class VoiceRecorder {
     private static final double MIN_THRESHOLD = 400;
 
     private AudioRecord rec;
+    private int channels = 1;
     private double noise = 200;
     private volatile boolean stopped;
     private volatile boolean triggered;
@@ -41,17 +42,33 @@ public class VoiceRecorder {
     public synchronized void ensureOpen() {
         if (rec != null) return;
         stopped = false;
-        int minBuf = AudioRecord.getMinBufferSize(RATE, AudioFormat.CHANNEL_IN_MONO,
-                AudioFormat.ENCODING_PCM_16BIT);
-        AudioRecord r = new AudioRecord(MediaRecorder.AudioSource.MIC, RATE,
-                AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT,
-                Math.max(minBuf, FRAME * 2 * 20));
+        // HAL của R1 báo "channel is not support" với mono -> thử mono trước, không được thì stereo rồi trộn
+        AudioRecord r = open(AudioFormat.CHANNEL_IN_MONO);
+        channels = 1;
+        if (r == null) {
+            r = open(AudioFormat.CHANNEL_IN_STEREO);
+            channels = 2;
+        }
+        if (r == null) throw new IllegalStateException("Không mở được micro (app khác còn giữ mic?)");
+        r.startRecording();
+        if (r.getRecordingState() != AudioRecord.RECORDSTATE_RECORDING) {
+            r.release();
+            throw new IllegalStateException("Micro không bắt đầu thu được");
+        }
+        rec = r;
+        BotLog.i("Đã mở micro (" + (channels == 1 ? "mono" : "stereo") + ")");
+    }
+
+    private static AudioRecord open(int channelMask) {
+        int minBuf = AudioRecord.getMinBufferSize(RATE, channelMask, AudioFormat.ENCODING_PCM_16BIT);
+        if (minBuf <= 0) return null;
+        AudioRecord r = new AudioRecord(MediaRecorder.AudioSource.MIC, RATE, channelMask,
+                AudioFormat.ENCODING_PCM_16BIT, Math.max(minBuf, FRAME * 4 * 20));
         if (r.getState() != AudioRecord.STATE_INITIALIZED) {
             r.release();
-            throw new IllegalStateException("Không mở được micro (app gốc của R1 còn giữ mic?)");
+            return null;
         }
-        r.startRecording();
-        rec = r;
+        return r;
     }
 
     /** Tạm dừng khi loa đang nói để không tự nghe lại chính mình; bỏ luôn audio cũ. */
@@ -80,14 +97,18 @@ public class VoiceRecorder {
     public short[] readFrame() {
         AudioRecord r = rec;
         if (r == null || stopped) return null;
-        short[] buf = new short[FRAME];
+        int want = FRAME * channels;
+        short[] buf = new short[want];
         int n = 0;
-        while (n < FRAME) {
-            int got = r.read(buf, n, FRAME - n);
+        while (n < want) {
+            int got = r.read(buf, n, want - n);
             if (got <= 0 || stopped) return null;
             n += got;
         }
-        return buf;
+        if (channels == 1) return buf;
+        short[] mono = new short[FRAME];
+        for (int i = 0; i < FRAME; i++) mono[i] = (short) ((buf[2 * i] + buf[2 * i + 1]) / 2);
+        return mono;
     }
 
     /** Cập nhật mức ồn nền khi đang im lặng (gọi trong lúc chờ từ đánh thức). */
