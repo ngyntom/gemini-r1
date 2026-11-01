@@ -198,6 +198,13 @@
         <input data-k="wake_reply" placeholder="Dạ?">
       </div>
       <div>
+        <label>Hỏi giờ / ngày / thứ</label>
+        <select data-k="local_time">
+          <option value="1">Trả lời tại loa (nhanh, không gửi Gemini)</option>
+          <option value="0">Gửi Gemini</option>
+        </select>
+      </div>
+      <div>
         <label>Khuếch đại micro (1 = giữ nguyên)</label>
         <input data-k="mic_gain" type="number" min="0.1" max="32" step="0.5">
       </div>

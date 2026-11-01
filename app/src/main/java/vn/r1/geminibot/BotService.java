@@ -19,10 +19,11 @@ import android.os.PowerManager;
 public class BotService extends Service {
     static final String TAG = "GeminiR1";
     private static final int TTS_RATE = 24000;
-    private static final long WAKE_LISTEN_MS = 5000; // chờ câu hỏi sau tiếng bíp
+    private static final long WAKE_LISTEN_MS = 7000; // chờ câu hỏi sau tiếng bíp
 
     private final GeminiClient gemini = new GeminiClient();
     private final VoiceRecorder recorder = new VoiceRecorder();
+    private LocalAnswer local;
     private final Object speakLock = new Object();
     private volatile boolean running;
     private volatile boolean paused;
@@ -45,6 +46,7 @@ public class BotService extends Service {
         wakeLock.acquire();
         web = new WebServer(this);
         web.start();
+        local = new LocalAnswer(this);
         Led.setEnabled(Config.load(this).led);
         Led.start();
         new Thread(() -> Updater.reportLastInstall(this), "update-log").start();
@@ -78,6 +80,13 @@ public class BotService extends Service {
                 BotLog.state = "thinking";
                 BotLog.lastHeard = question;
                 BotLog.i("Hỏi (Web): " + question);
+                String quick = cfg.localTime ? LocalAnswer.answer(question) : null;
+                if (quick != null) {
+                    BotLog.lastReply = quick;
+                    BotLog.i("Trả lời tại loa: " + quick);
+                    speak(cfg, quick);
+                    return;
+                }
                 GeminiClient.Answer a = gemini.askText(cfg, question);
                 BotLog.lastReply = a.reply;
                 BotLog.i("Trả lời: " + a.reply);
@@ -142,6 +151,8 @@ public class BotService extends Service {
                         BotLog.i("Bộ nhận từ đánh thức: " + wakeEngine);
                     }
                     recorder.setGain(cfg.micGain);
+                    if (cfg.localTime) local.loadAsync();
+                    recorder.setSink(cfg.localTime && local.ready() ? local : null);
                     Led.setEnabled(cfg.led);
                     recorder.ensureOpen();
 
@@ -162,16 +173,46 @@ public class BotService extends Service {
                         }
                         BotLog.i("Đánh thức: " + hit);
                         BotLog.state = "listening";
-                        // Phát xong âm báo rồi mới thu, và bỏ phần mic đã thu lúc phát
-                        recorder.pause();
-                        try {
-                            playWakeCue(cfg);
-                        } finally {
-                            recorder.resume();
+                        if ("voice".equals(cfg.wakeSound)) {
+                            // Câu đáp dài -> phát xong rồi mới thu, bỏ phần mic đã thu lúc phát
+                            recorder.pause();
+                            try {
+                                playWakeCue(cfg);
+                            } finally {
+                                recorder.resume();
+                            }
+                        } else {
+                            // Ding-dong (0.37 s) phát song song, mic vẫn thu: người hay nói liền
+                            // "Okay Nabu, mấy giờ rồi" nên tắt mic lúc này sẽ mất đầu câu hỏi.
+                            // Tiếng ding-dong ngắn hơn MIN_SPEECH_FRAMES nên không bị tính là câu nói.
+                            final Config c = cfg;
+                            new Thread(() -> {
+                                try {
+                                    playWakeCue(c);
+                                } catch (InterruptedException ignored) {
+                                }
+                            }, "wake-cue").start();
                         }
                         wav = recorder.recordUtterance(WAKE_LISTEN_MS);
                         if (wav == null) {
                             BotLog.i("Không nghe thấy câu hỏi");
+                            continue;
+                        }
+                    }
+                    if (cfg.localTime && local.ready()) {
+                        String heard = local.heard();
+                        String quick = LocalAnswer.answer(heard);
+                        if (quick != null) {
+                            BotLog.lastHeard = heard;
+                            BotLog.lastReply = quick;
+                            BotLog.i("Nghe (tại loa): " + heard + " -> " + quick);
+                            recorder.pause();
+                            try {
+                                speak(cfg, quick);
+                            } finally {
+                                recorder.resume();
+                            }
+                            followUp = true;
                             continue;
                         }
                     }

@@ -22,6 +22,14 @@ public class VoiceRecorder {
     // Micro của R1 thu nhỏ (nền ~25 RMS) -> ngưỡng tối thiểu thấp, phần còn lại theo mức ồn nền
     private static final double MIN_THRESHOLD = 120;
 
+    /** Nhận các frame của câu đang thu (vd. Vosk nghe song song). */
+    interface FrameSink {
+        void begin();
+
+        void frame(short[] f);
+    }
+
+    private volatile FrameSink sink;
     private AudioRecord rec;
     private int channels = 1;
     private double noise = 200;
@@ -121,6 +129,10 @@ public class VoiceRecorder {
         return mono;
     }
 
+    void setSink(FrameSink s) {
+        sink = s;
+    }
+
     void setGain(float g) {
         gain = g;
     }
@@ -186,12 +198,19 @@ public class VoiceRecorder {
                 }
                 if (loud >= START_FRAMES) {
                     out = new ByteArrayOutputStream();
-                    for (short[] f : preroll) writeFrame(out, f);
+                    FrameSink sk = sink;
+                    if (sk != null) sk.begin();
+                    for (short[] f : preroll) {
+                        writeFrame(out, f);
+                        if (sk != null) sk.frame(f);
+                    }
                     frames = preroll.size();
                     silent = 0;
                 }
             } else {
                 writeFrame(out, buf);
+                FrameSink sk = sink;
+                if (sk != null) sk.frame(buf);
                 frames++;
                 silent = v < th * 0.7 ? silent + 1 : 0;
                 if (silent >= END_SILENCE_FRAMES || frames >= MAX_FRAMES) {

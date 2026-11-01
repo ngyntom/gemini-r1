@@ -31,7 +31,19 @@ final class ModelInstaller {
     private static final String SHA256 = "efe5c8494212110471a79befc48c79da679e5b1fc52a4ffb500222ff86d622e5";
     private static final String DIR = "model-vn";
 
+    private static org.vosk.Model shared;
+
     private ModelInstaller() {}
+
+    /** Một model Vosk dùng chung (từ đánh thức Vosk + trả lời giờ tại loa), không bao giờ đóng. */
+    static synchronized org.vosk.Model shared(Context ctx) throws Exception {
+        if (shared == null) {
+            BotLog.i("Đang nạp model Vosk...");
+            shared = new org.vosk.Model(ensure(ctx).getAbsolutePath());
+            BotLog.i("Model Vosk sẵn sàng");
+        }
+        return shared;
+    }
 
     static synchronized File ensure(Context ctx) throws Exception {
         File dir = new File(ctx.getFilesDir(), DIR);

@@ -29,11 +29,7 @@ class VoskWakeWord implements WakeEngine {
 
     @Override
     public void configure(Config cfg) throws Exception {
-        if (model == null) {
-            BotLog.i("Đang nạp model Vosk...");
-            model = new Model(ModelInstaller.ensure(ctx).getAbsolutePath());
-            BotLog.i("Model Vosk sẵn sàng");
-        }
+        if (model == null) model = ModelInstaller.shared(ctx);
         List<String> norm = new ArrayList<>();
         for (String p : cfg.wakePhrases()) norm.add(normalize(p));
         if (norm.equals(phrases) && recognizer != null) return;
@@ -69,7 +65,7 @@ class VoskWakeWord implements WakeEngine {
     @Override
     public void close() {
         if (recognizer != null) recognizer.close();
-        if (model != null) model.close();
+        // Model dùng chung (ModelInstaller.shared) nên không đóng
         recognizer = null;
         model = null;
         phrases = new ArrayList<>();

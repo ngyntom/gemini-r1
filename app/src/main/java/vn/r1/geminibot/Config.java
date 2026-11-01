@@ -14,7 +14,7 @@ public class Config {
     private static final String PREFS = "gemini_r1";
     static final String[] KEYS = {"api_key", "model", "tts_model", "voice", "wake_engine",
             "mww_model", "mww_cutoff", "wake_word", "follow_up", "persona", "mic_gain",
-            "tts_engine", "google_voice", "google_tts_key", "tts_rate", "led", "wake_sound", "wake_reply"};
+            "tts_engine", "google_voice", "google_tts_key", "tts_rate", "led", "wake_sound", "wake_reply", "local_time"};
 
     public String apiKey;
     public String model;
@@ -44,6 +44,8 @@ public class Config {
     /** Âm báo khi đánh thức: "chime", "voice" (đọc wakeReply) hoặc "none". */
     public String wakeSound;
     public String wakeReply;
+    /** Hỏi giờ / ngày / thứ thì trả lời tại loa (Vosk offline), không gửi Gemini. */
+    public boolean localTime;
 
     public List<String> wakePhrases() {
         List<String> out = new ArrayList<>();
@@ -92,6 +94,7 @@ public class Config {
         c.wakeSound = p.getString("wake_sound", "chime").trim().toLowerCase();
         c.wakeReply = p.getString("wake_reply", "Dạ?").trim();
         if (c.wakeReply.isEmpty()) c.wakeReply = "Dạ?";
+        c.localTime = !"0".equals(p.getString("local_time", "1").trim());
         c.persona = p.getString("persona",
                 "Bạn là trợ lý giọng nói trên loa thông minh. Trả lời ngắn gọn, tự nhiên, "
                         + "bằng ngôn ngữ người dùng nói (mặc định tiếng Việt). Không dùng markdown, "
@@ -121,7 +124,8 @@ public class Config {
                 .put("tts_rate", String.valueOf(c.ttsRate))
                 .put("led", c.led ? "1" : "0")
                 .put("wake_sound", c.wakeSound)
-                .put("wake_reply", c.wakeReply);
+                .put("wake_reply", c.wakeReply)
+                .put("local_time", c.localTime ? "1" : "0");
     }
 
     /** Lưu các khoá có trong JSON từ Web UI. api_key rỗng = giữ nguyên. */

@@ -30,11 +30,22 @@ final class Led {
             while (true) {
                 try {
                     String st = test != null ? test : BotLog.state;
-                    String want = enabled || test != null ? effect(st) : off();
-                    if (!want.equals(shown)) {
-                        String out = LocalAdb.shell("echo '" + want + "' > " + DEV + " && echo OK", 3000);
-                        if (!out.contains("OK")) throw new Exception("ghi đèn lỗi: " + out.trim());
-                        shown = want;
+                    String key = enabled || test != null ? look(st) : "off";
+                    if (!key.equals(shown)) {
+                        String saved = current;
+                        String cmd = effect(key);
+                        String out;
+                        try {
+                            out = LocalAdb.shell("echo '" + cmd + "' > " + DEV + " && echo OK", 3000);
+                        } catch (Exception e) {
+                            current = saved; // chưa ghi được -> màu đang hiển thị vẫn là màu cũ
+                            throw e;
+                        }
+                        if (!out.contains("OK")) {
+                            current = saved;
+                            throw new Exception("ghi đèn lỗi: " + out.trim());
+                        }
+                        shown = key;
                         if (!lastError.isEmpty()) BotLog.i("Đèn LED hoạt động lại");
                         lastError = "";
                     }
@@ -59,8 +70,21 @@ final class Led {
         t.start();
     }
 
-    private static String effect(String state) {
+    /** Gộp trạng thái bot thành kiểu đèn (idle, paused, starting... đều là tắt). */
+    private static String look(String state) {
         switch (state) {
+            case "listening":
+            case "thinking":
+            case "speaking":
+            case "error":
+                return state;
+            default:
+                return "off";
+        }
+    }
+
+    private static String effect(String look) {
+        switch (look) {
             case "listening": return solid("0050ff");
             case "thinking": return breathe("201000", "ff8000");
             case "speaking": return solid("00c040");
@@ -69,11 +93,17 @@ final class Led {
         }
     }
 
+    /** Màu đang hiển thị; driver bỏ qua lệnh chuyển từ một màu sang chính nó. */
+    private static String current = "000000";
+
     private static String solid(String rgb) {
-        return "1 150 1 1 1 " + rgb + " " + rgb + " 150 0 " + RING;
+        String from = rgb.equals(current) ? (rgb.equals("000000") ? "010101" : "000000") : current;
+        current = rgb;
+        return "1 150 1 1 1 " + from + " " + rgb + " 150 0 " + RING;
     }
 
     private static String breathe(String lo, String hi) {
+        current = hi;
         return "1 1200 99999999 1 0 " + lo + " " + hi + " 600 1 " + RING;
     }
 
