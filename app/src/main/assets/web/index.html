@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Gemini R1</title>
+<style>
+  :root {
+    --bg: #f4f5f7; --card: #ffffff; --text: #1d2129; --muted: #6b7280; --line: #e3e5e8;
+    --accent: #3b6cf6; --accent-text: #ffffff; --ok: #18a058; --warn: #d48806; --err: #d03050;
+    --input: #ffffff; --code: #f0f1f3;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #111318; --card: #1b1e25; --text: #e6e8eb; --muted: #9aa1ab; --line: #2b2f38;
+      --accent: #5b86ff; --accent-text: #ffffff; --ok: #36c27a; --warn: #f0a020; --err: #ff5c7a;
+      --input: #14161b; --code: #14161b;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text);
+         font: 15px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  main { max-width: 760px; margin: 0 auto; padding: 16px; }
+  header { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 16px; }
+  h1 { font-size: 20px; margin: 0; }
+  h2 { font-size: 15px; margin: 0 0 12px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 16px; margin-bottom: 14px; }
+  .pill { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 999px;
+          font-size: 13px; font-weight: 600; background: var(--code); }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); }
+  .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  @media (max-width: 560px) { .grid { grid-template-columns: 1fr; } }
+  label { display: block; font-size: 13px; color: var(--muted); margin-bottom: 4px; }
+  input, select, textarea { width: 100%; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px;
+          background: var(--input); color: var(--text); font: inherit; }
+  textarea { min-height: 70px; resize: vertical; }
+  button { padding: 8px 14px; border-radius: 8px; border: 1px solid var(--line); background: var(--card);
+           color: var(--text); font: inherit; cursor: pointer; }
+  button.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-text); }
+  button:disabled { opacity: .5; cursor: default; }
+  .muted { color: var(--muted); font-size: 13px; }
+  .bubble { padding: 10px 12px; border-radius: 10px; background: var(--code); margin-top: 6px; min-height: 22px;
+            white-space: pre-wrap; word-break: break-word; }
+  .log { background: var(--code); border-radius: 8px; padding: 10px; height: 220px; overflow: auto;
+         font: 12px/1.45 ui-monospace, Consolas, monospace; white-space: pre-wrap; word-break: break-word; }
+  .flex1 { flex: 1; min-width: 0; }
+  #toast { position: fixed; left: 50%; bottom: 20px; transform: translateX(-50%); background: var(--text);
+           color: var(--bg); padding: 8px 14px; border-radius: 8px; font-size: 14px; opacity: 0;
+           transition: opacity .2s; pointer-events: none; }
+  #toast.show { opacity: 1; }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>Gemini R1</h1>
+    <span class="pill"><span class="dot" id="dot"></span><span id="state">Đang kết nối…</span></span>
+  </header>
+
+  <section class="card">
+    <h2>Hội thoại gần nhất</h2>
+    <label>Bạn nói</label>
+    <div class="bubble" id="heard">—</div>
+    <label style="margin-top:10px">Gemini trả lời</label>
+    <div class="bubble" id="reply">—</div>
+    <p class="muted" id="wakeinfo" style="margin:10px 0 0"></p>
+  </section>
+
+  <section class="card">
+    <h2>Điều khiển</h2>
+    <div class="row" style="margin-bottom:12px">
+      <button class="primary" onclick="post('/api/listen').then(()=>toast('Đang nghe…'))">🎙 Nghe ngay</button>
+      <button id="pauseBtn" onclick="togglePause()">⏸ Tạm dừng</button>
+      <button onclick="post('/api/reset').then(()=>toast('Đã xoá trí nhớ'))">🧹 Xoá trí nhớ</button>
+    </div>
+    <label>Âm lượng <span id="volLabel"></span></label>
+    <input type="range" id="vol" min="0" max="15" step="1">
+    <div class="row" style="margin-top:14px">
+      <input class="flex1" id="text" placeholder="Gõ câu hỏi cho Gemini, hoặc câu để loa đọc">
+      <button class="primary" onclick="sendText('/api/ask')">Hỏi</button>
+      <button onclick="sendText('/api/say')">Đọc</button>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>Gemini</h2>
+    <div class="grid">
+      <div>
+        <label>API key <span class="muted" id="keyHint"></span></label>
+        <input type="password" data-k="api_key" placeholder="Để trống = giữ nguyên" autocomplete="off">
+      </div>
+      <div>
+        <label>Model trả lời</label>
+        <input data-k="model">
+      </div>
+      <div>
+        <label>Model đọc giọng (TTS)</label>
+        <input data-k="tts_model">
+      </div>
+      <div>
+        <label>Giọng đọc</label>
+        <select data-k="voice">
+          <option>Kore</option><option>Puck</option><option>Charon</option><option>Aoede</option>
+          <option>Leda</option><option>Fenrir</option><option>Zephyr</option><option>Orus</option>
+        </select>
+      </div>
+    </div>
+    <div style="margin-top:12px">
+      <label>Tính cách / chỉ dẫn</label>
+      <textarea data-k="persona"></textarea>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>Từ đánh thức</h2>
+    <div class="grid">
+      <div>
+        <label>Bộ nhận</label>
+        <select data-k="wake_engine" onchange="showEngine()">
+          <option value="mww">microWakeWord (nhẹ)</option>
+          <option value="vosk">Vosk tiếng Việt</option>
+        </select>
+      </div>
+      <div>
+        <label>Nghe tiếp sau khi trả lời (giây, 0 = tắt)</label>
+        <input data-k="follow_up" type="number" min="0" max="30">
+      </div>
+      <div class="mww">
+        <label>Model microWakeWord</label>
+        <select data-k="mww_model" id="mwwModel"></select>
+      </div>
+      <div class="mww">
+        <label>Ngưỡng 0–1 (0 = theo model)</label>
+        <input data-k="mww_cutoff" type="number" min="0" max="1" step="0.01">
+      </div>
+      <div class="vosk" style="grid-column: 1 / -1">
+        <label>Cụm từ (cách nhau bằng dấu phẩy)</label>
+        <input data-k="wake_word" placeholder="trợ lý ơi, loa ơi">
+      </div>
+    </div>
+    <div class="mww" style="margin-top:12px">
+      <label>Tải model tự huấn luyện (.tflite, kèm .json nếu có)</label>
+      <div class="row">
+        <input class="flex1" type="file" id="upload" accept=".tflite,.json" multiple>
+        <button onclick="upload()">Tải lên</button>
+      </div>
+    </div>
+  </section>
+
+  <div class="row" style="margin-bottom:14px">
+    <button class="primary" onclick="save()">💾 Lưu cấu hình</button>
+    <span class="muted">Bot tự áp dụng sau vài giây.</span>
+  </div>
+
+  <section class="card">
+    <h2>Nhật ký</h2>
+    <div class="log" id="log"></div>
+  </section>
+</main>
+<div id="toast"></div>
+
+<script>
+const STATES = {
+  starting: ['Đang khởi động', 'var(--muted)'], no_key: ['Chưa có API key', 'var(--warn)'],
+  idle: ['Chờ từ đánh thức', 'var(--ok)'], listening: ['Đang nghe', 'var(--accent)'],
+  thinking: ['Đang nghĩ', 'var(--warn)'], speaking: ['Đang nói', 'var(--accent)'],
+  paused: ['Tạm dừng', 'var(--muted)'], error: ['Lỗi', 'var(--err)']
+};
+let loaded = false, paused = false, volDragging = false;
+
+function $(id) { return document.getElementById(id); }
+function toast(msg) { const t = $('toast'); t.textContent = msg; t.classList.add('show');
+  clearTimeout(t._h); t._h = setTimeout(() => t.classList.remove('show'), 1800); }
+
+async function post(path, data) {
+  const r = await fetch(path, { method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: data === undefined ? '' : JSON.stringify(data) });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) { toast('Lỗi: ' + (j.error || r.status)); throw new Error(j.error); }
+  return j;
+}
+
+function showEngine() {
+  const e = document.querySelector('[data-k=wake_engine]').value;
+  document.querySelectorAll('.mww').forEach(x => x.style.display = e === 'mww' ? '' : 'none');
+  document.querySelectorAll('.vosk').forEach(x => x.style.display = e === 'vosk' ? '' : 'none');
+}
+
+function fillModels(s) {
+  const sel = $('mwwModel'), cur = s.config.mww_model, opts = [];
+  (s.builtin_models || []).filter(f => f.endsWith('.tflite'))
+    .forEach(f => opts.push([f.replace('.tflite', ''), f.replace('.tflite', '') + ' (có sẵn)']));
+  (s.uploaded_models || []).forEach(p => opts.push([p, p.split('/').pop() + ' (đã tải lên)']));
+  if (cur && !opts.some(o => o[0] === cur)) opts.push([cur, cur]);
+  sel.innerHTML = '';
+  opts.forEach(([v, t]) => { const o = document.createElement('option'); o.value = v; o.textContent = t; sel.appendChild(o); });
+  sel.value = cur;
+}
+
+function fillConfig(s) {
+  document.querySelectorAll('[data-k]').forEach(el => {
+    const k = el.dataset.k;
+    if (k === 'api_key' || k === 'mww_model') return;
+    if (s.config[k] !== undefined) el.value = s.config[k];
+  });
+  $('keyHint').textContent = s.config.api_key_set ? '(đã đặt ' + s.config.api_key_hint + ')' : '(chưa đặt)';
+  fillModels(s);
+  showEngine();
+}
+
+async function refresh() {
+  try {
+    const s = await (await fetch('/api/status')).json();
+    const [label, color] = STATES[s.state] || [s.state, 'var(--muted)'];
+    $('state').textContent = label; $('dot').style.background = color;
+    $('heard').textContent = s.last_heard || '—';
+    $('reply').textContent = s.last_reply || '—';
+    $('wakeinfo').textContent = s.wake_name ? 'Từ đánh thức: "' + s.wake_name + '"' : '';
+    paused = s.paused;
+    $('pauseBtn').textContent = paused ? '▶ Tiếp tục' : '⏸ Tạm dừng';
+    if (!volDragging) { $('vol').max = s.volume_max; $('vol').value = s.volume; }
+    $('volLabel').textContent = s.volume + '/' + s.volume_max;
+    const log = $('log'), atBottom = log.scrollTop + log.clientHeight >= log.scrollHeight - 10;
+    log.textContent = (s.log || []).join('\n');
+    if (atBottom) log.scrollTop = log.scrollHeight;
+    if (!loaded) { fillConfig(s); loaded = true; }
+  } catch (e) {
+    $('state').textContent = 'Mất kết nối'; $('dot').style.background = 'var(--err)';
+  }
+}
+
+function togglePause() { post('/api/pause', { paused: !paused }).then(refresh); }
+
+function sendText(path) {
+  const t = $('text').value.trim(); if (!t) return;
+  post(path, { text: t }).then(() => { toast(path.endsWith('ask') ? 'Đã gửi câu hỏi' : 'Đang đọc'); $('text').value = ''; });
+}
+
+async function save() {
+  const data = {};
+  document.querySelectorAll('[data-k]').forEach(el => data[el.dataset.k] = el.value);
+  await post('/api/config', data);
+  document.querySelector('[data-k=api_key]').value = '';
+  loaded = false; await refresh(); toast('Đã lưu');
+}
+
+async function upload() {
+  const files = $('upload').files; if (!files.length) return toast('Chọn file trước');
+  let lastModel = null;
+  for (const f of files) {
+    const r = await fetch('/api/upload?name=' + encodeURIComponent(f.name), { method: 'POST', body: f });
+    const j = await r.json();
+    if (!r.ok) return toast('Lỗi: ' + j.error);
+    if (f.name.endsWith('.tflite')) lastModel = j.path;
+  }
+  if (lastModel) await post('/api/config', { mww_model: lastModel });
+  loaded = false; await refresh(); toast('Đã tải lên và chọn model');
+}
+
+$('vol').addEventListener('input', () => { volDragging = true; $('volLabel').textContent = $('vol').value + '/' + $('vol').max; });
+$('vol').addEventListener('change', () => { post('/api/volume', { level: +$('vol').value }).finally(() => volDragging = false); });
+$('text').addEventListener('keydown', e => { if (e.key === 'Enter') sendText('/api/ask'); });
+
+refresh();
+setInterval(refresh, 1500);
+</script>
+</body>
+</html>

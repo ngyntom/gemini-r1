@@ -1,0 +1,114 @@
+plugins {
+    id 'com.android.application'
+}
+
+android {
+    namespace 'vn.r1.geminibot'
+    compileSdk 34
+
+    defaultConfig {
+        applicationId 'vn.r1.geminibot'
+        // Phicomm R1 chạy Android 5.1 (API 22)
+        minSdk 21
+        targetSdk 22
+        versionCode 3
+        versionName '1.2'
+        // R1 dùng chip RK3229 (ARMv7) – bỏ các ABI khác cho APK nhẹ
+        ndk { abiFilters 'armeabi-v7a' }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_1_8
+        targetCompatibility JavaVersion.VERSION_1_8
+    }
+
+    lint {
+        abortOnError false
+        checkReleaseBuilds false
+    }
+
+    packaging {
+        jniLibs { pickFirsts += ['**/libc++_shared.so'] }
+    }
+
+    // Bộ tiền xử lý âm thanh micro_speech cho microWakeWord (C++, xem src/main/cpp)
+    externalNativeBuild {
+        cmake {
+            path 'src/main/cpp/CMakeLists.txt'
+            version '3.22.1'
+        }
+    }
+}
+
+dependencies {
+    implementation 'com.alphacephei:vosk-android:0.3.47@aar'
+    implementation 'net.java.dev.jna:jna:5.13.0@aar'
+    implementation 'org.tensorflow:tensorflow-lite:2.14.0'
+}
+
+def fetchFile = { String url, File dest ->
+    if (dest.exists()) return
+    dest.parentFile.mkdirs()
+    ant.get(src: url, dest: dest)
+}
+
+// Mã nguồn TFLM microfrontend + kissfft (Apache-2.0) lấy từ pymicro-features, ghim theo commit.
+def mfBase = 'https://raw.githubusercontent.com/rhasspy/pymicro-features/96bd69cfad79aa67697e176570d3dd87052c3def/'
+def mfDir = file('src/main/cpp/third_party')
+def mfLib = 'tensorflow/lite/experimental/microfrontend/lib/'
+def mfFiles = (['bits.h', 'kiss_fft_common.h', 'kiss_fft_int16.cc', 'kiss_fft_int16.h', 'log_lut.cc', 'log_lut.h'] +
+        ['fft', 'fft_util', 'filterbank', 'filterbank_util', 'frontend', 'frontend_util',
+         'log_scale', 'log_scale_util', 'noise_reduction', 'noise_reduction_util',
+         'pcan_gain_control', 'pcan_gain_control_util', 'window', 'window_util']
+                .collectMany { [it + '.cc', it + '.h'] }).collect { mfLib + it } +
+        ['kissfft/_kiss_fft_guts.h', 'kissfft/kiss_fft.cc', 'kissfft/kiss_fft.h',
+         'kissfft/tools/kiss_fftr.cc', 'kissfft/tools/kiss_fftr.h', 'LICENSE']
+
+tasks.register('downloadMicroFrontend') {
+    doLast {
+        mfFiles.each { fetchFile(mfBase + it, new File(mfDir, it)) }
+    }
+}
+
+// Model microWakeWord có sẵn của ESPHome (v2).
+def mwwBase = 'https://raw.githubusercontent.com/esphome/micro-wake-word-models/main/models/v2/'
+def mwwDir = file('src/main/assets/mww')
+
+tasks.register('downloadWakeModels') {
+    doLast {
+        ['hey_jarvis', 'okay_nabu', 'hey_mycroft', 'alexa'].each { name ->
+            ['.tflite', '.json'].each { ext -> fetchFile(mwwBase + name + ext, new File(mwwDir, name + ext)) }
+        }
+    }
+}
+
+preBuild.dependsOn 'downloadMicroFrontend', 'downloadWakeModels'
+tasks.configureEach { t ->
+    if (t.name.startsWith('configureCMake') || t.name.startsWith('buildCMake')) {
+        t.dependsOn 'downloadMicroFrontend'
+    }
+}
+
+// Tải model nhận dạng tiếng Việt của Vosk (32 MB) vào assets nếu chưa có.
+def voskModelUrl = 'https://alphacephei.com/vosk/models/vosk-model-small-vn-0.4.zip'
+def voskModelDir = file('src/main/assets/model-vn')
+
+tasks.register('downloadVoskModel') {
+    onlyIf { !voskModelDir.exists() }
+    doLast {
+        def zip = new File(buildDir, 'vosk-model.zip')
+        zip.parentFile.mkdirs()
+        ant.get(src: voskModelUrl, dest: zip, skipexisting: true)
+        project.copy {
+            from zipTree(zip)
+            into voskModelDir
+            includeEmptyDirs = false
+            // Bỏ thư mục gốc vosk-model-small-vn-0.4/ trong file zip
+            eachFile { f ->
+                f.relativePath = new RelativePath(true, f.relativePath.segments.drop(1) as String[])
+            }
+        }
+    }
+}
+
+preBuild.dependsOn 'downloadVoskModel'

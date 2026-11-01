@@ -1,0 +1,163 @@
+package vn.r1.geminibot;
+
+import android.media.AudioFormat;
+import android.media.AudioRecord;
+import android.media.MediaRecorder;
+
+import java.io.ByteArrayOutputStream;
+import java.util.ArrayDeque;
+
+/**
+ * Giữ micro mở liên tục (16 kHz mono), cung cấp từng frame 30 ms cho bộ nhận
+ * từ đánh thức, và thu một câu nói bằng VAD năng lượng đơn giản.
+ */
+public class VoiceRecorder {
+    static final int RATE = 16000;
+    static final int FRAME = 480;                      // 30 ms
+    private static final int PREROLL_FRAMES = 10;      // giữ 300 ms trước khi bắt đầu nói
+    private static final int START_FRAMES = 3;         // 90 ms to liên tục mới tính là nói
+    private static final int END_SILENCE_FRAMES = 40;  // im 1.2 s thì kết thúc
+    private static final int MAX_FRAMES = 333;         // tối đa ~10 s
+    private static final int MIN_SPEECH_FRAMES = 15;   // bỏ tiếng động ngắn < 450 ms
+    private static final double MIN_THRESHOLD = 400;
+
+    private AudioRecord rec;
+    private double noise = 200;
+    private volatile boolean stopped;
+    private volatile boolean triggered;
+
+    /** Yêu cầu nghe ngay (từ Web UI), bỏ qua từ đánh thức. */
+    public void trigger() {
+        triggered = true;
+    }
+
+    /** Bộ nhận từ đánh thức gọi mỗi frame; true một lần sau mỗi trigger(). */
+    public boolean takeTrigger() {
+        if (!triggered) return false;
+        triggered = false;
+        return true;
+    }
+
+    public synchronized void ensureOpen() {
+        if (rec != null) return;
+        stopped = false;
+        int minBuf = AudioRecord.getMinBufferSize(RATE, AudioFormat.CHANNEL_IN_MONO,
+                AudioFormat.ENCODING_PCM_16BIT);
+        AudioRecord r = new AudioRecord(MediaRecorder.AudioSource.MIC, RATE,
+                AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT,
+                Math.max(minBuf, FRAME * 2 * 20));
+        if (r.getState() != AudioRecord.STATE_INITIALIZED) {
+            r.release();
+            throw new IllegalStateException("Không mở được micro (app gốc của R1 còn giữ mic?)");
+        }
+        r.startRecording();
+        rec = r;
+    }
+
+    /** Tạm dừng khi loa đang nói để không tự nghe lại chính mình; bỏ luôn audio cũ. */
+    public synchronized void pause() {
+        if (rec != null) rec.stop();
+    }
+
+    public synchronized void resume() {
+        if (rec != null) rec.startRecording();
+    }
+
+    public void stop() {
+        stopped = true;
+    }
+
+    public synchronized void close() {
+        stopped = true;
+        if (rec != null) {
+            rec.stop();
+            rec.release();
+            rec = null;
+        }
+    }
+
+    /** Đọc đủ một frame 30 ms. Trả về null nếu mic bị dừng / lỗi. */
+    public short[] readFrame() {
+        AudioRecord r = rec;
+        if (r == null || stopped) return null;
+        short[] buf = new short[FRAME];
+        int n = 0;
+        while (n < FRAME) {
+            int got = r.read(buf, n, FRAME - n);
+            if (got <= 0 || stopped) return null;
+            n += got;
+        }
+        return buf;
+    }
+
+    /** Cập nhật mức ồn nền khi đang im lặng (gọi trong lúc chờ từ đánh thức). */
+    public void trackNoise(short[] frame) {
+        double v = rms(frame);
+        if (v < threshold()) noise = noise * 0.95 + v * 0.05;
+    }
+
+    /**
+     * Thu một câu nói, trả về WAV. Trả về null nếu không ai bắt đầu nói
+     * trong startTimeoutMs, hoặc mic bị dừng.
+     */
+    public byte[] recordUtterance(long startTimeoutMs) {
+        int waitLimit = (int) (startTimeoutMs / 30);
+        int waited = 0, loud = 0, silent = 0, frames = 0;
+        ArrayDeque<short[]> preroll = new ArrayDeque<>();
+        ByteArrayOutputStream out = null;
+
+        while (!stopped) {
+            short[] buf = readFrame();
+            if (buf == null) return null;
+            double v = rms(buf);
+            double th = threshold();
+
+            if (out == null) {
+                if (++waited > waitLimit) return null;
+                preroll.addLast(buf);
+                if (preroll.size() > PREROLL_FRAMES) preroll.removeFirst();
+                if (v > th) {
+                    loud++;
+                } else {
+                    loud = 0;
+                    noise = noise * 0.95 + v * 0.05;
+                }
+                if (loud >= START_FRAMES) {
+                    out = new ByteArrayOutputStream();
+                    for (short[] f : preroll) writeFrame(out, f);
+                    frames = preroll.size();
+                    silent = 0;
+                }
+            } else {
+                writeFrame(out, buf);
+                frames++;
+                silent = v < th * 0.7 ? silent + 1 : 0;
+                if (silent >= END_SILENCE_FRAMES || frames >= MAX_FRAMES) {
+                    if (frames - silent >= MIN_SPEECH_FRAMES) return Wav.wrap(out.toByteArray(), RATE);
+                    // Chỉ là tiếng động ngắn, nghe tiếp
+                    out = null;
+                    loud = 0;
+                    preroll.clear();
+                }
+            }
+        }
+        return null;
+    }
+
+    private double threshold() {
+        return Math.max(noise * 3, MIN_THRESHOLD);
+    }
+
+    static double rms(short[] s) {
+        double sum = 0;
+        for (short v : s) sum += (double) v * v;
+        return Math.sqrt(sum / s.length);
+    }
+
+    private static void writeFrame(ByteArrayOutputStream out, short[] f) {
+        for (short v : f) {
+            out.write(v & 0xff);
+            out.write((v >> 8) & 0xff);
+        }
+    }
+}
