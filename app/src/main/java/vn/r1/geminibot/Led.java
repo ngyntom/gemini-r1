@@ -16,7 +16,7 @@ import java.io.FileOutputStream;
  *           gửi từng khung qua adb thì quá chậm)
  *   nói   = viền sáng + đèn trong xanh lá (501)
  *   lỗi   = đèn trong đỏ (500)
- *   rảnh  = tắt hết (504 tắt đèn trong)
+ *   rảnh  = tắt hết (close từng hiệu ứng đèn trong)
  *
  * App thường không chạy được lights_test nên gọi qua shell của adbd (LocalAdb).
  */
@@ -24,7 +24,15 @@ final class Led {
     /** Bit 15..38 = 24 đèn của viền. */
     private static final String RING = "7fffff8000";
     private static final String PID = "/data/local/tmp/gr1_led.pid";
-    private static final String INNER_OFF = "lights_test close 203; lights_test show 504";
+    /**
+     * Tắt đèn trong bằng "close" từng hiệu ứng. KHÔNG dùng "show 504": đó là hiệu ứng "luôn bật màu đen",
+     * nó đè lên và che mọi màu bật sau (thử trên loa: 504 rồi 501 thì không sáng).
+     */
+    private static final String INNER_OFF =
+            "lights_test close 203; lights_test close 500; lights_test close 501; lights_test close 504";
+    /** Lúc app mới chạy: đóng hết hiệu ứng đèn trong có thể còn chạy (khởi động loa, app cũ…). */
+    private static final String INNER_ALL_OFF = "for i in 200 202 203 204 206 251 252 253 254 255 500 501 502 504 "
+            + "510 511 512 513 514 515; do lights_test close $i; done";
 
     private static volatile boolean enabled = true;
     /** Trạng thái thử từ Web UI (/api/led), null = theo bot. */
@@ -56,11 +64,13 @@ final class Led {
                     // 30 s đầu: hiệu ứng khởi động của loa có thể bật đèn sau khi app đã tắt -> tắt lại vài lần
                     long now = System.currentTimeMillis();
                     if ("off".equals(mode) && now - started < 30000 && now - lastOff > 5000) {
-                        shown = "";
                         lastOff = now;
+                        LocalAdb.shell(command("off").replace(INNER_OFF, INNER_ALL_OFF) + "\necho OK", 6000);
+                        shown = "off";
                     }
                     if (!mode.equals(shown)) {
-                        String out = LocalAdb.shell(command(mode) + " ; echo OK", 4000);
+                        // Xuống dòng, không dùng ";": lệnh "nghĩ" kết thúc bằng "&" và "& ;" là lỗi cú pháp sh
+                        String out = LocalAdb.shell(command(mode) + "\necho OK", 4000);
                         if (!out.contains("OK")) throw new Exception("lights_test lỗi: " + out.trim());
                         shown = mode;
                         if (!lastError.isEmpty()) BotLog.i("Đèn LED hoạt động lại");
@@ -105,11 +115,11 @@ final class Led {
         switch (mode) {
             // Lệnh viền để cuối: lệnh lights_test cuối của sao chổi vừa bị dừng có thể chạy trễ ~40 ms
             case "listening":
-                return stop + "lights_test show 203; lights_test set " + RING + " ffffff";
+                return stop + INNER_OFF + "; lights_test show 203; lights_test set " + RING + " ffffff";
             case "speaking":
-                return stop + "lights_test close 203; lights_test show 501; lights_test set " + RING + " ffffff";
+                return stop + INNER_OFF + "; lights_test show 501; lights_test set " + RING + " ffffff";
             case "error":
-                return stop + "lights_test close 203; lights_test set " + RING + " 0; lights_test show 500";
+                return stop + INNER_OFF + "; lights_test set " + RING + " 0; lights_test show 500";
             case "thinking":
                 if (comet != null) {
                     return stop + INNER_OFF + "; lights_test set " + RING + " 0; trap '' HUP; sh "
@@ -131,7 +141,7 @@ final class Led {
         for (int k = 0; k < 24; k++) {
             // Đèn trong nhịp xanh lá (~1 s sáng / 1 s tắt): loa không có hiệu ứng thở xanh lá
             if (k % 6 == 0) {
-                sb.append("if [ $g = 0 ]; then lights_test show 501; g=1; else lights_test show 504; g=0; fi\n");
+                sb.append("if [ $g = 0 ]; then lights_test show 501; g=1; else lights_test close 501; g=0; fi\n");
             }
             for (int t = tail.length - 1; t >= 0; t--) {
                 int led = (k - t + 24) % 24;
@@ -139,7 +149,7 @@ final class Led {
                   .append(tail[t]).append(t == 0 ? "\n" : "; ");
             }
         }
-        sb.append("n=$((n+1))\ndone\nlights_test show 504\nlights_test set ").append(RING).append(" 0\nrm -f ")
+        sb.append("n=$((n+1))\ndone\nlights_test close 501\nlights_test set ").append(RING).append(" 0\nrm -f ")
           .append(PID).append('\n');
         File dir = ctx.getExternalCacheDir();
         if (dir == null) throw new Exception("không có bộ nhớ ngoài");
