@@ -240,6 +240,7 @@ class WebServer {
     }
 
     private JSONObject status() throws Exception {
+        Updater.reportLastInstall(bot); // cài lỗi thì app không bị tắt -> báo kết quả ngay
         AudioManager am = (AudioManager) bot.getSystemService(Context.AUDIO_SERVICE);
         JSONArray uploaded = new JSONArray();
         File[] files = new File(bot.getFilesDir(), "mww").listFiles();

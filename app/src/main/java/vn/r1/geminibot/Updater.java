@@ -55,6 +55,8 @@ final class Updater {
         String t = "/data/local/tmp";
         String script = "sleep 2\n"
                 + "cp " + SD + "/update.apk " + t + "/gr1.apk\n"
+                // cp giữ quyền 0770 của thẻ nhớ -> system_server không đọc được (INSTALL_FAILED_INVALID_APK)
+                + "chmod 644 " + t + "/gr1.apk\n"
                 + "rm -f " + t + "/gr1.xml\n"
                 + "[ -f " + SD + "/prefs.xml ] && cp " + SD + "/prefs.xml " + t + "/gr1.xml\n"
                 + "{\n"
@@ -83,7 +85,7 @@ final class Updater {
     }
 
     /** Gọi khi app khởi động: ghi kết quả lần cập nhật trước (nếu có) vào log. */
-    static void reportLastInstall(Context ctx) {
+    static synchronized void reportLastInstall(Context ctx) {
         File dir = ctx.getExternalCacheDir();
         if (dir == null) return;
         File log = new File(dir, "install.log");

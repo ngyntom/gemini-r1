@@ -313,7 +313,11 @@ async function installApk() {
     const wait = setInterval(async () => {
       try {
         const s = await (await fetch('/api/status')).json();
-        if (down || ('v' + s.version) !== old) { clearInterval(wait); location.reload(); }
+        if (down || ('v' + s.version) !== old) { clearInterval(wait); location.reload(); return; }
+        const res = (s.log || []).filter(l => l.includes('Kết quả cập nhật')).pop();
+        if (res && res.includes('Failure')) {
+          clearInterval(wait); msg.textContent = 'Cài lỗi: ' + res.split('Kết quả cập nhật: ')[1]; btn.disabled = false;
+        }
       } catch (e) { down = true; }
       if (Date.now() - t0 > 180000) { clearInterval(wait); msg.textContent = 'Hết giờ chờ, xem nhật ký.'; btn.disabled = false; }
     }, 3000);
