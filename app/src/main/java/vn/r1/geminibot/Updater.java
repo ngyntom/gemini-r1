@@ -67,10 +67,10 @@ final class Updater {
                 + "  cat " + t + "/gr1.xml | run-as " + pkg
                 + " sh -c 'mkdir -p shared_prefs && cat > shared_prefs/" + PREFS + "'\n"
                 + "fi\n"
-                + "am startservice -n " + pkg + "/.BotService\n"
-                + "sleep 2\n"
+                // Ghi kết quả trước, rồi mới bật lại bot (thử vài lần: app mới cài có thể chưa sẵn sàng)
                 + "mkdir -p " + SD + "\n"
                 + "cp " + t + "/gr1.log " + SD + "/install.log\n"
+                + "for i in 1 2 3; do sleep 3; am startservice -n " + pkg + "/.BotService; done\n"
                 + "rm -f " + t + "/gr1.apk " + t + "/gr1.xml " + t + "/gr1.log " + SD + "/update.apk "
                 + SD + "/prefs.xml\n";
         FileOutputStream fos = new FileOutputStream(new File(dir, "install.sh"));
