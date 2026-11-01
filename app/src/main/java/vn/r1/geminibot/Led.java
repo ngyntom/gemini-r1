@@ -12,7 +12,8 @@ import java.io.FileOutputStream;
  *    (ghi thẳng mặt nạ 1..15 làm loa khởi động lại).
  *
  *   nghe  = viền sáng + đèn trong thở xanh dương (203)
- *   nghĩ  = sao chổi chạy vòng trên viền (script nền trên loa, gửi từng khung qua adb thì quá chậm)
+ *   nghĩ  = sao chổi chạy vòng trên viền + đèn trong nhịp xanh lá (script nền trên loa,
+ *           gửi từng khung qua adb thì quá chậm)
  *   nói   = viền sáng + đèn trong xanh lá (501)
  *   lỗi   = đèn trong đỏ (500)
  *   rảnh  = tắt hết (504 tắt đèn trong)
@@ -45,11 +46,19 @@ final class Led {
         } catch (Exception e) {
             BotLog.w("Không tạo được hiệu ứng sao chổi: " + e.getMessage());
         }
+        final long started = System.currentTimeMillis();
         Thread t = new Thread(() -> {
+            long lastOff = 0;
             while (true) {
                 try {
                     String st = test != null ? test : BotLog.state;
                     String mode = enabled || test != null ? mode(st) : "off";
+                    // 30 s đầu: hiệu ứng khởi động của loa có thể bật đèn sau khi app đã tắt -> tắt lại vài lần
+                    long now = System.currentTimeMillis();
+                    if ("off".equals(mode) && now - started < 30000 && now - lastOff > 5000) {
+                        shown = "";
+                        lastOff = now;
+                    }
                     if (!mode.equals(shown)) {
                         String out = LocalAdb.shell(command(mode) + " ; echo OK", 4000);
                         if (!out.contains("OK")) throw new Exception("lights_test lỗi: " + out.trim());
@@ -118,15 +127,20 @@ final class Led {
      */
     private static File writeComet(Context ctx) throws Exception {
         String[] tail = {"ffffff", "606060", "181818", "0"};
-        StringBuilder sb = new StringBuilder("echo $$ > " + PID + "\nn=0\nwhile [ $n -lt 200 ]; do\n");
+        StringBuilder sb = new StringBuilder("echo $$ > " + PID + "\nn=0\ng=0\nwhile [ $n -lt 200 ]; do\n");
         for (int k = 0; k < 24; k++) {
+            // Đèn trong nhịp xanh lá (~1 s sáng / 1 s tắt): loa không có hiệu ứng thở xanh lá
+            if (k % 6 == 0) {
+                sb.append("if [ $g = 0 ]; then lights_test show 501; g=1; else lights_test show 504; g=0; fi\n");
+            }
             for (int t = tail.length - 1; t >= 0; t--) {
                 int led = (k - t + 24) % 24;
                 sb.append("lights_test set ").append(Long.toHexString(1L << (15 + led))).append(' ')
                   .append(tail[t]).append(t == 0 ? "\n" : "; ");
             }
         }
-        sb.append("n=$((n+1))\ndone\nlights_test set ").append(RING).append(" 0\nrm -f ").append(PID).append('\n');
+        sb.append("n=$((n+1))\ndone\nlights_test show 504\nlights_test set ").append(RING).append(" 0\nrm -f ")
+          .append(PID).append('\n');
         File dir = ctx.getExternalCacheDir();
         if (dir == null) throw new Exception("không có bộ nhớ ngoài");
         File f = new File(dir, "led_comet.sh");

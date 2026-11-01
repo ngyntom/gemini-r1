@@ -22,6 +22,7 @@ public class BotService extends Service {
     private static final long WAKE_LISTEN_MS = 7000; // chờ câu hỏi sau tiếng bíp
 
     private final GeminiClient gemini = new GeminiClient();
+    private final GeminiLive live = new GeminiLive();
     private final VoiceRecorder recorder = new VoiceRecorder();
     private LocalAnswer local;
     private final Object speakLock = new Object();
@@ -193,6 +194,10 @@ public class BotService extends Service {
                                 }
                             }, "wake-cue").start();
                         }
+                        if (cfg.live) {
+                            live.run(cfg, recorder); // trò chuyện liên tục tới khi im lặng / tạm biệt
+                            continue;
+                        }
                         wav = recorder.recordUtterance(WAKE_LISTEN_MS);
                         if (wav == null) {
                             BotLog.i("Không nghe thấy câu hỏi");
@@ -218,9 +223,44 @@ public class BotService extends Service {
                         if (!heard.isEmpty()) BotLog.i("Vosk nghe: " + heard + " (không phải hỏi giờ)");
                     }
                     BotLog.state = "thinking";
-                    BotLog.i("Thu được " + (wav.length - 44) / 32 + " ms audio, gửi Gemini...");
-
-                    GeminiClient.Answer a = gemini.ask(cfg, wav);
+                    GeminiClient.Answer a = null;
+                    if (GoogleStt.usable(cfg)) {
+                        // Đổi giọng nói thành chữ trước: câu đơn giản trả lời tại loa, còn lại gửi chữ (nhanh hơn audio)
+                        long t0 = System.currentTimeMillis();
+                        try {
+                            String text = GoogleStt.recognize(cfg, wav);
+                            BotLog.i("Google STT (" + (System.currentTimeMillis() - t0) + " ms): " + text);
+                            if (text.isEmpty()) {
+                                BotLog.i("Không nghe rõ lời");
+                                continue;
+                            }
+                            String quick = cfg.localTime ? LocalAnswer.answer(text) : null;
+                            if (quick != null) {
+                                BotLog.lastHeard = text;
+                                BotLog.lastReply = quick;
+                                BotLog.i("Trả lời tại loa: " + quick);
+                                recorder.pause();
+                                try {
+                                    speak(cfg, quick);
+                                } finally {
+                                    recorder.resume();
+                                }
+                                followUp = true;
+                                continue;
+                            }
+                            a = gemini.askText(cfg, text);
+                            if (a.heard.isEmpty()) a.heard = text;
+                        } catch (InterruptedException e) {
+                            throw e;
+                        } catch (Exception e) {
+                            String m = String.valueOf(e.getMessage());
+                            BotLog.w((m.length() > 200 ? m.substring(0, 200) + "…" : m));
+                        }
+                    }
+                    if (a == null) {
+                        BotLog.i("Thu được " + (wav.length - 44) / 32 + " ms audio, gửi Gemini...");
+                        a = gemini.ask(cfg, wav);
+                    }
                     BotLog.lastHeard = a.heard;
                     BotLog.i("Nghe: " + a.heard);
                     if (a.reply.isEmpty()) continue;

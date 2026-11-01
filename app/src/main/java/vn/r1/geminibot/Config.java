@@ -15,7 +15,7 @@ public class Config {
     static final String[] KEYS = {"api_key", "model", "tts_model", "voice", "wake_engine",
             "mww_model", "mww_cutoff", "wake_word", "follow_up", "persona", "mic_gain",
             "tts_engine", "google_voice", "google_tts_key", "tts_rate", "led", "wake_sound", "wake_reply", "local_time",
-            "ha_url", "ha_token"};
+            "ha_url", "ha_token", "stt_engine", "live", "live_model", "live_idle"};
 
     public String apiKey;
     public String model;
@@ -51,6 +51,14 @@ public class Config {
     public String haUrl;
     /** Long-lived access token của Home Assistant. */
     public String haToken;
+
+    /** "google" = Cloud Speech-to-Text rồi gửi chữ cho Gemini; "gemini" = gửi audio cho Gemini nghe. */
+    public String sttEngine;
+    /** Sau từ đánh thức thì trò chuyện liên tục qua Gemini Live. */
+    public boolean live;
+    public String liveModel;
+    /** Live: im lặng quá số giây này thì kết thúc, quay lại chờ từ đánh thức. */
+    public int liveIdleSec;
 
     public boolean haEnabled() {
         return !haUrl.isEmpty() && !haToken.isEmpty();
@@ -107,6 +115,14 @@ public class Config {
         c.localTime = !"0".equals(p.getString("local_time", "1").trim());
         c.haUrl = p.getString("ha_url", "").trim().replaceAll("/+$", "");
         c.haToken = p.getString("ha_token", "").trim();
+        c.sttEngine = p.getString("stt_engine", "google").trim().toLowerCase();
+        c.live = "1".equals(p.getString("live", "0").trim());
+        c.liveModel = p.getString("live_model", "gemini-2.5-flash-native-audio-latest").trim();
+        try {
+            c.liveIdleSec = Math.max(5, Math.min(300, Integer.parseInt(p.getString("live_idle", "20").trim())));
+        } catch (NumberFormatException e) {
+            c.liveIdleSec = 20;
+        }
         c.persona = p.getString("persona",
                 "Bạn là trợ lý giọng nói trên loa thông minh. Trả lời ngắn gọn, tự nhiên, "
                         + "bằng ngôn ngữ người dùng nói (mặc định tiếng Việt). Không dùng markdown, "
@@ -139,7 +155,11 @@ public class Config {
                 .put("wake_reply", c.wakeReply)
                 .put("local_time", c.localTime ? "1" : "0")
                 .put("ha_url", c.haUrl)
-                .put("ha_token_set", !c.haToken.isEmpty());
+                .put("ha_token_set", !c.haToken.isEmpty())
+                .put("stt_engine", c.sttEngine)
+                .put("live", c.live ? "1" : "0")
+                .put("live_model", c.liveModel)
+                .put("live_idle", String.valueOf(c.liveIdleSec));
     }
 
     /** Lưu các khoá có trong JSON từ Web UI. api_key rỗng = giữ nguyên. */

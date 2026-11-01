@@ -141,9 +141,9 @@
         <input data-k="tts_rate" id="rate" type="range" min="0.5" max="2" step="0.05"
                oninput="$('rateLabel').textContent = '×' + (+this.value).toFixed(2)">
       </div>
-      <div class="gtts">
-        <label>Key riêng cho Cloud TTS <span class="muted" id="gkeyHint"></span></label>
-        <input type="password" data-k="google_tts_key" placeholder="Để trống = dùng API key Gemini" autocomplete="off">
+      <div>
+        <label>Key Google Cloud (TTS & nhận giọng nói) <span class="muted" id="gkeyHint"></span></label>
+        <input type="password" data-k="google_tts_key" placeholder="AIza… ; để trống = dùng API key Gemini" autocomplete="off">
       </div>
       <div>
         <label>Đèn LED theo trạng thái</label>
@@ -232,6 +232,38 @@
         <button onclick="upload()">Tải lên</button>
       </div>
     </div>
+  </section>
+
+  <section class="card">
+    <h2>Nhận giọng nói & Gemini Live</h2>
+    <div class="grid">
+      <div>
+        <label>Nhận giọng nói</label>
+        <select data-k="stt_engine">
+          <option value="google">Google Cloud STT → chữ (nhanh hơn ~1 s, hỏi giờ trả lời tại loa)</option>
+          <option value="gemini">Gemini nghe trực tiếp (không cần key Cloud)</option>
+        </select>
+      </div>
+      <div>
+        <label>Gemini Live (trò chuyện liên tục)</label>
+        <select data-k="live">
+          <option value="0">Tắt – mỗi câu gọi từ đánh thức</option>
+          <option value="1">Bật – gọi một lần rồi nói chuyện liên tục</option>
+        </select>
+      </div>
+      <div>
+        <label>Model Live</label>
+        <input data-k="live_model" placeholder="gemini-2.5-flash-native-audio-latest">
+      </div>
+      <div>
+        <label>Live: im lặng bao nhiêu giây thì kết thúc</label>
+        <input data-k="live_idle" type="number" min="5" max="300">
+      </div>
+    </div>
+    <p class="muted" style="margin:10px 0 0">Google Cloud STT cần key Google Cloud (AIza…) của project đã bật
+      "Cloud Speech-to-Text API" và billing (miễn phí 60 phút / tháng). Key bị từ chối thì bot tự quay về Gemini nghe trực tiếp.
+      Gemini Live dùng API key Gemini và giọng đọc Gemini ở trên; nói "tạm biệt" để kết thúc. Loa không khử được
+      tiếng vọng nên không nói chen ngang được khi loa đang nói.</p>
   </section>
 
   <section class="card">

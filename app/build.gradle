@@ -59,6 +59,8 @@ dependencies {
     implementation 'net.java.dev.jna:jna:5.13.0@aar'
     // 2.12+ cần Android 6 (__register_atfork, strtod_l); 2.11.0 là bản mới nhất chạy được trên R1 (API 22)
     implementation 'org.tensorflow:tensorflow-lite:2.11.0'
+    // WebSocket cho Gemini Live; 3.12.x là nhánh cuối còn hỗ trợ Android 5
+    implementation 'com.squareup.okhttp3:okhttp:3.12.13'
 }
 
 def fetchFile = { String url, File dest ->
