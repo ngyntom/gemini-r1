@@ -115,6 +115,17 @@ final class LocalAnswer implements VoiceRecorder.FrameSink {
         return null;
     }
 
+    /**
+     * Thời gian hiện tại viết rõ cho chỉ dẫn của Gemini. Dạng "Chủ Nhật, 01/11/2026, 22:11" làm
+     * gemini-3.5-flash-lite đọc nhầm thành "11 giờ 11 phút" (lẫn số của ngày / tháng).
+     */
+    static String nowForPrompt() {
+        Calendar now = Calendar.getInstance(TimeZone.getTimeZone("Asia/Ho_Chi_Minh"));
+        int h = now.get(Calendar.HOUR_OF_DAY), m = now.get(Calendar.MINUTE);
+        return "bây giờ là " + h + " giờ " + m + " phút (" + timeText(now).replace("Bây giờ là ", "")
+                .replace(".", "") + "), hôm nay là " + dateText(now);
+    }
+
     private static String timeText(Calendar now) {
         int h = now.get(Calendar.HOUR_OF_DAY), m = now.get(Calendar.MINUTE);
         String buoi = h < 4 ? "đêm" : h < 11 ? "sáng" : h < 13 ? "trưa" : h < 18 ? "chiều" : h < 22 ? "tối" : "đêm";

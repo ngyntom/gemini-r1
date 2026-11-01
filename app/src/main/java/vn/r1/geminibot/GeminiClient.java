@@ -259,11 +259,19 @@ public class GeminiClient {
         while (history.length() > 0) history.remove(0);
     }
 
+    /**
+     * Luôn thêm vào sau persona: với danh sách thiết bị HA dài, model nhỏ (3.5 Flash Lite) tưởng mình
+     * chỉ điều khiển nhà và từ chối "Kể chuyện cổ tích"; persona mặc định "ngắn gọn" cũng làm truyện cụt.
+     */
+    static final String CAPABILITIES = "Bạn là trợ lý đa năng: trò chuyện, trả lời mọi câu hỏi, kể chuyện "
+            + "(cổ tích, truyện cười, truyện cho trẻ em), đọc thơ, giải thích, gợi ý. Câu hỏi thường thì trả lời "
+            + "ngắn; khi được nhờ kể chuyện, đọc thơ hay giải thích chi tiết thì nói đầy đủ, mạch lạc (truyện "
+            + "khoảng 200–350 từ), dùng câu văn tự nhiên để đọc thành tiếng.";
+
     private static String systemPrompt(Config cfg, String devices) {
         StringBuilder sb = new StringBuilder(cfg.persona);
-        SimpleDateFormat now = new SimpleDateFormat("EEEE, dd/MM/yyyy, HH:mm", new Locale("vi", "VN"));
-        now.setTimeZone(TimeZone.getTimeZone("Asia/Ho_Chi_Minh"));
-        sb.append("\n\nThời gian hiện tại (giờ Việt Nam): ").append(now.format(new Date()))
+        sb.append("\n\n").append(CAPABILITIES);
+        sb.append("\n\nThời gian hiện tại (giờ Việt Nam): ").append(LocalAnswer.nowForPrompt())
           .append(". Khi được hỏi giờ / ngày, luôn dùng thời gian này, không lặp lại giờ trong các câu trả lời trước.");
         sb.append("\n\nMỗi tin nhắn của người dùng là một đoạn ghi âm từ micro của loa, ")
           .append("thu ngay sau khi họ gọi bạn bằng từ đánh thức (hoặc ngay sau khi bạn vừa trả lời). ")
@@ -272,13 +280,15 @@ public class GeminiClient {
           .append("Nếu đoạn ghi âm chỉ là tiếng ồn, nhạc, TV, không rõ lời, hoặc rõ ràng không nói ")
           .append("với bạn thì để reply rỗng.");
         if (devices != null) {
-            sb.append("\n\nBạn điều khiển được thiết bị trong nhà qua Home Assistant. Danh sách thiết bị ")
-              .append("(entity_id | tên | trạng thái hiện tại):\n").append(devices)
+            sb.append("\n\nNgoài việc trò chuyện ở trên, bạn còn điều khiển được thiết bị trong nhà qua Home Assistant. ")
+              .append("Danh sách thiết bị (entity_id | tên | trạng thái hiện tại):\n").append(devices)
               .append("\nKhi người dùng muốn bật / tắt / chỉnh thiết bị, gọi hàm ha_call với entity_id đúng ")
               .append("trong danh sách (chọn theo tên gần nhất với lời nói; \"tất cả đèn\" thì liệt kê các entity_id). ")
               .append("Hỏi trạng thái thì trả lời theo danh sách, không cần gọi ha_call. ")
-              .append("Cuối cùng luôn gọi hàm respond với heard và reply; reply ngắn, vd. \"Đã bật đèn phòng khách.\" ")
-              .append("Nếu ha_call báo lỗi hoặc không tìm thấy thiết bị thì nói rõ cho người dùng.");
+              .append("Mọi yêu cầu khác (trò chuyện, kể chuyện, hỏi đáp, đọc thơ…) không liên quan thiết bị: ")
+              .append("trả lời bình thường như trên, chỉ cần gọi respond, KHÔNG từ chối. ")
+              .append("Cuối cùng luôn gọi hàm respond với heard và reply; xác nhận điều khiển thì ngắn, ")
+              .append("vd. \"Đã bật đèn phòng khách.\" Nếu ha_call báo lỗi hoặc không tìm thấy thiết bị thì nói rõ.");
         }
         return sb.toString();
     }

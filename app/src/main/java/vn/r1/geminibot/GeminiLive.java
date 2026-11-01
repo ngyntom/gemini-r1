@@ -210,12 +210,11 @@ final class GeminiLive {
     }
 
     private String prompt(String devices) {
-        SimpleDateFormat now = new SimpleDateFormat("EEEE, dd/MM/yyyy, HH:mm", new Locale("vi", "VN"));
-        now.setTimeZone(TimeZone.getTimeZone("Asia/Ho_Chi_Minh"));
         StringBuilder sb = new StringBuilder(cfg.persona)
+                .append("\n\n").append(GeminiClient.CAPABILITIES)
                 .append("\n\nBạn đang trò chuyện bằng giọng nói qua một chiếc loa. Luôn nói tiếng Việt (trừ khi ")
                 .append("người dùng nói ngôn ngữ khác), câu ngắn, tự nhiên. Thời gian hiện tại (giờ Việt Nam): ")
-                .append(now.format(new Date()))
+                .append(LocalAnswer.nowForPrompt())
                 .append(". Khi người dùng chào tạm biệt hoặc muốn dừng (\"tạm biệt\", \"thôi nhé\", \"xong rồi\"), ")
                 .append("chào lại thật ngắn rồi gọi hàm end_conversation.");
         if (devices != null) {
