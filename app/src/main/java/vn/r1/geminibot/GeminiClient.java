@@ -70,12 +70,26 @@ public class GeminiClient {
                         .put("heard", new JSONObject().put("type", "STRING"))
                         .put("reply", new JSONObject().put("type", "STRING")))
                 .put("required", new JSONArray().put("heard").put("reply"));
-        JSONObject gen = new JSONObject().put("thinkingConfig", new JSONObject().put("thinkingBudget", 0));
+        JSONObject gen = new JSONObject().put("thinkingConfig", thinkingConfig(cfg.model));
         body.put("generationConfig", gen);
 
-        Answer a = devices == null
-                ? askJson(cfg, body, gen, answerSchema)
-                : askWithTools(cfg, body, contents, answerSchema, deviceIds);
+        int base = contents.length();
+        Answer a;
+        try {
+            a = devices == null
+                    ? askJson(cfg, body, gen, answerSchema)
+                    : askWithTools(cfg, body, contents, answerSchema, deviceIds);
+        } catch (Exception e) {
+            // Model không nhận kiểu tắt suy nghĩ này (vd. bản Pro bắt buộc suy nghĩ) -> gửi lại không kèm
+            String m = String.valueOf(e.getMessage());
+            if (!m.contains("HTTP 400") || !m.toLowerCase(Locale.ROOT).contains("think")) throw e;
+            BotLog.w("Model " + cfg.model + " không nhận thinkingConfig, gửi lại không kèm");
+            gen.remove("thinkingConfig");
+            while (contents.length() > base) contents.remove(contents.length() - 1);
+            a = devices == null
+                    ? askJson(cfg, body, gen, answerSchema)
+                    : askWithTools(cfg, body, contents, answerSchema, deviceIds);
+        }
 
         if (!a.reply.isEmpty()) {
             history.put(new JSONObject().put("role", "user")
@@ -85,6 +99,16 @@ public class GeminiClient {
             while (history.length() > MAX_HISTORY) history.remove(0);
         }
         return a;
+    }
+
+    /**
+     * Tắt / giảm suy nghĩ cho nhanh. Gemini 2.x: thinkingBudget 0. Gemini 3 trở lên báo lỗi 400 với
+     * thinkingBudget 0 (thử: gemini-3.5-flash-lite) và dùng thinkingLevel "minimal" (~1.2–1.3 s).
+     */
+    private static JSONObject thinkingConfig(String model) throws Exception {
+        return model.startsWith("gemini-2")
+                ? new JSONObject().put("thinkingBudget", 0)
+                : new JSONObject().put("thinkingLevel", "minimal");
     }
 
     /** Không có Home Assistant: trả lời thẳng bằng JSON {heard, reply}. */
