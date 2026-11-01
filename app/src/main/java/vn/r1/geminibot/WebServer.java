@@ -35,6 +35,7 @@ import java.util.Map;
  *   POST /api/upload?name=x.tflite   (body = file) tải model microWakeWord lên loa
  *   POST /api/install           (body = file APK) cập nhật app
  *   POST /api/led    {state}    thử đèn LED
+ *   POST /api/ha_test           kiểm tra kết nối Home Assistant
  */
 class WebServer {
     static final int PORT = 8088;
@@ -183,6 +184,21 @@ class WebServer {
                 if (path.equals("/api/ask")) bot.askTextAsync(req.optString("text", ""));
                 else bot.sayAsync(req.optString("text", ""));
                 break;
+            case "/api/ha_test": {
+                Config c = Config.load(bot);
+                if (!c.haEnabled()) {
+                    sendJson(s, 400, new JSONObject().put("error", "Chưa đặt địa chỉ hoặc token Home Assistant"));
+                    return;
+                }
+                try {
+                    String msg = HomeAssistant.test(c);
+                    BotLog.i("Home Assistant: " + msg);
+                    sendJson(s, 200, new JSONObject().put("ok", true).put("message", msg));
+                } catch (Exception e) {
+                    sendJson(s, 502, new JSONObject().put("error", String.valueOf(e.getMessage())));
+                }
+                return;
+            }
             case "/api/led": // thử đèn: {state: listening|thinking|speaking|error|idle}, rỗng = theo bot
                 Led.test = req.optString("state", "").isEmpty() ? null : req.optString("state");
                 break;

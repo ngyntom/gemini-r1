@@ -14,7 +14,8 @@ public class Config {
     private static final String PREFS = "gemini_r1";
     static final String[] KEYS = {"api_key", "model", "tts_model", "voice", "wake_engine",
             "mww_model", "mww_cutoff", "wake_word", "follow_up", "persona", "mic_gain",
-            "tts_engine", "google_voice", "google_tts_key", "tts_rate", "led", "wake_sound", "wake_reply", "local_time"};
+            "tts_engine", "google_voice", "google_tts_key", "tts_rate", "led", "wake_sound", "wake_reply", "local_time",
+            "ha_url", "ha_token"};
 
     public String apiKey;
     public String model;
@@ -46,6 +47,14 @@ public class Config {
     public String wakeReply;
     /** Hỏi giờ / ngày / thứ thì trả lời tại loa (Vosk offline), không gửi Gemini. */
     public boolean localTime;
+    /** Home Assistant, vd. http://192.168.2.10:8123 (rỗng = không dùng). */
+    public String haUrl;
+    /** Long-lived access token của Home Assistant. */
+    public String haToken;
+
+    public boolean haEnabled() {
+        return !haUrl.isEmpty() && !haToken.isEmpty();
+    }
 
     public List<String> wakePhrases() {
         List<String> out = new ArrayList<>();
@@ -96,6 +105,8 @@ public class Config {
         c.wakeReply = p.getString("wake_reply", "Dạ?").trim();
         if (c.wakeReply.isEmpty()) c.wakeReply = "Dạ?";
         c.localTime = !"0".equals(p.getString("local_time", "1").trim());
+        c.haUrl = p.getString("ha_url", "").trim().replaceAll("/+$", "");
+        c.haToken = p.getString("ha_token", "").trim();
         c.persona = p.getString("persona",
                 "Bạn là trợ lý giọng nói trên loa thông minh. Trả lời ngắn gọn, tự nhiên, "
                         + "bằng ngôn ngữ người dùng nói (mặc định tiếng Việt). Không dùng markdown, "
@@ -126,7 +137,9 @@ public class Config {
                 .put("led", c.led ? "1" : "0")
                 .put("wake_sound", c.wakeSound)
                 .put("wake_reply", c.wakeReply)
-                .put("local_time", c.localTime ? "1" : "0");
+                .put("local_time", c.localTime ? "1" : "0")
+                .put("ha_url", c.haUrl)
+                .put("ha_token_set", !c.haToken.isEmpty());
     }
 
     /** Lưu các khoá có trong JSON từ Web UI. api_key rỗng = giữ nguyên. */
@@ -135,8 +148,9 @@ public class Config {
         for (String k : KEYS) {
             if (!o.has(k)) continue;
             String v = o.optString(k, "").trim();
-            if ((k.equals("api_key") || k.equals("google_tts_key")) && v.isEmpty()) continue;
-            if (k.equals("google_tts_key") && v.equals("-")) v = ""; // "-" = xoá key riêng
+            boolean secret = k.equals("api_key") || k.equals("google_tts_key") || k.equals("ha_token");
+            if (secret && v.isEmpty()) continue;
+            if (!k.equals("api_key") && secret && v.equals("-")) v = ""; // "-" = xoá key / token
             e.putString(k, v);
         }
         e.apply();

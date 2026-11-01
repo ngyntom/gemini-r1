@@ -1,8 +1,8 @@
 package vn.r1.geminibot;
 
 /**
- * Đèn LED của R1 đổi màu theo trạng thái bot: nghe = xanh dương, nghĩ = cam,
- * nói = xanh lá, lỗi = đỏ, chờ = tắt.
+ * Đèn viền của R1 theo trạng thái bot: nghe / nói = sáng trắng, nghĩ (chờ Gemini) = nhấp nháy,
+ * chờ = tắt.
  *
  * Dùng chương trình có sẵn /system/bin/lights_test (như trang điều khiển EchoService):
  * "lights_test set <mặt nạ đèn> <RRGGBB>". Ghi thẳng vào /sys/class/leds/.../color
@@ -60,11 +60,15 @@ final class Led {
         t.start();
     }
 
+    /** Nửa chu kỳ nhấp nháy lúc đang chờ Gemini. */
+    private static final long BLINK_MS = 350;
+
     private static String color(String state) {
         switch (state) {
-            // Viền đèn chỉ có LED trắng, độ sáng theo byte xanh dương: màu khác gần như không sáng.
+            // Viền đèn chỉ có LED trắng, độ sáng theo byte xanh dương: màu khác gần như không sáng,
+            // nên hiệu ứng "đang nghĩ" là nhấp nháy bật/tắt.
+            case "thinking": return (System.currentTimeMillis() / BLINK_MS) % 2 == 0 ? "ffffff" : "0";
             case "listening":
-            case "thinking":
             case "speaking": return "ffffff";
             default: return "0";
         }

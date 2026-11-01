@@ -148,8 +148,8 @@
       <div>
         <label>Đèn LED theo trạng thái</label>
         <select data-k="led">
+          <option value="1">Bật (nghe / nói sáng trắng, nghĩ nhấp nháy)</option>
           <option value="0">Tắt</option>
-          <option value="1">Bật – thử nghiệm, có thể không sáng (nghe xanh dương, nghĩ cam, nói xanh lá)</option>
         </select>
       </div>
     </div>
@@ -233,6 +233,28 @@
     </div>
   </section>
 
+  <section class="card">
+    <h2>Home Assistant</h2>
+    <div class="grid">
+      <div>
+        <label>Địa chỉ</label>
+        <input data-k="ha_url" placeholder="http://192.168.2.100:8123">
+      </div>
+      <div>
+        <label>Long-lived access token <span class="muted" id="haHint"></span></label>
+        <input type="password" data-k="ha_token" placeholder="Để trống = giữ nguyên" autocomplete="off">
+      </div>
+    </div>
+    <div class="row" style="margin-top:12px">
+      <button onclick="haTest()">🔌 Kiểm tra kết nối</button>
+      <span class="muted" id="haMsg"></span>
+    </div>
+    <p class="muted" style="margin:10px 0 0">Tạo token trong Home Assistant: bấm tên tài khoản (góc dưới bên trái) → tab
+      Bảo mật → Long-lived access tokens → Tạo token. Dùng địa chỉ IP trong mạng nhà (http), không dùng
+      homeassistant.local hay https. Lưu cấu hình rồi nói "bật đèn phòng khách", "tắt quạt", "điều hoà 26 độ"…
+      Gemini đọc tên thiết bị từ HA, nên đặt tên tiếng Việt dễ gọi trong HA sẽ chính xác hơn.</p>
+  </section>
+
   <div class="row" style="margin-bottom:14px">
     <button class="primary" onclick="save()">💾 Lưu cấu hình</button>
     <span class="muted">Bot tự áp dụng sau vài giây.</span>
@@ -295,15 +317,22 @@ function fillModels(s) {
 function fillConfig(s) {
   document.querySelectorAll('[data-k]').forEach(el => {
     const k = el.dataset.k;
-    if (k === 'api_key' || k === 'google_tts_key' || k === 'mww_model') return;
+    if (k === 'api_key' || k === 'google_tts_key' || k === 'ha_token' || k === 'mww_model') return;
     if (s.config[k] !== undefined) el.value = s.config[k];
   });
   $('keyHint').textContent = s.config.api_key_set ? '(đã đặt ' + s.config.api_key_hint + ')' : '(chưa đặt)';
   $('gkeyHint').textContent = s.config.google_tts_key_set ? '(đã đặt, gõ - để xoá)' : '';
+  $('haHint').textContent = s.config.ha_token_set ? '(đã đặt, gõ - để xoá)' : '(chưa đặt)';
   $('rateLabel').textContent = '×' + (+$('rate').value).toFixed(2);
   fillModels(s);
   showEngine();
   showTts();
+}
+
+async function haTest() {
+  $('haMsg').textContent = 'Đang kết nối…';
+  try { $('haMsg').textContent = (await post('/api/ha_test')).message; }
+  catch (e) { $('haMsg').textContent = 'Lỗi: ' + e.message + ' (nhớ bấm Lưu cấu hình trước)'; }
 }
 
 function showTts() {
@@ -409,6 +438,7 @@ async function save() {
   await post('/api/config', data);
   document.querySelector('[data-k=api_key]').value = '';
   document.querySelector('[data-k=google_tts_key]').value = '';
+  document.querySelector('[data-k=ha_token]').value = '';
   loaded = false; await refresh(); toast('Đã lưu');
 }
 

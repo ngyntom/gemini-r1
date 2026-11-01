@@ -89,6 +89,7 @@ final class LocalAdb {
     }
 
     static String readAll(InputStream is) throws IOException {
+        if (is == null) return "";
         ByteArrayOutputStream bos = new ByteArrayOutputStream();
         byte[] b = new byte[8192];
         int n;

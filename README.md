@@ -3,30 +3,34 @@
 App Android chạy ngầm trên R1 (Android 5.1, không màn hình):
 
 1. **Chờ từ đánh thức offline**, chạy ngay trên loa và không gửi gì lên mạng. Có 2 bộ nhận:
-   - **microWakeWord** (mặc định): rất nhẹ, dùng model `.tflite` của ESPHome. Mặc định là **"Hey Jarvis"**.
-     Có thể tự huấn luyện "Hey Gemini".
+   - **microWakeWord** (mặc định): rất nhẹ, dùng model `.tflite` của ESPHome. Trên loa đang dùng
+     **"Okay Nabu"**. Có thể tự huấn luyện "Hey Gemini".
    - **Vosk**: từ đánh thức tiếng Việt, ví dụ **"trợ lý ơi"**, nhưng nặng CPU hơn.
-2. Nghe thấy thì kêu "bíp", ghi câu hỏi của bạn (tự dừng khi bạn ngừng nói).
-3. Gửi đoạn ghi âm cho Gemini (`gemini-2.5-flash`), Gemini vừa nghe vừa trả lời.
-4. Đọc câu trả lời bằng giọng Gemini TTS qua loa R1.
-5. Nghe tiếp 6 giây để bạn hỏi tiếp mà không cần gọi lại từ đánh thức.
-6. Tự chạy lại khi R1 khởi động.
+     Model Vosk (32 MB) không nằm trong APK: loa tự tải khi cần.
+2. Nghe thấy thì kêu "ding-dong" và đèn viền sáng trắng, rồi ghi câu hỏi (tự dừng khi bạn ngừng nói).
+3. Hỏi giờ / ngày / thứ thì loa tự trả lời (Vosk offline), không gửi Gemini.
+4. Câu khác thì gửi đoạn ghi âm cho Gemini (`gemini-2.5-flash`), Gemini vừa nghe vừa trả lời.
+5. Đọc câu trả lời bằng giọng Google Dịch (gTTS, nhanh, không cần key), có chỉnh tốc độ.
+   Có thể đổi sang Google Cloud TTS (cần key Cloud) hoặc Gemini TTS (chậm hơn).
+6. Đèn viền sáng trắng lúc nghe và lúc nói, nhấp nháy lúc đang chờ Gemini, tắt khi rảnh.
+7. Điều khiển thiết bị qua **Home Assistant** ("bật đèn phòng khách", "điều hoà 26 độ"…), xem bên dưới.
+8. Tự chạy lại khi R1 khởi động.
 
-Ví dụ: "Hey Jarvis" → *bíp* → "Hôm nay thời tiết Hà Nội thế nào?"
+Ví dụ: "Okay Nabu" → *ding-dong* → "Hôm nay thời tiết Hà Nội thế nào?"
 
 ## 1. Build APK
 
 Lần build đầu tự tải về:
-- model Vosk tiếng Việt (`vosk-model-small-vn-0.4`, 32 MB),
 - 4 model microWakeWord của ESPHome (`hey_jarvis`, `okay_nabu`, `hey_mycroft`, `alexa`),
 - mã C của bộ tiền xử lý âm thanh micro_speech (từ `rhasspy/pymicro-features`, Apache-2.0),
   được biên dịch bằng NDK + CMake.
 
-APK nặng khoảng 45 MB. Cần **Android NDK** và **CMake 3.22.1**. GitHub Actions đã có sẵn;
+APK nặng khoảng 5 MB. Cần **Android NDK** và **CMake 3.22.1**. GitHub Actions đã có sẵn;
 trên máy riêng, Android Studio sẽ tự tải khi build.
 
 **Cách A – GitHub Actions (không cần cài gì):** đẩy thư mục này lên một repo GitHub,
-vào tab *Actions* → *Build APK*, rồi tải artifact `gemini-r1-apk` (file `app-debug.apk`).
+vào tab *Actions* → *Build APK*, rồi tải artifact `gemini-r1-apk` (file zip chứa `app-debug.apk`).
+`build.yml` giữ lại khoá ký debug giữa các lần build, nhờ vậy bản mới cài đè lên bản cũ được.
 
 **Cách B – build trên máy:** cài JDK 17 và Android SDK (hoặc Android Studio), rồi:
 
@@ -36,20 +40,42 @@ gradle assembleDebug
 
 ## 2. Cài lên R1
 
-R1 mở sẵn adb qua Wi-Fi ở cổng 5555. Thay `192.168.1.50` bằng IP của loa:
+**Đã có app trên loa:** mở Web UI, thẻ **Cập nhật app**, chọn file zip vừa tải (hoặc `.apk`) rồi bấm cài.
+Loa tự cài, tự chạy lại và giữ nguyên cài đặt. Nếu báo lỗi kết nối adb thì máy tính đang giữ adb của
+loa (loa chỉ nhận một kết nối): chạy `adb disconnect` hoặc `adb kill-server` rồi thử lại.
+
+**Lần đầu:** R1 mở sẵn adb qua Wi-Fi ở cổng 5555. Thay `192.168.1.50` bằng IP của loa:
 
 ```
 adb connect 192.168.1.50:5555
 adb install -r app-debug.apk
 ```
 
-Ẩn trợ lý gốc của Phicomm để nó không giữ micro:
+Ẩn trợ lý gốc của Phicomm (小讯) để nó không giữ micro. Nếu không ẩn, Web UI sẽ báo
+**mic 0 · điểm 0.00** và gọi từ đánh thức không ăn:
 
 ```
-adb shell pm hide com.phicomm.speaker.device
+adb shell "for p in device productiontest bugreport otaservice systemtool; do pm hide com.phicomm.speaker.$p; done"
 ```
 
-(Muốn khôi phục: `adb shell pm unhide com.phicomm.speaker.device`.)
+(Muốn khôi phục: thay `pm hide` bằng `pm unhide`.)
+
+## Khôi phục sau khi reset loa về mặc định
+
+Reset xoá Wi-Fi, mọi app đã cài và bật lại các app gốc Phicomm. adb vẫn mở.
+
+1. **Wi-Fi:** loa phát Wi-Fi riêng, không mật khẩu, tên `Phicomm_R1_xxxx`. Cho máy tính vào mạng đó, rồi chạy
+   `powershell -ExecutionPolicy Bypass -File tools\r1-wifi.ps1` và nhập tên + mật khẩu Wi-Fi nhà.
+   (Script gửi `POST http://192.168.43.1:8989/api/configwifi` với JSON
+   `{"ssid","mac":"","level":"","secure":"WPA","password"}`; xem danh sách mạng loa thấy ở
+   `http://192.168.43.1:8989/api/wifilist`.) Mở `192.168.43.1` trên trình duyệt sẽ không hiện gì, vì
+   loa không có trang web ở cổng 80.
+2. Khoảng 1 phút sau loa vào mạng nhà (thường lấy lại IP cũ). Cài APK bằng adb như trên.
+3. Ẩn lại các app gốc Phicomm (lệnh `pm hide` ở trên).
+4. Nhập lại API key và cài đặt trên Web UI, hoặc chép lại file cài đặt đã sao lưu:
+   `adb push gemini_r1_prefs.xml /data/local/tmp/gr1.xml`, rồi
+   `adb shell "run-as vn.r1.geminibot sh -c 'mkdir -p shared_prefs && cat /data/local/tmp/gr1.xml > shared_prefs/gemini_r1.xml'; rm /data/local/tmp/gr1.xml"`.
+5. Múi giờ của loa về Thượng Hải sau reset. App đã tự dùng giờ Việt Nam nên không cần chỉnh.
 
 ## 3. Web UI
 
@@ -60,10 +86,31 @@ trong cùng mạng. Trên đó có thể:
 - bấm **Nghe ngay** (không cần từ đánh thức), **Tạm dừng** (nhả micro cho app khác), **Xoá trí nhớ**;
 - chỉnh âm lượng, gõ câu hỏi cho Gemini, hoặc gõ một câu để loa đọc;
 - đổi API key, model, giọng đọc, tính cách, bộ nhận và từ đánh thức;
+- chọn giọng đọc (gTTS / Google Cloud / Gemini), tốc độ đọc, bật/tắt đèn và thử đèn;
+- chọn âm báo khi đánh thức (ding-dong / câu đáp "Dạ?" / im lặng), bật/tắt trả lời giờ tại loa,
+  chỉnh độ nhạy mic; xem **mức micro / điểm nhận** và bấm **▶ Nghe mic** để nghe 5 giây mic vừa thu;
+- **cập nhật app** từ file zip/apk;
 - tải model microWakeWord tự huấn luyện (.tflite) lên loa.
 
 Web UI không có mật khẩu, nên chỉ dùng trong mạng nhà. Cổng 8080 và 8081 thường đã bị các app khác
 trên R1 dùng (vd. AI BOX), nên app này dùng cổng 8088.
+
+## Home Assistant
+
+1. Trong HA: bấm tên tài khoản (góc dưới bên trái) → tab **Bảo mật** → **Long-lived access tokens** →
+   **Tạo token**, rồi chép token.
+2. Trên Web UI, thẻ **Home Assistant**: nhập địa chỉ dạng `http://<IP của HA>:8123` và token, bấm
+   **Lưu cấu hình** rồi **Kiểm tra kết nối**. Phải dùng IP và http: Android 5.1 không phân giải được
+   `homeassistant.local` và không tin chứng chỉ Let's Encrypt.
+3. Nói "bật đèn phòng khách", "tắt hết đèn", "đóng rèm", "điều hoà 26 độ", "nhiệt độ phòng ngủ bao nhiêu"…
+
+Cách hoạt động: mỗi câu hỏi, loa lấy danh sách thiết bị qua `/api/states` (tối đa 300; chỉ các nhóm đèn,
+công tắc, quạt, rèm, điều hoà, media, scene, script, khoá, input_*, máy hút bụi… cùng cảm biến) và đưa cho
+Gemini. Gemini gọi hàm `ha_call(domain, service, entity_id, data_json)`, loa gọi
+`/api/services/<domain>/<service>` rồi báo kết quả lại cho Gemini để nó trả lời. Chỉ gọi được các nhóm điều
+khiển ở trên và các entity có trong danh sách. Lệnh hệ thống (`homeassistant.restart`, `shell_command`,
+`hassio`…) bị chặn. Đặt tên tiếng Việt dễ gọi cho thiết bị trong HA sẽ giúp nhận đúng hơn.
+Mỗi lệnh điều khiển tốn thêm một lượt gọi Gemini (khoảng 1 s).
 
 ## 4. Cấu hình qua adb (tuỳ chọn)
 
@@ -84,7 +131,15 @@ Các tuỳ chọn khác (đặt lúc nào cũng được, giá trị được l�
 | `mww_model` | `hey_jarvis` | `hey_jarvis`, `okay_nabu`, `hey_mycroft`, `alexa`, hoặc đường dẫn file `.tflite` |
 | `mww_cutoff` | `0` | ngưỡng 0–1; `0` = lấy từ file `.json` của model. Tăng lên nếu kích hoạt nhầm, giảm nếu gọi khó ăn |
 | `wake_word` | `trợ lý ơi` | (Vosk) từ đánh thức; nhiều từ thì cách nhau bằng dấu phẩy, vd. `"trợ lý ơi,loa ơi"` |
-| `follow_up` | `6` | số giây nghe tiếp sau khi trả lời; `0` = luôn phải gọi lại từ đánh thức |
+| `follow_up` | `6` | số giây nghe tiếp sau khi trả lời; `0` = luôn phải gọi lại từ đánh thức (trên loa đang để `0` vì `6` hay tự trả lời liên tiếp) |
+| `mic_gain` | `1` | khuếch đại mic; trên loa đang để `4` |
+| `tts_engine` | `gfree` | `gfree` = Google Dịch, `google` = Cloud TTS (cần key `AIza…` có billing), `gemini` |
+| `tts_rate` | `1` | tốc độ đọc 0.5–2 |
+| `led` | `1` | đèn viền: `1` bật, `0` tắt |
+| `wake_sound` | `chime` | `chime`, `voice` (đọc `wake_reply`, mặc định "Dạ?"), `none` |
+| `local_time` | `1` | hỏi giờ / ngày / thứ thì trả lời tại loa |
+| `ha_url` | rỗng | Home Assistant, vd. `http://192.168.2.10:8123` |
+| `ha_token` | rỗng | long-lived access token của HA (`-` = xoá) |
 | `model` | `gemini-2.5-flash` | model trả lời |
 | `tts_model` | `gemini-2.5-flash-preview-tts` | model đọc giọng |
 | `voice` | `Kore` | giọng đọc (Puck, Charon, Aoede, Leda…) |
@@ -142,11 +197,14 @@ Không cần build lại app.
 - Trên Android 5.1, mỗi lúc chỉ một app được dùng micro. Nếu loa đang chạy bot khác (AI BOX
   `info.dourok.voicebot`, `com.phicomm.r1.xiaozhi`, `com.mgt.r1voice`…) thì phải tắt bot đó,
   hoặc bấm **Tạm dừng** trên Web UI của app này khi muốn dùng bot kia.
-- App chưa được thử trên R1 thật. Nếu log báo "Không mở được micro" thì một app gốc khác
-  vẫn đang giữ mic. Liệt kê các app Phicomm bằng `adb shell pm list packages | grep phicomm`
-  rồi `pm hide` dần từng cái.
-- microWakeWord trên Android dùng TensorFlow Lite thay cho TFLite Micro của ESP32. Đặc trưng âm thanh
-  được tính bằng chính mã C mà ESPHome dùng, nên kết quả phải giống nhau, nhưng điều này chưa được kiểm
-  chứng trên R1. Nếu gọi mãi không ăn, thử giảm `mww_cutoff` (vd. `0.8`) rồi xem log.
+- Nếu log báo "Không mở được micro" hoặc mức mic luôn 0 thì một app khác vẫn đang giữ mic.
+  Liệt kê các app Phicomm bằng `adb shell pm list packages | grep phicomm` rồi `pm hide` dần từng cái.
+- Gọi mãi không ăn: xem dòng "Gần nhận ... (ngưỡng 0.97)" trong log; nếu điểm thường chỉ 0.8–0.9 thì
+  giảm `mww_cutoff` (vd. `0.85`).
+- **Đèn:** viền đèn chỉ có LED trắng, độ sáng theo byte xanh dương của màu (`lights_test set 7fffff8000 <rgb>`),
+  nên app luôn dùng `ffffff`. Các app khác như EchoService / AI BOX có thể giành quyền điều khiển đèn.
+  **Không** ghi vào nhóm LED 1–15: loa sẽ khởi động lại.
+- **Âm thanh:** ampli của R1 tắt khi rảnh và mất khoảng 0.5 s để bật lại, nên âm thanh ngắn phải có
+  khoảng im lặng ở đầu (xem `Tone.java`), không thì mất tiếng.
 - Giờ hệ thống R1 phải đúng, nếu không kết nối HTTPS tới Google sẽ lỗi chứng chỉ.
 - Nếu Google đổi tên model, đổi bằng `--es model ...` / `--es tts_model ...`, không cần build lại.

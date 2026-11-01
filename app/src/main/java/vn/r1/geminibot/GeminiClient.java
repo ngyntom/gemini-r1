@@ -12,7 +12,9 @@ import java.net.HttpURLConnection;
 import java.net.URL;
 import java.text.SimpleDateFormat;
 import java.util.Date;
+import java.util.HashSet;
 import java.util.Locale;
+import java.util.Set;
 import java.util.TimeZone;
 
 /**
@@ -43,39 +45,133 @@ public class GeminiClient {
     }
 
     private synchronized Answer askPart(Config cfg, JSONObject userPart) throws Exception {
+        String devices = null;
+        Set<String> deviceIds = new HashSet<>();
+        if (cfg.haEnabled()) {
+            try {
+                devices = HomeAssistant.entities(cfg, deviceIds);
+            } catch (Exception e) {
+                BotLog.w("Không lấy được thiết bị Home Assistant: " + e.getMessage());
+            }
+        }
+
         JSONObject body = new JSONObject();
         body.put("system_instruction", new JSONObject()
-                .put("parts", new JSONArray().put(text(systemPrompt(cfg)))));
+                .put("parts", new JSONArray().put(text(systemPrompt(cfg, devices)))));
 
         JSONArray contents = new JSONArray();
         for (int i = 0; i < history.length(); i++) contents.put(history.get(i));
         contents.put(new JSONObject().put("role", "user").put("parts", new JSONArray().put(userPart)));
         body.put("contents", contents);
 
-        JSONObject schema = new JSONObject()
+        JSONObject answerSchema = new JSONObject()
                 .put("type", "OBJECT")
                 .put("properties", new JSONObject()
                         .put("heard", new JSONObject().put("type", "STRING"))
                         .put("reply", new JSONObject().put("type", "STRING")))
                 .put("required", new JSONArray().put("heard").put("reply"));
-        body.put("generationConfig", new JSONObject()
-                .put("responseMimeType", "application/json")
-                .put("responseSchema", schema)
-                .put("thinkingConfig", new JSONObject().put("thinkingBudget", 0)));
+        JSONObject gen = new JSONObject().put("thinkingConfig", new JSONObject().put("thinkingBudget", 0));
+        body.put("generationConfig", gen);
 
-        JSONObject res = post(cfg, cfg.model, body);
-        JSONObject j = new JSONObject(firstPart(res).getString("text"));
-        Answer a = new Answer();
-        a.heard = j.optString("heard", "").trim();
-        a.reply = j.optString("reply", "").trim();
+        Answer a = devices == null
+                ? askJson(cfg, body, gen, answerSchema)
+                : askWithTools(cfg, body, contents, answerSchema, deviceIds);
 
         if (!a.reply.isEmpty()) {
             history.put(new JSONObject().put("role", "user")
-                    .put("parts", new JSONArray().put(text(a.heard))));
+                    .put("parts", new JSONArray().put(text(a.heard.isEmpty() ? "(không rõ lời)" : a.heard))));
             history.put(new JSONObject().put("role", "model")
                     .put("parts", new JSONArray().put(text(a.reply))));
             while (history.length() > MAX_HISTORY) history.remove(0);
         }
+        return a;
+    }
+
+    /** Không có Home Assistant: trả lời thẳng bằng JSON {heard, reply}. */
+    private Answer askJson(Config cfg, JSONObject body, JSONObject gen, JSONObject schema) throws Exception {
+        gen.put("responseMimeType", "application/json").put("responseSchema", schema);
+        JSONObject j = new JSONObject(firstPart(post(cfg, cfg.model, body)).getString("text"));
+        return answer(j);
+    }
+
+    /**
+     * Có Home Assistant: Gemini phải gọi hàm. ha_call -> loa gọi HA rồi gửi kết quả lại;
+     * respond -> câu trả lời cuối. (Gemini không cho dùng JSON mode cùng lúc với tools.)
+     */
+    private Answer askWithTools(Config cfg, JSONObject body, JSONArray contents, JSONObject answerSchema,
+                                Set<String> deviceIds) throws Exception {
+        JSONObject haSchema = new JSONObject()
+                .put("type", "OBJECT")
+                .put("properties", new JSONObject()
+                        .put("domain", new JSONObject().put("type", "STRING")
+                                .put("description", "vd. light, switch, fan, cover, climate, media_player, scene, script"))
+                        .put("service", new JSONObject().put("type", "STRING")
+                                .put("description", "vd. turn_on, turn_off, toggle, open_cover, close_cover, set_temperature"))
+                        .put("entity_id", new JSONObject().put("type", "STRING")
+                                .put("description", "entity_id trong danh sách; nhiều thiết bị thì cách nhau bằng dấu phẩy"))
+                        .put("data_json", new JSONObject().put("type", "STRING")
+                                .put("description", "tham số thêm dạng JSON, vd. {\"brightness_pct\":50} hoặc {\"temperature\":26}; không có thì để {}")))
+                .put("required", new JSONArray().put("domain").put("service").put("entity_id"));
+        body.put("tools", new JSONArray().put(new JSONObject().put("functionDeclarations", new JSONArray()
+                .put(new JSONObject().put("name", "ha_call")
+                        .put("description", "Điều khiển một thiết bị trong nhà qua Home Assistant")
+                        .put("parameters", haSchema))
+                .put(new JSONObject().put("name", "respond")
+                        .put("description", "Câu trả lời cuối cùng cho người dùng (luôn gọi sau cùng)")
+                        .put("parameters", answerSchema)))));
+        body.put("toolConfig", new JSONObject().put("functionCallingConfig", new JSONObject().put("mode", "ANY")));
+
+        for (int round = 0; round < 4; round++) {
+            JSONObject content = post(cfg, cfg.model, body).getJSONArray("candidates")
+                    .getJSONObject(0).getJSONObject("content");
+            JSONArray parts = content.getJSONArray("parts");
+            JSONArray responses = new JSONArray();
+            JSONObject respond = null;
+            boolean allOk = true;
+            for (int i = 0; i < parts.length(); i++) {
+                JSONObject fc = parts.getJSONObject(i).optJSONObject("functionCall");
+                if (fc == null) continue;
+                JSONObject args = fc.optJSONObject("args");
+                if (args == null) args = new JSONObject();
+                if ("respond".equals(fc.optString("name"))) {
+                    respond = args;
+                    continue;
+                }
+                JSONObject result;
+                try {
+                    String dataJson = args.optString("data_json", "").trim();
+                    result = HomeAssistant.call(cfg, deviceIds, args.optString("domain"), args.optString("service"),
+                            args.optString("entity_id"), dataJson.isEmpty() ? null : new JSONObject(dataJson));
+                } catch (Exception e) {
+                    result = new JSONObject().put("ok", false).put("error", String.valueOf(e.getMessage()));
+                }
+                if (!result.optBoolean("ok")) {
+                    allOk = false;
+                    BotLog.w("Home Assistant lỗi: " + result.optString("error"));
+                }
+                responses.put(new JSONObject().put("functionResponse", new JSONObject()
+                        .put("name", fc.optString("name")).put("response", result)));
+            }
+            // Đã có câu trả lời và mọi lệnh đều chạy được -> xong. Lệnh lỗi thì để Gemini nói lại cho đúng.
+            if (respond != null && allOk) return answer(respond);
+            if (responses.length() == 0) {
+                if (respond != null) return answer(respond);
+                String t = parts.getJSONObject(0).optString("text", "");
+                Answer a = new Answer();
+                a.heard = "";
+                a.reply = t.trim();
+                return a;
+            }
+            contents.put(content);
+            contents.put(new JSONObject().put("role", "user").put("parts", responses));
+        }
+        throw new Exception("Gemini gọi Home Assistant quá nhiều lần");
+    }
+
+    private static Answer answer(JSONObject j) {
+        Answer a = new Answer();
+        a.heard = j.optString("heard", "").trim();
+        a.reply = j.optString("reply", "").trim();
         return a;
     }
 
@@ -110,7 +206,7 @@ public class GeminiClient {
         while (history.length() > 0) history.remove(0);
     }
 
-    private static String systemPrompt(Config cfg) {
+    private static String systemPrompt(Config cfg, String devices) {
         StringBuilder sb = new StringBuilder(cfg.persona);
         SimpleDateFormat now = new SimpleDateFormat("EEEE, dd/MM/yyyy, HH:mm", new Locale("vi", "VN"));
         now.setTimeZone(TimeZone.getTimeZone("Asia/Ho_Chi_Minh"));
@@ -122,6 +218,15 @@ public class GeminiClient {
           .append("\"reply\" = câu trả lời sẽ được đọc lên. ")
           .append("Nếu đoạn ghi âm chỉ là tiếng ồn, nhạc, TV, không rõ lời, hoặc rõ ràng không nói ")
           .append("với bạn thì để reply rỗng.");
+        if (devices != null) {
+            sb.append("\n\nBạn điều khiển được thiết bị trong nhà qua Home Assistant. Danh sách thiết bị ")
+              .append("(entity_id | tên | trạng thái hiện tại):\n").append(devices)
+              .append("\nKhi người dùng muốn bật / tắt / chỉnh thiết bị, gọi hàm ha_call với entity_id đúng ")
+              .append("trong danh sách (chọn theo tên gần nhất với lời nói; \"tất cả đèn\" thì liệt kê các entity_id). ")
+              .append("Hỏi trạng thái thì trả lời theo danh sách, không cần gọi ha_call. ")
+              .append("Cuối cùng luôn gọi hàm respond với heard và reply; reply ngắn, vd. \"Đã bật đèn phòng khách.\" ")
+              .append("Nếu ha_call báo lỗi hoặc không tìm thấy thiết bị thì nói rõ cho người dùng.");
+        }
         return sb.toString();
     }
 
