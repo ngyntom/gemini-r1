@@ -1,30 +1,31 @@
 package vn.r1.geminibot;
 
-/** Tiếng "bíp" báo đã nghe thấy từ đánh thức. */
+/** Âm "ding-dong" báo đã nghe thấy từ đánh thức (hai nốt Si5 → Mi6, tắt dần như chuông). */
 final class Tone {
-    private static final int RATE = 16000;
-    private static final byte[] BEEP = make(880, 150);
+    static final int RATE = 24000;
+    static final byte[] CHIME = chime();
 
     private Tone() {}
 
-    static void beepAsync() {
-        new Thread(() -> {
-            try {
-                PcmPlayer.play(BEEP, RATE);
-            } catch (InterruptedException ignored) {
+    private static byte[] chime() {
+        double[][] notes = {{988, 110}, {1319, 260}}; // {Hz, ms}
+        int total = 0;
+        for (double[] n : notes) total += (int) (RATE * n[1] / 1000);
+        byte[] pcm = new byte[total * 2];
+        int pos = 0;
+        for (double[] note : notes) {
+            int n = (int) (RATE * note[1] / 1000);
+            int attack = RATE / 400; // 2.5 ms, tránh tiếng "tách"
+            for (int i = 0; i < n; i++) {
+                double env = Math.min(1.0, i / (double) attack) * Math.exp(-4.0 * i / n)
+                        * Math.min(1.0, (n - 1 - i) / (double) attack);
+                double s = Math.sin(2 * Math.PI * note[0] * i / RATE)
+                        + 0.3 * Math.sin(2 * Math.PI * 2 * note[0] * i / RATE); // thêm bồi âm cho "trong"
+                short v = (short) (s / 1.3 * 22000 * env);
+                pcm[2 * pos] = (byte) v;
+                pcm[2 * pos + 1] = (byte) (v >> 8);
+                pos++;
             }
-        }).start();
-    }
-
-    private static byte[] make(double hz, int ms) {
-        int n = RATE * ms / 1000;
-        int fade = RATE / 200; // 5 ms vào/ra để không bị "tách"
-        byte[] pcm = new byte[n * 2];
-        for (int i = 0; i < n; i++) {
-            double env = Math.min(1.0, Math.min(i, n - 1 - i) / (double) fade);
-            short v = (short) (Math.sin(2 * Math.PI * hz * i / RATE) * 12000 * env);
-            pcm[2 * i] = (byte) v;
-            pcm[2 * i + 1] = (byte) (v >> 8);
         }
         return pcm;
     }

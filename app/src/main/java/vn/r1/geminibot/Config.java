@@ -14,7 +14,7 @@ public class Config {
     private static final String PREFS = "gemini_r1";
     static final String[] KEYS = {"api_key", "model", "tts_model", "voice", "wake_engine",
             "mww_model", "mww_cutoff", "wake_word", "follow_up", "persona", "mic_gain",
-            "tts_engine", "google_voice", "google_tts_key", "tts_rate", "led"};
+            "tts_engine", "google_voice", "google_tts_key", "tts_rate", "led", "wake_sound", "wake_reply"};
 
     public String apiKey;
     public String model;
@@ -41,6 +41,9 @@ public class Config {
     /** Tốc độ đọc 0.5..2 (1 = bình thường). */
     public float ttsRate;
     public boolean led;
+    /** Âm báo khi đánh thức: "chime", "voice" (đọc wakeReply) hoặc "none". */
+    public String wakeSound;
+    public String wakeReply;
 
     public List<String> wakePhrases() {
         List<String> out = new ArrayList<>();
@@ -86,6 +89,9 @@ public class Config {
             c.ttsRate = 1;
         }
         c.led = !"0".equals(p.getString("led", "1").trim());
+        c.wakeSound = p.getString("wake_sound", "chime").trim().toLowerCase();
+        c.wakeReply = p.getString("wake_reply", "Dạ?").trim();
+        if (c.wakeReply.isEmpty()) c.wakeReply = "Dạ?";
         c.persona = p.getString("persona",
                 "Bạn là trợ lý giọng nói trên loa thông minh. Trả lời ngắn gọn, tự nhiên, "
                         + "bằng ngôn ngữ người dùng nói (mặc định tiếng Việt). Không dùng markdown, "
@@ -113,7 +119,9 @@ public class Config {
                 .put("google_voice", c.googleVoice)
                 .put("google_tts_key_set", !c.googleTtsKey.isEmpty())
                 .put("tts_rate", String.valueOf(c.ttsRate))
-                .put("led", c.led ? "1" : "0");
+                .put("led", c.led ? "1" : "0")
+                .put("wake_sound", c.wakeSound)
+                .put("wake_reply", c.wakeReply);
     }
 
     /** Lưu các khoá có trong JSON từ Web UI. api_key rỗng = giữ nguyên. */

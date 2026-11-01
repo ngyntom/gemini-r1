@@ -161,8 +161,14 @@ public class BotService extends Service {
                             continue;
                         }
                         BotLog.i("Đánh thức: " + hit);
-                        Tone.beepAsync();
                         BotLog.state = "listening";
+                        // Phát xong âm báo rồi mới thu, và bỏ phần mic đã thu lúc phát
+                        recorder.pause();
+                        try {
+                            playWakeCue(cfg);
+                        } finally {
+                            recorder.resume();
+                        }
                         wav = recorder.recordUtterance(WAKE_LISTEN_MS);
                         if (wav == null) {
                             BotLog.i("Không nghe thấy câu hỏi");
@@ -221,6 +227,29 @@ public class BotService extends Service {
                 BotLog.state = prev;
             }
         }
+    }
+
+    private String cueText;
+    private PcmPlayer.Pcm cueVoice;
+
+    /** chime = "ding-dong", voice = đọc câu đáp (vd. "Dạ?") một lần rồi giữ lại, none = im lặng. */
+    private void playWakeCue(Config cfg) throws InterruptedException {
+        if ("none".equals(cfg.wakeSound)) return;
+        if ("voice".equals(cfg.wakeSound)) {
+            try {
+                if (cueVoice == null || !cfg.wakeReply.equals(cueText)) {
+                    cueVoice = synth(cfg, cfg.wakeReply);
+                    cueText = cfg.wakeReply;
+                }
+                PcmPlayer.play(cueVoice.data, cueVoice.rate);
+                return;
+            } catch (InterruptedException e) {
+                throw e;
+            } catch (Exception e) {
+                BotLog.w("Không tạo được câu đáp, dùng ding-dong: " + e.getMessage());
+            }
+        }
+        PcmPlayer.play(Tone.CHIME, Tone.RATE);
     }
 
     /**
