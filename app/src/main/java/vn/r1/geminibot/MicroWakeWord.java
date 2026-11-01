@@ -44,6 +44,8 @@ class MicroWakeWord implements WakeEngine {
     private ByteBuffer output;
     private int rowsFilled;
     private int cooldown;
+    private float scorePeak;
+    private int scoreCount;
     private final int[] features = new int[MicroFrontend.FEATURES];
 
     MicroWakeWord(Context ctx) {
@@ -162,7 +164,18 @@ class MicroWakeWord implements WakeEngine {
         }
         float sum = 0;
         for (float w : window) sum += w;
-        return sum / window.length >= cutoff;
+        float avg = sum / window.length;
+        scorePeak = Math.max(scorePeak, avg);
+        if (++scoreCount >= 33) { // ~1 s
+            BotLog.wakeScore = scorePeak;
+            if (scorePeak >= 0.3f && scorePeak < cutoff) {
+                BotLog.i(String.format(java.util.Locale.ROOT, "Gần nhận \"%s\": %.2f (ngưỡng %.2f)",
+                        wakeName, scorePeak, cutoff));
+            }
+            scorePeak = 0;
+            scoreCount = 0;
+        }
+        return avg >= cutoff;
     }
 
     @Override

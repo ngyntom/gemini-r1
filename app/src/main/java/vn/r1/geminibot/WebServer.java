@@ -24,6 +24,7 @@ import java.util.Map;
  *
  * API (JSON):
  *   GET  /api/status            trạng thái, cấu hình, log
+ *   GET  /api/mic.wav           5 giây micro vừa thu (để kiểm tra mic)
  *   POST /api/config            {key: value, ...} lưu cấu hình
  *   POST /api/say    {text}     đọc một câu
  *   POST /api/ask    {text}     hỏi Gemini bằng chữ, đọc câu trả lời
@@ -134,6 +135,10 @@ class WebServer {
             sendJson(s, 200, status());
             return;
         }
+        if (method.equals("GET") && path.equals("/api/mic.wav")) {
+            send(s, 200, "audio/wav", bot.recentMicWav());
+            return;
+        }
         if (!method.equals("POST")) {
             send(s, 404, "text/plain", "Not found".getBytes("UTF-8"));
             return;
@@ -205,6 +210,8 @@ class WebServer {
                 .put("state", BotLog.state)
                 .put("paused", bot.isPaused())
                 .put("wake_name", BotLog.wakeName)
+                .put("mic_level", BotLog.micLevel)
+                .put("wake_score", BotLog.wakeScore)
                 .put("last_heard", BotLog.lastHeard)
                 .put("last_reply", BotLog.lastReply)
                 .put("volume", am.getStreamVolume(AudioManager.STREAM_MUSIC))

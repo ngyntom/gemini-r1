@@ -13,7 +13,7 @@ import java.util.List;
 public class Config {
     private static final String PREFS = "gemini_r1";
     static final String[] KEYS = {"api_key", "model", "tts_model", "voice", "wake_engine",
-            "mww_model", "mww_cutoff", "wake_word", "follow_up", "persona"};
+            "mww_model", "mww_cutoff", "wake_word", "follow_up", "persona", "mic_gain"};
 
     public String apiKey;
     public String model;
@@ -30,6 +30,8 @@ public class Config {
     /** Số giây nghe tiếp câu sau mà không cần gọi lại từ đánh thức (0 = tắt). */
     public int followUpSec;
     public String persona;
+    /** Hệ số khuếch đại micro (1 = giữ nguyên), cho mic thu nhỏ. */
+    public float micGain;
 
     public List<String> wakePhrases() {
         List<String> out = new ArrayList<>();
@@ -61,6 +63,11 @@ public class Config {
         } catch (NumberFormatException e) {
             c.followUpSec = 6;
         }
+        try {
+            c.micGain = Math.max(0.1f, Math.min(32f, Float.parseFloat(p.getString("mic_gain", "1").trim())));
+        } catch (NumberFormatException e) {
+            c.micGain = 1;
+        }
         c.persona = p.getString("persona",
                 "Bạn là trợ lý giọng nói trên loa thông minh. Trả lời ngắn gọn, tự nhiên, "
                         + "bằng ngôn ngữ người dùng nói (mặc định tiếng Việt). Không dùng markdown, "
@@ -82,7 +89,8 @@ public class Config {
                 .put("mww_cutoff", String.valueOf(c.mwwCutoff))
                 .put("wake_word", c.wakeWord)
                 .put("follow_up", String.valueOf(c.followUpSec))
-                .put("persona", c.persona);
+                .put("persona", c.persona)
+                .put("mic_gain", String.valueOf(c.micGain));
     }
 
     /** Lưu các khoá có trong JSON từ Web UI. api_key rỗng = giữ nguyên. */

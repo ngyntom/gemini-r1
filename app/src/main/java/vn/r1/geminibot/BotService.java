@@ -97,6 +97,10 @@ public class BotService extends Service {
         BotLog.i(p ? "Tạm dừng nghe (nhả micro)" : "Tiếp tục nghe");
     }
 
+    byte[] recentMicWav() {
+        return recorder.recentWav();
+    }
+
     boolean isPaused() {
         return paused;
     }
@@ -134,6 +138,7 @@ public class BotService extends Service {
                         wakeEngine = cfg.wakeEngine;
                         BotLog.i("Bộ nhận từ đánh thức: " + wakeEngine);
                     }
+                    recorder.setGain(cfg.micGain);
                     recorder.ensureOpen();
 
                     byte[] wav;

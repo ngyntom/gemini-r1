@@ -26,6 +26,7 @@ public class VoiceRecorder {
     private double noise = 200;
     private volatile boolean stopped;
     private volatile boolean triggered;
+    private volatile float gain = 1f;
 
     /** Yêu cầu nghe ngay (từ Web UI), bỏ qua từ đánh thức. */
     public void trigger() {
@@ -105,10 +106,49 @@ public class VoiceRecorder {
             if (got <= 0 || stopped) return null;
             n += got;
         }
-        if (channels == 1) return buf;
-        short[] mono = new short[FRAME];
-        for (int i = 0; i < FRAME; i++) mono[i] = (short) ((buf[2 * i] + buf[2 * i + 1]) / 2);
+        short[] mono = buf;
+        if (channels != 1) {
+            mono = new short[FRAME];
+            for (int i = 0; i < FRAME; i++) mono[i] = (short) ((buf[2 * i] + buf[2 * i + 1]) / 2);
+        }
+        if (gain != 1f) {
+            for (int i = 0; i < FRAME; i++) {
+                mono[i] = (short) Math.max(-32768, Math.min(32767, Math.round(mono[i] * gain)));
+            }
+        }
+        recent(mono);
         return mono;
+    }
+
+    void setGain(float g) {
+        gain = g;
+    }
+
+    // ---- Chẩn đoán: mức micro và 5 s âm thanh gần nhất ----
+
+    private static final int RECENT_FRAMES = 166;
+    private final short[][] ring = new short[RECENT_FRAMES][];
+    private int ringPos, levelFrames, levelPeak;
+
+    private synchronized void recent(short[] f) {
+        ring[ringPos] = f;
+        ringPos = (ringPos + 1) % RECENT_FRAMES;
+        levelPeak = Math.max(levelPeak, (int) rms(f));
+        if (++levelFrames >= 33) {
+            BotLog.micLevel = levelPeak;
+            levelPeak = 0;
+            levelFrames = 0;
+        }
+    }
+
+    /** 5 giây micro vừa thu (sau khuếch đại), dạng WAV. */
+    synchronized byte[] recentWav() {
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        for (int i = 0; i < RECENT_FRAMES; i++) {
+            short[] f = ring[(ringPos + i) % RECENT_FRAMES];
+            if (f != null) writeFrame(out, f);
+        }
+        return Wav.wrap(out.toByteArray(), RATE);
     }
 
     /** Cập nhật mức ồn nền khi đang im lặng (gọi trong lúc chờ từ đánh thức). */

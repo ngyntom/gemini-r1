@@ -21,6 +21,9 @@ final class BotLog {
     static volatile String wakeName = "";
     static volatile String lastHeard = "";
     static volatile String lastReply = "";
+    /** Chẩn đoán: RMS micro lớn nhất ~1 s gần nhất, điểm từ đánh thức lớn nhất ~1 s gần nhất. */
+    static volatile int micLevel;
+    static volatile float wakeScore;
 
     private BotLog() {}
 

@@ -134,9 +134,24 @@
         <label>Ngưỡng 0–1 (0 = theo model)</label>
         <input data-k="mww_cutoff" type="number" min="0" max="1" step="0.01">
       </div>
+      <div>
+        <label>Khuếch đại micro (1 = giữ nguyên)</label>
+        <input data-k="mic_gain" type="number" min="0.1" max="32" step="0.5">
+      </div>
+      <div>
+        <label>Mức micro / điểm nhận</label>
+        <div class="muted" id="diag" style="padding:8px 0">—</div>
+      </div>
       <div class="vosk" style="grid-column: 1 / -1">
         <label>Cụm từ (cách nhau bằng dấu phẩy)</label>
         <input data-k="wake_word" placeholder="trợ lý ơi, loa ơi">
+      </div>
+    </div>
+    <div style="margin-top:12px">
+      <label>Nghe lại 5 giây micro vừa thu</label>
+      <div class="row">
+        <button onclick="$('micAudio').src='/api/mic.wav?t='+Date.now(); $('micAudio').play()">▶ Nghe mic</button>
+        <audio id="micAudio" controls class="flex1"></audio>
       </div>
     </div>
     <div class="mww" style="margin-top:12px">
@@ -217,6 +232,7 @@ async function refresh() {
     $('heard').textContent = s.last_heard || '—';
     $('reply').textContent = s.last_reply || '—';
     $('wakeinfo').textContent = s.wake_name ? 'Từ đánh thức: "' + s.wake_name + '"' : '';
+    $('diag').textContent = 'mic ' + (s.mic_level || 0) + ' · điểm ' + (s.wake_score || 0).toFixed(2);
     paused = s.paused;
     $('pauseBtn').textContent = paused ? '▶ Tiếp tục' : '⏸ Tạm dừng';
     if (!volDragging) { $('vol').max = s.volume_max; $('vol').value = s.volume; }

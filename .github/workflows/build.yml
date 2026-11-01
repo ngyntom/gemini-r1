@@ -16,6 +16,11 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.7'
+      # Giữ cùng một khoá ký debug giữa các lần build để APK mới cài đè được lên bản cũ
+      - uses: actions/cache@v4
+        with:
+          path: ~/.android/debug.keystore
+          key: android-debug-keystore-v1
       - run: gradle assembleDebug
       - uses: actions/upload-artifact@v4
         with:
