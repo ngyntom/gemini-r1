@@ -11,8 +11,8 @@ android {
         // Phicomm R1 chạy Android 5.1 (API 22)
         minSdk 21
         targetSdk 22
-        versionCode 5
-        versionName '1.4'
+        versionCode 6
+        versionName '1.5'
         // R1 dùng chip RK3229 (ARMv7) – bỏ các ABI khác cho APK nhẹ
         ndk { abiFilters 'armeabi-v7a' }
     }
@@ -90,26 +90,4 @@ tasks.configureEach { t ->
     }
 }
 
-// Tải model nhận dạng tiếng Việt của Vosk (32 MB) vào assets nếu chưa có.
-def voskModelUrl = 'https://alphacephei.com/vosk/models/vosk-model-small-vn-0.4.zip'
-def voskModelDir = file('src/main/assets/model-vn')
-
-tasks.register('downloadVoskModel') {
-    onlyIf { !voskModelDir.exists() }
-    doLast {
-        def zip = new File(buildDir, 'vosk-model.zip')
-        zip.parentFile.mkdirs()
-        ant.get(src: voskModelUrl, dest: zip, skipexisting: true)
-        project.copy {
-            from zipTree(zip)
-            into voskModelDir
-            includeEmptyDirs = false
-            // Bỏ thư mục gốc vosk-model-small-vn-0.4/ trong file zip
-            eachFile { f ->
-                f.relativePath = new RelativePath(true, f.relativePath.segments.drop(1) as String[])
-            }
-        }
-    }
-}
-
-preBuild.dependsOn 'downloadVoskModel'
+// Model Vosk tiếng Việt không còn nằm trong APK: loa tự tải khi chọn Vosk (xem ModelInstaller).

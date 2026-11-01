@@ -113,6 +113,49 @@
   </section>
 
   <section class="card">
+    <h2>Giọng đọc & đèn</h2>
+    <div class="grid">
+      <div>
+        <label>Bộ đọc</label>
+        <select data-k="tts_engine" onchange="showTts()">
+          <option value="google">Google Cloud TTS (nhanh)</option>
+          <option value="gemini">Gemini TTS</option>
+        </select>
+      </div>
+      <div class="gtts">
+        <label>Giọng Google</label>
+        <select data-k="google_voice">
+          <option value="vi-VN-Neural2-A">Neural2-A (nữ)</option>
+          <option value="vi-VN-Neural2-D">Neural2-D (nam)</option>
+          <option value="vi-VN-Wavenet-A">Wavenet-A (nữ)</option>
+          <option value="vi-VN-Wavenet-B">Wavenet-B (nam)</option>
+          <option value="vi-VN-Wavenet-C">Wavenet-C (nữ)</option>
+          <option value="vi-VN-Wavenet-D">Wavenet-D (nam)</option>
+          <option value="vi-VN-Standard-A">Standard-A (nữ)</option>
+          <option value="vi-VN-Standard-B">Standard-B (nam)</option>
+        </select>
+      </div>
+      <div>
+        <label>Tốc độ đọc <span id="rateLabel"></span></label>
+        <input data-k="tts_rate" id="rate" type="range" min="0.5" max="2" step="0.05"
+               oninput="$('rateLabel').textContent = '×' + (+this.value).toFixed(2)">
+      </div>
+      <div class="gtts">
+        <label>Key riêng cho Cloud TTS <span class="muted" id="gkeyHint"></span></label>
+        <input type="password" data-k="google_tts_key" placeholder="Để trống = dùng API key Gemini" autocomplete="off">
+      </div>
+      <div>
+        <label>Đèn LED theo trạng thái</label>
+        <select data-k="led">
+          <option value="1">Bật (nghe xanh dương, nghĩ cam, nói xanh lá)</option>
+          <option value="0">Tắt</option>
+        </select>
+      </div>
+    </div>
+    <p class="muted gtts" style="margin:10px 0 0">Cloud TTS cần bật "Cloud Text-to-Speech API" trong Google Cloud cho project của key. Lỗi thì bot tự dùng Gemini TTS.</p>
+  </section>
+
+  <section class="card">
     <h2>Từ đánh thức</h2>
     <div class="grid">
       <div>
@@ -169,6 +212,15 @@
   </div>
 
   <section class="card">
+    <h2>Cập nhật app <span class="muted" id="version"></span></h2>
+    <div class="row">
+      <input class="flex1" type="file" id="apk" accept=".apk,.zip">
+      <button class="primary" id="installBtn" onclick="installApk()">⬆ Cài</button>
+    </div>
+    <p class="muted" id="installMsg" style="margin:10px 0 0">Chọn file app-debug.apk (hoặc file .zip tải từ GitHub Actions). Cài đặt và API key được giữ nguyên.</p>
+  </section>
+
+  <section class="card">
     <h2>Nhật ký</h2>
     <div class="log" id="log"></div>
   </section>
@@ -216,12 +268,73 @@ function fillModels(s) {
 function fillConfig(s) {
   document.querySelectorAll('[data-k]').forEach(el => {
     const k = el.dataset.k;
-    if (k === 'api_key' || k === 'mww_model') return;
+    if (k === 'api_key' || k === 'google_tts_key' || k === 'mww_model') return;
     if (s.config[k] !== undefined) el.value = s.config[k];
   });
   $('keyHint').textContent = s.config.api_key_set ? '(đã đặt ' + s.config.api_key_hint + ')' : '(chưa đặt)';
+  $('gkeyHint').textContent = s.config.google_tts_key_set ? '(đã đặt, gõ - để xoá)' : '';
+  $('rateLabel').textContent = '×' + (+$('rate').value).toFixed(2);
   fillModels(s);
   showEngine();
+  showTts();
+}
+
+function showTts() {
+  const g = document.querySelector('[data-k=tts_engine]').value === 'google';
+  document.querySelectorAll('.gtts').forEach(x => x.style.display = g ? '' : 'none');
+}
+
+async function installApk() {
+  let f = $('apk').files[0]; if (!f) return toast('Chọn file APK trước');
+  const btn = $('installBtn'), msg = $('installMsg');
+  btn.disabled = true;
+  try {
+    if (f.name.toLowerCase().endsWith('.zip')) {
+      msg.textContent = 'Đang lấy APK trong file zip…';
+      f = await apkFromZip(f);
+    }
+    msg.textContent = 'Đang tải lên ' + (f.size / 1048576).toFixed(1) + ' MB…';
+    const r = await fetch('/api/install', { method: 'POST', body: f });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(j.error || r.status);
+    msg.textContent = j.message;
+    const old = $('version').textContent;
+    // App bị tắt khi cài -> chờ nó chạy lại rồi tải lại trang
+    const t0 = Date.now();
+    let down = false;
+    const wait = setInterval(async () => {
+      try {
+        const s = await (await fetch('/api/status')).json();
+        if (down || ('v' + s.version) !== old) { clearInterval(wait); location.reload(); }
+      } catch (e) { down = true; }
+      if (Date.now() - t0 > 180000) { clearInterval(wait); msg.textContent = 'Hết giờ chờ, xem nhật ký.'; btn.disabled = false; }
+    }, 3000);
+  } catch (e) {
+    msg.textContent = 'Lỗi: ' + e.message; btn.disabled = false;
+  }
+}
+
+// Lấy file .apk đầu tiên trong zip (artifact GitHub Actions nén kiểu deflate)
+async function apkFromZip(zip) {
+  const buf = new Uint8Array(await zip.arrayBuffer()), dv = new DataView(buf.buffer);
+  let e = buf.length - 22; while (e >= 0 && dv.getUint32(e, true) !== 0x06054b50) e--;
+  if (e < 0) throw new Error('File zip hỏng');
+  let p = dv.getUint32(e + 16, true);
+  const n = dv.getUint16(e + 10, true);
+  for (let i = 0; i < n; i++) {
+    const method = dv.getUint16(p + 10, true), csize = dv.getUint32(p + 20, true);
+    const nl = dv.getUint16(p + 28, true), xl = dv.getUint16(p + 30, true), cl = dv.getUint16(p + 32, true);
+    const off = dv.getUint32(p + 42, true);
+    const name = new TextDecoder().decode(buf.subarray(p + 46, p + 46 + nl));
+    p += 46 + nl + xl + cl;
+    if (!name.toLowerCase().endsWith('.apk')) continue;
+    const start = off + 30 + dv.getUint16(off + 26, true) + dv.getUint16(off + 28, true);
+    const data = buf.subarray(start, start + csize);
+    if (method === 0) return new Blob([data]);
+    if (method !== 8 || typeof DecompressionStream === 'undefined') throw new Error('Trình duyệt không giải nén được, hãy giải nén zip rồi chọn file .apk');
+    return await new Response(new Blob([data]).stream().pipeThrough(new DecompressionStream('deflate-raw'))).blob();
+  }
+  throw new Error('Không có file .apk trong zip');
 }
 
 async function refresh() {
@@ -232,6 +345,7 @@ async function refresh() {
     $('heard').textContent = s.last_heard || '—';
     $('reply').textContent = s.last_reply || '—';
     $('wakeinfo').textContent = s.wake_name ? 'Từ đánh thức: "' + s.wake_name + '"' : '';
+    $('version').textContent = s.version ? 'v' + s.version : '';
     $('diag').textContent = 'mic ' + (s.mic_level || 0) + ' · điểm ' + (s.wake_score || 0).toFixed(2);
     paused = s.paused;
     $('pauseBtn').textContent = paused ? '▶ Tiếp tục' : '⏸ Tạm dừng';
@@ -263,6 +377,7 @@ async function save() {
   document.querySelectorAll('[data-k]').forEach(el => data[el.dataset.k] = el.value);
   await post('/api/config', data);
   document.querySelector('[data-k=api_key]').value = '';
+  document.querySelector('[data-k=google_tts_key]').value = '';
   loaded = false; await refresh(); toast('Đã lưu');
 }
 

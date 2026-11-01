@@ -33,10 +33,12 @@ import java.util.Map;
  *   POST /api/reset             xoá trí nhớ hội thoại
  *   POST /api/volume {level}    âm lượng 0..max
  *   POST /api/upload?name=x.tflite   (body = file) tải model microWakeWord lên loa
+ *   POST /api/install           (body = file APK) cập nhật app
  */
 class WebServer {
     static final int PORT = 8088;
     private static final int MAX_BODY = 8 * 1024 * 1024;
+    private static final int MAX_APK = 120 * 1024 * 1024;
 
     private final BotService bot;
     private ServerSocket server;
@@ -89,6 +91,10 @@ class WebServer {
             }
             int len = 0;
             if (headers.containsKey("content-length")) len = Integer.parseInt(headers.get("content-length"));
+            if (method.equals("POST") && target.equals("/api/install")) {
+                installApk(s, in, len);
+                return;
+            }
             if (len > MAX_BODY) {
                 send(s, 413, "text/plain", "Too large".getBytes("UTF-8"));
                 return;
@@ -199,6 +205,36 @@ class WebServer {
         sendJson(s, 200, new JSONObject().put("ok", true));
     }
 
+    /** Nhận APK (body = file, ghi thẳng ra đĩa) rồi tự cài. */
+    private void installApk(Socket s, InputStream in, int len) throws Exception {
+        if (len <= 0 || len > MAX_APK) {
+            sendJson(s, 413, new JSONObject().put("error", "File APK rỗng hoặc quá lớn"));
+            return;
+        }
+        File f = Updater.apkFile(bot);
+        FileOutputStream fos = new FileOutputStream(f);
+        byte[] buf = new byte[65536];
+        int left = len;
+        while (left > 0) {
+            int n = in.read(buf, 0, Math.min(buf.length, left));
+            if (n < 0) break;
+            fos.write(buf, 0, n);
+            left -= n;
+        }
+        fos.close();
+        if (left > 0) {
+            sendJson(s, 400, new JSONObject().put("error", "Tải lên bị ngắt giữa chừng"));
+            return;
+        }
+        BotLog.i("Đã nhận APK " + len / 1024 + " KB");
+        try {
+            sendJson(s, 200, new JSONObject().put("ok", true).put("message", Updater.install(bot, f)));
+        } catch (java.net.ConnectException | java.net.SocketTimeoutException e) {
+            sendJson(s, 500, new JSONObject().put("error",
+                    "Không nối được adb của loa. Máy tính đang kết nối adb? Chạy 'adb disconnect' rồi thử lại."));
+        }
+    }
+
     private JSONObject status() throws Exception {
         AudioManager am = (AudioManager) bot.getSystemService(Context.AUDIO_SERVICE);
         JSONArray uploaded = new JSONArray();
@@ -208,6 +244,7 @@ class WebServer {
         }
         return new JSONObject()
                 .put("state", BotLog.state)
+                .put("version", bot.getPackageManager().getPackageInfo(bot.getPackageName(), 0).versionName)
                 .put("paused", bot.isPaused())
                 .put("wake_name", BotLog.wakeName)
                 .put("mic_level", BotLog.micLevel)

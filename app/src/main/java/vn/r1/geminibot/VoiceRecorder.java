@@ -19,7 +19,8 @@ public class VoiceRecorder {
     private static final int END_SILENCE_FRAMES = 40;  // im 1.2 s thì kết thúc
     private static final int MAX_FRAMES = 333;         // tối đa ~10 s
     private static final int MIN_SPEECH_FRAMES = 15;   // bỏ tiếng động ngắn < 450 ms
-    private static final double MIN_THRESHOLD = 400;
+    // Micro của R1 thu nhỏ (nền ~25 RMS) -> ngưỡng tối thiểu thấp, phần còn lại theo mức ồn nền
+    private static final double MIN_THRESHOLD = 120;
 
     private AudioRecord rec;
     private int channels = 1;

@@ -13,7 +13,8 @@ import java.util.List;
 public class Config {
     private static final String PREFS = "gemini_r1";
     static final String[] KEYS = {"api_key", "model", "tts_model", "voice", "wake_engine",
-            "mww_model", "mww_cutoff", "wake_word", "follow_up", "persona", "mic_gain"};
+            "mww_model", "mww_cutoff", "wake_word", "follow_up", "persona", "mic_gain",
+            "tts_engine", "google_voice", "google_tts_key", "tts_rate", "led"};
 
     public String apiKey;
     public String model;
@@ -32,6 +33,14 @@ public class Config {
     public String persona;
     /** Hệ số khuếch đại micro (1 = giữ nguyên), cho mic thu nhỏ. */
     public float micGain;
+    /** "google" (Cloud TTS, nhanh) hoặc "gemini". */
+    public String ttsEngine;
+    public String googleVoice;
+    /** Key riêng cho Cloud TTS; rỗng = dùng api_key. */
+    public String googleTtsKey;
+    /** Tốc độ đọc 0.5..2 (1 = bình thường). */
+    public float ttsRate;
+    public boolean led;
 
     public List<String> wakePhrases() {
         List<String> out = new ArrayList<>();
@@ -68,6 +77,15 @@ public class Config {
         } catch (NumberFormatException e) {
             c.micGain = 1;
         }
+        c.ttsEngine = p.getString("tts_engine", "google").trim().toLowerCase();
+        c.googleVoice = p.getString("google_voice", "vi-VN-Neural2-A").trim();
+        c.googleTtsKey = p.getString("google_tts_key", "").trim();
+        try {
+            c.ttsRate = Math.max(0.5f, Math.min(2f, Float.parseFloat(p.getString("tts_rate", "1").trim())));
+        } catch (NumberFormatException e) {
+            c.ttsRate = 1;
+        }
+        c.led = !"0".equals(p.getString("led", "1").trim());
         c.persona = p.getString("persona",
                 "Bạn là trợ lý giọng nói trên loa thông minh. Trả lời ngắn gọn, tự nhiên, "
                         + "bằng ngôn ngữ người dùng nói (mặc định tiếng Việt). Không dùng markdown, "
@@ -90,7 +108,12 @@ public class Config {
                 .put("wake_word", c.wakeWord)
                 .put("follow_up", String.valueOf(c.followUpSec))
                 .put("persona", c.persona)
-                .put("mic_gain", String.valueOf(c.micGain));
+                .put("mic_gain", String.valueOf(c.micGain))
+                .put("tts_engine", c.ttsEngine)
+                .put("google_voice", c.googleVoice)
+                .put("google_tts_key_set", !c.googleTtsKey.isEmpty())
+                .put("tts_rate", String.valueOf(c.ttsRate))
+                .put("led", c.led ? "1" : "0");
     }
 
     /** Lưu các khoá có trong JSON từ Web UI. api_key rỗng = giữ nguyên. */
@@ -99,7 +122,8 @@ public class Config {
         for (String k : KEYS) {
             if (!o.has(k)) continue;
             String v = o.optString(k, "").trim();
-            if (k.equals("api_key") && v.isEmpty()) continue;
+            if ((k.equals("api_key") || k.equals("google_tts_key")) && v.isEmpty()) continue;
+            if (k.equals("google_tts_key") && v.equals("-")) v = ""; // "-" = xoá key riêng
             e.putString(k, v);
         }
         e.apply();

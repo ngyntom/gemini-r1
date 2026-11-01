@@ -45,6 +45,9 @@ public class BotService extends Service {
         wakeLock.acquire();
         web = new WebServer(this);
         web.start();
+        Led.setEnabled(Config.load(this).led);
+        Led.start();
+        new Thread(() -> Updater.reportLastInstall(this), "update-log").start();
     }
 
     @Override
@@ -139,6 +142,7 @@ public class BotService extends Service {
                         BotLog.i("Bộ nhận từ đánh thức: " + wakeEngine);
                     }
                     recorder.setGain(cfg.micGain);
+                    Led.setEnabled(cfg.led);
                     recorder.ensureOpen();
 
                     byte[] wav;
@@ -209,13 +213,31 @@ public class BotService extends Service {
             String prev = BotLog.state;
             BotLog.state = "speaking";
             try {
-                PcmPlayer.play(gemini.tts(cfg, say), TTS_RATE);
+                PcmPlayer.play(synth(cfg, say), TTS_RATE);
             } catch (Throwable e) {
                 BotLog.e("TTS lỗi", e);
             } finally {
                 BotLog.state = prev;
             }
         }
+    }
+
+    /** Google Cloud TTS (nhanh); lỗi (vd. chưa bật API) thì dùng Gemini TTS. */
+    private byte[] synth(Config cfg, String say) throws Exception {
+        if ("google".equals(cfg.ttsEngine)) {
+            try {
+                long t0 = System.currentTimeMillis();
+                byte[] pcm = GoogleTts.synth(cfg, say, TTS_RATE);
+                BotLog.i("Google TTS: " + (System.currentTimeMillis() - t0) + " ms");
+                return pcm;
+            } catch (Exception e) {
+                BotLog.e("Google TTS lỗi, dùng Gemini TTS", e);
+            }
+        }
+        long t0 = System.currentTimeMillis();
+        byte[] pcm = gemini.tts(cfg, say);
+        BotLog.i("Gemini TTS: " + (System.currentTimeMillis() - t0) + " ms");
+        return pcm;
     }
 
     @Override
