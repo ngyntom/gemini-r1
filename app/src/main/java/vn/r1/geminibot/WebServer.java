@@ -253,6 +253,12 @@ class WebServer {
                 Wifi.connectAsync(bot, ssid, req.optString("password", ""), req.optString("secure", "WPA"));
                 break;
             }
+            case "/api/airplay": // {on}: bật = cài bản sửa + khởi động lại loa, tắt = về bản gốc
+                Extras.setAirplay(bot, req.optBoolean("on"));
+                break;
+            case "/api/bluetooth": // {on}
+                Extras.setBluetooth(req.optBoolean("on"));
+                break;
             case "/api/listen":
                 bot.triggerListen();
                 break;
@@ -319,6 +325,9 @@ class WebServer {
                 .put("version", bot.getPackageManager().getPackageInfo(bot.getPackageName(), 0).versionName)
                 .put("paused", bot.isPaused())
                 .put("led_test", Led.test == null ? "" : Led.test)
+                .put("airplay", Extras.airplayOn(bot))
+                .put("bluetooth", Extras.bluetoothOn())
+                .put("extras_busy", Extras.busy)
                 .put("wifi_switch", Wifi.switchState)
                 .put("wifi_switch_msg", Wifi.switchMessage)
                 .put("wake_name", BotLog.wakeName)

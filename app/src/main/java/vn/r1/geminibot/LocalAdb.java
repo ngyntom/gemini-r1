@@ -25,7 +25,20 @@ final class LocalAdb {
      * Chạy lệnh shell, trả về toàn bộ output (đợi đến khi lệnh kết thúc).
      * adbd của R1 chỉ phục vụ một kết nối mỗi lúc, nên các lệnh chạy lần lượt.
      */
-    static synchronized String shell(String cmd, int timeoutMs) throws IOException {
+    static String shell(String cmd, int timeoutMs) throws IOException {
+        return exec("shell:" + cmd, timeoutMs);
+    }
+
+    /** Khởi động lại loa (dịch vụ "reboot:" của adbd, như "adb reboot"; shell thường không được reboot). */
+    static void reboot() {
+        try {
+            exec("reboot:", 5000);
+        } catch (IOException ignored) {
+            // adbd tắt giữa chừng khi loa khởi động lại -> bình thường
+        }
+    }
+
+    private static synchronized String exec(String service, int timeoutMs) throws IOException {
         Socket s = new Socket("127.0.0.1", 5555);
         try {
             s.setSoTimeout(timeoutMs);
@@ -38,7 +51,7 @@ final class LocalAdb {
             if (m.cmd != CNXN) throw new IOException("adb: trả lời lạ " + Integer.toHexString(m.cmd));
 
             int local = 1;
-            send(out, OPEN, local, 0, ("shell:" + cmd + "\0").getBytes("UTF-8"));
+            send(out, OPEN, local, 0, (service + "\0").getBytes("UTF-8"));
             ByteArrayOutputStream result = new ByteArrayOutputStream();
             int remote = 0;
             while (true) {

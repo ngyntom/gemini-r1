@@ -196,6 +196,12 @@
               <li class="item-content"><div class="item-media"><i class="icon f7-icons">ear</i></div>
                 <div class="item-inner"><div class="item-title">Nghe từ đánh thức</div>
                   <div class="item-after"><label class="toggle"><input type="checkbox" id="runToggle"><span class="toggle-icon"></span></label></div></div></li>
+              <li class="item-content"><div class="item-media"><i class="icon f7-icons">airplayaudio</i></div>
+                <div class="item-inner"><div class="item-title">AirPlay + DLNA<div class="item-footer" id="airplaySub">Phát nhạc từ iPhone / máy tính / app nhiều loa</div></div>
+                  <div class="item-after"><label class="toggle"><input type="checkbox" id="airplayToggle"><span class="toggle-icon"></span></label></div></div></li>
+              <li class="item-content"><div class="item-media"><i class="icon f7-icons">bluetooth</i></div>
+                <div class="item-inner"><div class="item-title">Bluetooth</div>
+                  <div class="item-after"><label class="toggle"><input type="checkbox" id="btToggle"><span class="toggle-icon"></span></label></div></div></li>
               <li class="item-content"><div class="item-media"><i class="icon f7-icons">speaker_3_fill</i></div>
                 <div class="item-inner"><div class="item-title">Âm lượng</div><div class="item-after" id="volLabel"></div></div></li>
             </ul>
@@ -818,6 +824,18 @@ $('devEditBtn').addEventListener('click', e => {
 
 // ----- Cửa sổ Thêm/bớt thiết bị -----
 let allDevs = [], pickSel = {}, pickTab = 'on', saveTimer = null;
+// ---------- AirPlay / Bluetooth ----------
+let extrasPending = false; // vừa bấm: chờ vài giây cho trạng thái thật cập nhật, đừng bật lại công tắc
+function holdExtras() { extrasPending = true; setTimeout(() => extrasPending = false, 5000); }
+$('airplayToggle').addEventListener('change', e => {
+  const on = e.target.checked;
+  const go = () => { holdExtras(); post('/api/airplay', { on }); };
+  if (on) app.dialog.confirm('Bật AirPlay + DLNA cần khởi động lại loa (~1,5 phút). Tiếp tục?', 'AirPlay', go,
+    () => { e.target.checked = false; });
+  else go();
+});
+$('btToggle').addEventListener('change', e => { holdExtras(); post('/api/bluetooth', { on: e.target.checked }); });
+
 // ---------- Đổi Wi-Fi ----------
 const wifiPopup = app.popup.create({ el: '#wifiPopup' });
 const wifiMsgRow = t => `<li class="item-content"><div class="item-inner">${t}</div></li>`;
@@ -948,6 +966,8 @@ async function refresh() {
     }
     renderSys(S.sys || {});
     if (S.wifi_switch) $('wifiMsg').textContent = S.wifi_switch_msg;
+    if (!extrasPending) { $('airplayToggle').checked = !!S.airplay; $('btToggle').checked = !!S.bluetooth; }
+    $('airplaySub').textContent = S.extras_busy || 'Phát nhạc từ iPhone / máy tính / app nhiều loa';
     const log = $('log'), atBottom = log.scrollTop + log.clientHeight >= log.scrollHeight - 10;
     log.textContent = (S.log || []).join('\n');
     if (atBottom) log.scrollTop = log.scrollHeight;
