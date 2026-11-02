@@ -36,6 +36,8 @@ import java.util.Map;
  *   POST /api/install           (body = file APK) cập nhật app
  *   POST /api/led    {state}    thử đèn LED
  *   POST /api/ha_test           kiểm tra kết nối Home Assistant
+ *   GET  /api/ha/devices        thiết bị Home Assistant cho tab Thiết bị
+ *   POST /api/ha/service {entity_id, service}   bật / tắt thiết bị
  */
 class WebServer {
     static final int PORT = 8088;
@@ -147,6 +149,23 @@ class WebServer {
             send(s, 200, "audio/wav", bot.recentMicWav());
             return;
         }
+        if (method.equals("GET") && path.equals("/api/ha/devices")) {
+            Config c = Config.load(bot);
+            if (!c.haEnabled()) {
+                sendJson(s, 400, new JSONObject().put("error", "Chưa cấu hình Home Assistant"));
+                return;
+            }
+            try {
+                sendJson(s, 200, new JSONObject().put("devices", HomeAssistant.devices(c)));
+            } catch (Exception e) {
+                sendJson(s, 502, new JSONObject().put("error", String.valueOf(e.getMessage())));
+            }
+            return;
+        }
+        if (method.equals("GET") && path.equals("/favicon.ico")) {
+            send(s, 204, "image/x-icon", new byte[0]); // trình duyệt tự xin, trước đây trả 404
+            return;
+        }
         if (!method.equals("POST")) {
             send(s, 404, "text/plain", "Not found".getBytes("UTF-8"));
             return;
@@ -198,6 +217,16 @@ class WebServer {
                     sendJson(s, 502, new JSONObject().put("error", String.valueOf(e.getMessage())));
                 }
                 return;
+            }
+            case "/api/ha/service": { // {entity_id, service}: bật / tắt từ tab Thiết bị
+                Config c = Config.load(bot);
+                try {
+                    HomeAssistant.uiService(c, req.optString("entity_id"), req.optString("service", "toggle"));
+                } catch (Exception e) {
+                    sendJson(s, 502, new JSONObject().put("error", String.valueOf(e.getMessage())));
+                    return;
+                }
+                break;
             }
             case "/api/led": // thử đèn: {state: listening|thinking|speaking|error|idle}, rỗng = theo bot
                 Led.test = req.optString("state", "").isEmpty() ? null : req.optString("state");

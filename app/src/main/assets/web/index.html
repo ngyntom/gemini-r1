@@ -2,438 +2,498 @@
 <html lang="vi">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#f2f2f7">
 <title>Gemini R1</title>
+<!-- Giao diện theo kiểu Voicebot trên Pi: Framework7 (theme iOS) + F7 Icons, tải từ CDN
+     (trình duyệt xem Web UI có mạng; loa chỉ phục vụ file này). -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/framework7@9.1.3/framework7-bundle.min.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/framework7-icons@5.0.5/css/framework7-icons.css">
 <style>
-  :root {
-    --bg: #f4f5f7; --card: #ffffff; --text: #1d2129; --muted: #6b7280; --line: #e3e5e8;
-    --accent: #3b6cf6; --accent-text: #ffffff; --ok: #18a058; --warn: #d48806; --err: #d03050;
-    --input: #ffffff; --code: #f0f1f3;
+  :root { --sidebar-w: 270px; --bubble-bot: #e9e9eb; --bubble-bot-text: #000; }
+  .dark { --bubble-bot: #26252a; --bubble-bot-text: #fff; }
+  body { background: var(--f7-page-bg-color); }
+
+  /* Menu trái trên máy tính, thanh tab dưới trên điện thoại */
+  #sidebar { display: none; }
+  @media (min-width: 900px) {
+    #sidebar { display: block; position: fixed; left: 0; top: 0; bottom: 0; width: var(--sidebar-w); margin: 0;
+               padding: 12px; overflow: auto; z-index: 10; background: var(--f7-page-bg-color);
+               border-right: 1px solid var(--f7-list-outline-border-color, rgba(0,0,0,.12)); }
+    #sidebar .brand { font-weight: 600; font-size: 17px; padding: 10px 10px 14px;
+                      border-bottom: 1px solid var(--f7-list-outline-border-color, rgba(0,0,0,.12)); margin-bottom: 10px; }
+    .views.tabs { margin-left: var(--sidebar-w); width: calc(100% - var(--sidebar-w)); }
+    #tabbar { display: none !important; }
+    .page-content { --chat-bar-bottom: 0px; }
   }
-  @media (prefers-color-scheme: dark) {
-    :root {
-      --bg: #111318; --card: #1b1e25; --text: #e6e8eb; --muted: #9aa1ab; --line: #2b2f38;
-      --accent: #5b86ff; --accent-text: #ffffff; --ok: #36c27a; --warn: #f0a020; --err: #ff5c7a;
-      --input: #14161b; --code: #14161b;
-    }
-  }
-  * { box-sizing: border-box; }
-  body { margin: 0; background: var(--bg); color: var(--text);
-         font: 15px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
-  main { max-width: 760px; margin: 0 auto; padding: 16px; }
-  header { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 16px; }
-  h1 { font-size: 20px; margin: 0; }
-  h2 { font-size: 15px; margin: 0 0 12px; }
-  .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 16px; margin-bottom: 14px; }
-  .pill { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 999px;
-          font-size: 13px; font-weight: 600; background: var(--code); }
-  .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); }
-  .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
-  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-  @media (max-width: 560px) { .grid { grid-template-columns: 1fr; } }
-  label { display: block; font-size: 13px; color: var(--muted); margin-bottom: 4px; }
-  input, select, textarea { width: 100%; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px;
-          background: var(--input); color: var(--text); font: inherit; }
-  textarea { min-height: 70px; resize: vertical; }
-  button { padding: 8px 14px; border-radius: 8px; border: 1px solid var(--line); background: var(--card);
-           color: var(--text); font: inherit; cursor: pointer; }
-  button.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-text); }
-  button:disabled { opacity: .5; cursor: default; }
-  .muted { color: var(--muted); font-size: 13px; }
-  .bubble { padding: 10px 12px; border-radius: 10px; background: var(--code); margin-top: 6px; min-height: 22px;
-            white-space: pre-wrap; word-break: break-word; }
-  .log { background: var(--code); border-radius: 8px; padding: 10px; height: 220px; overflow: auto;
-         font: 12px/1.45 ui-monospace, Consolas, monospace; white-space: pre-wrap; word-break: break-word; }
-  .flex1 { flex: 1; min-width: 0; }
-  #toast { position: fixed; left: 50%; bottom: 20px; transform: translateX(-50%); background: var(--text);
-           color: var(--bg); padding: 8px 14px; border-radius: 8px; font-size: 14px; opacity: 0;
-           transition: opacity .2s; pointer-events: none; }
-  #toast.show { opacity: 1; }
+  #sidebar .menu-list li { margin-bottom: 4px; }
+  #sidebar .item-subtitle { font-size: 12px; opacity: .65; white-space: normal; }
+
+  .page-inner { max-width: 760px; margin: 0 auto; }
+  .muted { opacity: .6; font-size: 13px; }
+  .block-footer, .item-footer { white-space: normal; }
+
+  /* Chat */
+  .chat-list { padding: 12px 14px 90px; display: flex; flex-direction: column; gap: 6px; max-width: 760px; margin: 0 auto; }
+  .chat-time { align-self: center; font-size: 12px; opacity: .55; margin: 10px 0 4px; }
+  .msg { max-width: 78%; padding: 8px 13px; border-radius: 18px; font-size: 16px; line-height: 1.35;
+         white-space: pre-wrap; word-break: break-word; }
+  .msg.user { align-self: flex-end; background: var(--f7-theme-color); color: #fff; border-bottom-right-radius: 6px; }
+  .msg-row { display: flex; align-items: flex-end; gap: 8px; align-self: flex-start; max-width: 86%; }
+  .msg-row .msg { max-width: none; background: var(--bubble-bot); color: var(--bubble-bot-text); border-bottom-left-radius: 6px; }
+  .msg-row .avatar { flex: none; width: 28px; height: 28px; border-radius: 50%; background: var(--f7-theme-color);
+                     color: #fff; display: flex; align-items: center; justify-content: center; font-size: 15px; }
+  .msg .tag { display: block; font-size: 11px; opacity: .6; margin-top: 3px; }
+  .chat-empty { text-align: center; opacity: .55; margin-top: 30vh; }
+  .chat-bar { position: absolute; left: 0; right: 0; z-index: 20; padding: 8px 12px;
+              bottom: var(--chat-bar-bottom, calc(var(--f7-toolbar-height, 50px) + var(--f7-safe-area-bottom) + 14px));
+              display: flex; gap: 8px; align-items: center; max-width: 760px; margin: 0 auto; }
+  .chat-bar input { flex: 1; min-width: 0; height: 42px; border-radius: 21px; padding: 0 16px; font-size: 16px;
+                    background: var(--f7-list-bg-color, #fff); color: inherit;
+                    box-shadow: 0 2px 10px rgba(0,0,0,.12); border: none; outline: none; }
+  .round-btn { flex: none; width: 42px; height: 42px; border-radius: 50%; display: flex; align-items: center;
+               justify-content: center; background: var(--f7-list-bg-color, #fff); color: var(--f7-theme-color);
+               box-shadow: 0 2px 10px rgba(0,0,0,.12); }
+  .round-btn.fill { background: var(--f7-text-color, #000); color: var(--f7-page-bg-color, #fff); }
+  .round-btn i { font-size: 22px; }
+
+  /* Trạng thái */
+  .state-chip { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; }
+  .dot { width: 9px; height: 9px; border-radius: 50%; background: #8e8e93; display: inline-block; }
+  .log { font: 12px/1.45 ui-monospace, Consolas, monospace; white-space: pre-wrap; word-break: break-word;
+         max-height: 340px; overflow: auto; padding: 12px 16px; }
+
+  /* Thiết bị */
+  .tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; padding: 12px; }
+  .tile { position: relative; border-radius: 16px; padding: 12px; min-height: 120px; cursor: pointer; user-select: none;
+          background: rgba(120,120,128,.14); display: flex; flex-direction: column; justify-content: space-between;
+          transition: background .15s, transform .1s; }
+  .tile:active { transform: scale(.97); }
+  .tile.on { background: var(--f7-theme-color); color: #fff; }
+  .tile i.f7-icons { font-size: 28px; }
+  .tile .t-name { font-size: 14px; font-weight: 500; margin-top: 10px; }
+  .tile .t-state { font-size: 12px; opacity: .7; }
+  .tile .t-badge { position: absolute; top: 10px; right: 10px; font-size: 11px; border: 1px solid currentColor;
+                   border-radius: 999px; padding: 2px 6px; opacity: .8; }
+  .tile.busy { opacity: .5; }
+
+  .range-row { padding: 6px 16px 12px; }
+  .range-row input[type=range] { width: 100%; accent-color: var(--f7-theme-color); }
+  .btn-row { display: flex; flex-wrap: wrap; gap: 8px; padding: 0 16px 14px; }
+  .btn-row .button { width: auto; flex: 1 1 auto; }
 </style>
 </head>
 <body>
-<main>
-  <header>
-    <h1>Gemini R1</h1>
-    <span class="pill"><span class="dot" id="dot"></span><span id="state">Đang kết nối…</span></span>
-  </header>
+<div id="app">
 
-  <section class="card">
-    <h2>Hội thoại gần nhất</h2>
-    <label>Bạn nói</label>
-    <div class="bubble" id="heard">—</div>
-    <label style="margin-top:10px">Gemini trả lời</label>
-    <div class="bubble" id="reply">—</div>
-    <p class="muted" id="wakeinfo" style="margin:10px 0 0"></p>
-  </section>
+  <!-- Menu trái (máy tính) - cùng kiểu Menu List của F7 như Voicebot trên Pi -->
+  <div class="list media-list menu-list no-hairlines" id="sidebar">
+    <div class="brand">Gemini R1 <span class="state-chip muted" style="float:right"><span class="dot" data-state-dot></span><span data-state-text>…</span></span></div>
+    <ul>
+      <li><a href="#view-chat" class="item-content item-link tab-link tab-link-active">
+        <div class="item-media"><i class="icon f7-icons">chat_bubble_2_fill</i></div>
+        <div class="item-inner"><div class="item-title-wrap"><div class="item-title">Chat</div></div>
+          <div class="item-subtitle">Trò chuyện, hỏi Gemini bằng chữ</div></div></a></li>
+      <li><a href="#view-speaker" class="item-content item-link tab-link">
+        <div class="item-media"><i class="icon f7-icons">speaker_3_fill</i></div>
+        <div class="item-inner"><div class="item-title-wrap"><div class="item-title">Loa</div></div>
+          <div class="item-subtitle">Trạng thái, âm lượng, mic, nhật ký</div></div></a></li>
+      <li><a href="#view-devices" class="item-content item-link tab-link">
+        <div class="item-media"><i class="icon f7-icons">square_grid_2x2_fill</i></div>
+        <div class="item-inner"><div class="item-title-wrap"><div class="item-title">Thiết bị</div></div>
+          <div class="item-subtitle">Bật/tắt thiết bị nhà</div></div></a></li>
+      <li><a href="#view-settings" class="item-content item-link tab-link">
+        <div class="item-media"><i class="icon f7-icons">gear_alt_fill</i></div>
+        <div class="item-inner"><div class="item-title-wrap"><div class="item-title">Cài đặt</div></div>
+          <div class="item-subtitle">Gemini, giọng, đánh thức, đèn LED</div></div></a></li>
+    </ul>
+  </div>
 
-  <section class="card">
-    <h2>Điều khiển</h2>
-    <div class="row" style="margin-bottom:12px">
-      <button class="primary" onclick="post('/api/listen').then(()=>toast('Đang nghe…'))">🎙 Nghe ngay</button>
-      <button id="pauseBtn" onclick="togglePause()">⏸ Tạm dừng</button>
-      <button onclick="post('/api/reset').then(()=>toast('Đã xoá trí nhớ'))">🧹 Xoá trí nhớ</button>
-    </div>
-    <label>Âm lượng <span id="volLabel"></span></label>
-    <input type="range" id="vol" min="0" max="15" step="1">
-    <div class="row" style="margin-top:14px">
-      <input class="flex1" id="text" placeholder="Gõ câu hỏi cho Gemini, hoặc câu để loa đọc">
-      <button class="primary" onclick="sendText('/api/ask')">Hỏi</button>
-      <button onclick="sendText('/api/say')">Đọc</button>
-    </div>
-  </section>
-
-  <section class="card">
-    <h2>Gemini</h2>
-    <div class="grid">
-      <div>
-        <label>API key <span class="muted" id="keyHint"></span></label>
-        <input type="password" data-k="api_key" placeholder="Để trống = giữ nguyên" autocomplete="off">
-      </div>
-      <div>
-        <label>Model trả lời (chọn hoặc gõ tên khác)</label>
-        <input data-k="model" list="modelList" placeholder="gemini-2.5-flash">
-        <datalist id="modelList">
-          <option value="gemini-2.5-flash">Gemini 2.5 Flash (~1.4 s)</option>
-          <option value="gemini-2.5-flash-lite">Gemini 2.5 Flash-Lite</option>
-          <option value="gemini-3.5-flash-lite">Gemini 3.5 Flash Lite (~1.2 s, nhanh nhất)</option>
-          <option value="gemini-3.5-flash">Gemini 3.5 Flash (~1.3 s)</option>
-          <option value="gemini-3.8-flash">Gemini 3.8 Flash</option>
-          <option value="gemini-3.1-flash-lite">Gemini 3.1 Flash Lite</option>
-        </datalist>
-      </div>
-      <div>
-        <label>Model đọc giọng (TTS)</label>
-        <input data-k="tts_model">
-      </div>
-      <div>
-        <label>Giọng đọc</label>
-        <select data-k="voice">
-          <option>Kore</option><option>Puck</option><option>Charon</option><option>Aoede</option>
-          <option>Leda</option><option>Fenrir</option><option>Zephyr</option><option>Orus</option>
-        </select>
-      </div>
-    </div>
-    <div style="margin-top:12px">
-      <label>Tính cách / chỉ dẫn</label>
-      <textarea data-k="persona"></textarea>
-    </div>
-  </section>
-
-  <section class="card">
-    <h2>Giọng đọc & đèn</h2>
-    <div class="grid">
-      <div>
-        <label>Bộ đọc</label>
-        <select data-k="tts_engine" onchange="showTts()">
-          <option value="gfree">Google Dịch (nhanh, miễn phí, không cần key)</option>
-          <option value="google">Google Cloud TTS (nhanh, cần key Cloud)</option>
-          <option value="gemini">Gemini TTS (tự nhiên, chậm ~3–4 s)</option>
-        </select>
-      </div>
-      <div class="gtts">
-        <label>Giọng Google</label>
-        <select data-k="google_voice">
-          <option value="vi-VN-Neural2-A">Neural2-A (nữ)</option>
-          <option value="vi-VN-Neural2-D">Neural2-D (nam)</option>
-          <option value="vi-VN-Wavenet-A">Wavenet-A (nữ)</option>
-          <option value="vi-VN-Wavenet-B">Wavenet-B (nam)</option>
-          <option value="vi-VN-Wavenet-C">Wavenet-C (nữ)</option>
-          <option value="vi-VN-Wavenet-D">Wavenet-D (nam)</option>
-          <option value="vi-VN-Standard-A">Standard-A (nữ)</option>
-          <option value="vi-VN-Standard-B">Standard-B (nam)</option>
-        </select>
-      </div>
-      <div>
-        <label>Tốc độ đọc <span id="rateLabel"></span></label>
-        <input data-k="tts_rate" id="rate" type="range" min="0.5" max="2" step="0.05"
-               oninput="$('rateLabel').textContent = '×' + (+this.value).toFixed(2)">
-      </div>
-      <div>
-        <label>Key Google Cloud (TTS & nhận giọng nói) <span class="muted" id="gkeyHint"></span></label>
-        <input type="password" data-k="google_tts_key" placeholder="AIza… ; để trống = dùng API key Gemini" autocomplete="off">
-      </div>
-      <div>
-        <label>Đèn LED theo trạng thái</label>
-        <select data-k="led">
-          <option value="1">Bật (nghe: thở xanh, nghĩ: sao chổi, nói: xanh lá, lỗi: đỏ)</option>
-          <option value="0">Tắt</option>
-        </select>
-      </div>
-    </div>
-    <div class="row" style="margin-top:12px">
-      <span class="muted">Thử đèn:</span>
-      <button onclick="post('/api/led',{state:'listening'})">Nghe</button>
-      <button onclick="post('/api/led',{state:'thinking'})">Nghĩ</button>
-      <button onclick="post('/api/led',{state:'speaking'})">Nói</button>
-      <button onclick="post('/api/led',{state:'error'})">Lỗi</button>
-      <button onclick="post('/api/led',{state:''})">Theo bot</button>
-    </div>
-    <p class="muted gtts" style="margin:10px 0 0">Cloud TTS cần bật "Cloud Text-to-Speech API" trong Google Cloud cho project của key. Lỗi thì bot tự dùng Gemini TTS.</p>
-  </section>
-
-  <section class="card">
-    <h2>Từ đánh thức</h2>
-    <div class="grid">
-      <div>
-        <label>Bộ nhận</label>
-        <select data-k="wake_engine" onchange="showEngine()">
-          <option value="mww">microWakeWord (nhẹ)</option>
-          <option value="vosk">Vosk tiếng Việt</option>
-        </select>
-      </div>
-      <div>
-        <label>Nghe tiếp sau khi trả lời (giây, 0 = tắt)</label>
-        <input data-k="follow_up" type="number" min="0" max="30">
-      </div>
-      <div class="mww">
-        <label>Model microWakeWord</label>
-        <select data-k="mww_model" id="mwwModel"></select>
-      </div>
-      <div class="mww">
-        <label>Ngưỡng 0–1 (0 = theo model)</label>
-        <input data-k="mww_cutoff" type="number" min="0" max="1" step="0.01">
-      </div>
-      <div>
-        <label>Âm báo khi đánh thức</label>
-        <select data-k="wake_sound">
-          <option value="chime">Ding-dong</option>
-          <option value="voice">Giọng đáp (câu bên cạnh)</option>
-          <option value="none">Không</option>
-        </select>
-      </div>
-      <div>
-        <label>Câu đáp khi gọi</label>
-        <input data-k="wake_reply" placeholder="Dạ?">
-      </div>
-      <div>
-        <label>Hỏi giờ / ngày / thứ</label>
-        <select data-k="local_time">
-          <option value="1">Trả lời tại loa (nhanh, không gửi Gemini)</option>
-          <option value="0">Gửi Gemini</option>
-        </select>
-      </div>
-      <div>
-        <label>Khuếch đại micro (1 = giữ nguyên)</label>
-        <input data-k="mic_gain" type="number" min="0.1" max="32" step="0.5">
-      </div>
-      <div>
-        <label>Mức micro / điểm nhận</label>
-        <div class="muted" id="diag" style="padding:8px 0">—</div>
-      </div>
-      <div class="vosk" style="grid-column: 1 / -1">
-        <label>Cụm từ (cách nhau bằng dấu phẩy)</label>
-        <input data-k="wake_word" placeholder="trợ lý ơi, loa ơi">
-      </div>
-    </div>
-    <div style="margin-top:12px">
-      <label>Nghe lại 5 giây micro vừa thu</label>
-      <div class="row">
-        <button onclick="$('micAudio').src='/api/mic.wav?t='+Date.now(); $('micAudio').play()">▶ Nghe mic</button>
-        <audio id="micAudio" controls class="flex1"></audio>
-      </div>
-    </div>
-    <div class="mww" style="margin-top:12px">
-      <label>Tải model tự huấn luyện (.tflite, kèm .json nếu có)</label>
-      <div class="row">
-        <input class="flex1" type="file" id="upload" accept=".tflite,.json" multiple>
-        <button onclick="upload()">Tải lên</button>
-      </div>
-    </div>
-  </section>
-
-  <section class="card">
-    <h2>Nhận giọng nói & Gemini Live</h2>
-    <div class="grid">
-      <div>
-        <label>Nhận giọng nói</label>
-        <select data-k="stt_engine">
-          <option value="google">Google Cloud STT → chữ (nhanh hơn ~1 s, hỏi giờ trả lời tại loa)</option>
-          <option value="gemini">Gemini nghe trực tiếp (không cần key Cloud)</option>
-        </select>
-      </div>
-      <div>
-        <label>Gemini Live (trò chuyện liên tục)</label>
-        <select data-k="live">
-          <option value="0">Tắt – mỗi câu gọi từ đánh thức</option>
-          <option value="1">Bật – gọi một lần rồi nói chuyện liên tục</option>
-        </select>
-      </div>
-      <div>
-        <label>Model Live</label>
-        <input data-k="live_model" placeholder="gemini-2.5-flash-native-audio-latest">
-      </div>
-      <div>
-        <label>Live: im lặng bao nhiêu giây thì kết thúc</label>
-        <input data-k="live_idle" type="number" min="5" max="300">
-      </div>
-      <div style="grid-column: 1 / -1">
-        <label>Service account Google Cloud (file .json, cho STT & Cloud TTS) <span class="muted" id="saHint"></span></label>
-        <div class="row">
-          <input class="flex1" type="file" id="saFile" accept=".json,application/json">
-          <button onclick="saUpload()">Lưu file</button>
-          <button onclick="saClear()">Xoá</button>
+  <div class="views tabs">
+    <div class="toolbar tabbar tabbar-icons toolbar-bottom" id="tabbar">
+      <div class="toolbar-inner">
+        <div class="toolbar-pane">
+          <a href="#view-chat" class="tab-link tab-link-active"><i class="icon f7-icons">chat_bubble_2_fill</i><span class="tabbar-label">Chat</span></a>
+          <a href="#view-speaker" class="tab-link"><i class="icon f7-icons">speaker_3_fill</i><span class="tabbar-label">Loa</span></a>
+          <a href="#view-devices" class="tab-link"><i class="icon f7-icons">square_grid_2x2_fill</i><span class="tabbar-label">Thiết bị</span></a>
+          <a href="#view-settings" class="tab-link"><i class="icon f7-icons">gear_alt_fill</i><span class="tabbar-label">Cài đặt</span></a>
         </div>
       </div>
     </div>
-    <p class="muted" style="margin:10px 0 0">Google Cloud STT cần key Google Cloud (AIza…) của project đã bật
-      "Cloud Speech-to-Text API" và billing (miễn phí 60 phút / tháng). Key bị từ chối thì bot tự quay về Gemini nghe trực tiếp.
-      Gemini Live dùng API key Gemini và giọng đọc Gemini ở trên; nói "tạm biệt" để kết thúc. Loa không khử được
-      tiếng vọng nên không nói chen ngang được khi loa đang nói.</p>
-  </section>
 
-  <section class="card">
-    <h2>Home Assistant</h2>
-    <div class="grid">
-      <div>
-        <label>Địa chỉ</label>
-        <input data-k="ha_url" placeholder="http://192.168.2.100:8123">
-      </div>
-      <div>
-        <label>Long-lived access token <span class="muted" id="haHint"></span></label>
-        <input type="password" data-k="ha_token" placeholder="Để trống = giữ nguyên" autocomplete="off">
+    <!-- ===== Chat ===== -->
+    <div id="view-chat" class="view view-main tab tab-active" data-url="/">
+      <div class="page" data-name="chat">
+        <div class="navbar"><div class="navbar-bg"></div><div class="navbar-inner">
+          <div class="title">Chat<span class="subtitle" data-state-text>…</span></div>
+          <div class="right"><a href="#" class="link icon-only" id="listenBtn" title="Nghe ngay (không cần từ đánh thức)"><i class="icon f7-icons">mic_fill</i></a></div>
+        </div></div>
+        <div class="page-content" id="chatScroll">
+          <div class="chat-list" id="chatList"><div class="chat-empty">Chưa có hội thoại. Gọi từ đánh thức hoặc nhắn bên dưới.</div></div>
+        </div>
+        <div class="chat-bar">
+          <input id="chatInput" placeholder="Nhắn cho Gemini…" autocomplete="off">
+          <a href="#" class="round-btn" id="sayBtn" title="Loa đọc nguyên văn"><i class="icon f7-icons">speaker_2_fill</i></a>
+          <a href="#" class="round-btn fill" id="sendBtn" title="Hỏi Gemini"><i class="icon f7-icons">arrow_up</i></a>
+        </div>
       </div>
     </div>
-    <div class="row" style="margin-top:12px">
-      <button onclick="haTest()">🔌 Kiểm tra kết nối</button>
-      <span class="muted" id="haMsg"></span>
-    </div>
-    <p class="muted" style="margin:10px 0 0">Tạo token trong Home Assistant: bấm tên tài khoản (góc dưới bên trái) → tab
-      Bảo mật → Long-lived access tokens → Tạo token. Dùng địa chỉ IP trong mạng nhà (http), không dùng
-      homeassistant.local hay https. Lưu cấu hình rồi nói "bật đèn phòng khách", "tắt quạt", "điều hoà 26 độ"…
-      Gemini đọc tên thiết bị từ HA, nên đặt tên tiếng Việt dễ gọi trong HA sẽ chính xác hơn.</p>
-  </section>
 
-  <div class="row" style="margin-bottom:14px">
-    <button class="primary" onclick="save()">💾 Lưu cấu hình</button>
-    <span class="muted">Bot tự áp dụng sau vài giây.</span>
+    <!-- ===== Loa ===== -->
+    <div id="view-speaker" class="view tab" data-url="/">
+      <div class="page" data-name="speaker">
+        <div class="navbar"><div class="navbar-bg"></div><div class="navbar-inner">
+          <div class="title">Loa</div>
+        </div></div>
+        <div class="page-content"><div class="page-inner">
+          <div class="list list-strong list-dividers inset">
+            <ul>
+              <li class="item-content"><div class="item-media"><span class="dot" data-state-dot></span></div>
+                <div class="item-inner"><div class="item-title" data-state-text>…</div><div class="item-after" id="version"></div></div></li>
+              <li class="item-content"><div class="item-inner"><div class="item-title">Từ đánh thức</div><div class="item-after" id="wakeName">—</div></div></li>
+              <li class="item-content"><div class="item-inner"><div class="item-title">Mức mic · điểm nhận</div><div class="item-after" id="diag">—</div></div></li>
+            </ul>
+          </div>
+
+          <div class="block-title">Điều khiển</div>
+          <div class="list list-strong list-dividers inset">
+            <ul>
+              <li class="item-content"><div class="item-media"><i class="icon f7-icons">ear</i></div>
+                <div class="item-inner"><div class="item-title">Nghe từ đánh thức</div>
+                  <div class="item-after"><label class="toggle"><input type="checkbox" id="runToggle"><span class="toggle-icon"></span></label></div></div></li>
+              <li class="item-content"><div class="item-media"><i class="icon f7-icons">speaker_3_fill</i></div>
+                <div class="item-inner"><div class="item-title">Âm lượng</div><div class="item-after" id="volLabel"></div></div></li>
+            </ul>
+            <div class="range-row"><input type="range" id="vol" min="0" max="15" step="1"></div>
+            <div class="btn-row">
+              <a href="#" class="button button-tonal" id="btnListen"><i class="icon f7-icons" style="font-size:18px">mic</i>&nbsp;Nghe ngay</a>
+              <a href="#" class="button button-tonal" id="btnReset"><i class="icon f7-icons" style="font-size:18px">trash</i>&nbsp;Xoá trí nhớ</a>
+            </div>
+          </div>
+
+          <div class="block-title">Micro</div>
+          <div class="list list-strong list-dividers inset">
+            <div class="btn-row" style="padding-top:14px">
+              <a href="#" class="button button-tonal" id="btnMic"><i class="icon f7-icons" style="font-size:18px">play_fill</i>&nbsp;Nghe lại 5 giây mic</a>
+            </div>
+            <div style="padding:0 16px 14px"><audio id="micAudio" controls style="width:100%"></audio></div>
+          </div>
+
+          <div class="block-title">Thử đèn LED</div>
+          <div class="list list-strong list-dividers inset">
+            <div class="btn-row" style="padding-top:14px">
+              <a href="#" class="button button-tonal" data-led="listening">Nghe</a>
+              <a href="#" class="button button-tonal" data-led="thinking">Nghĩ</a>
+              <a href="#" class="button button-tonal" data-led="speaking">Nói</a>
+              <a href="#" class="button button-tonal" data-led="error">Lỗi</a>
+              <a href="#" class="button button-fill" data-led="">Theo bot</a>
+            </div>
+          </div>
+
+          <div class="block-title">Nhật ký</div>
+          <div class="list list-strong list-dividers inset"><div class="log" id="log"></div></div>
+        </div></div>
+      </div>
+    </div>
+
+    <!-- ===== Thiết bị ===== -->
+    <div id="view-devices" class="view tab" data-url="/">
+      <div class="page" data-name="devices">
+        <div class="navbar"><div class="navbar-bg"></div><div class="navbar-inner">
+          <div class="title">Thiết bị</div>
+          <div class="right"><a href="#" class="link icon-only" id="devReload" title="Tải lại"><i class="icon f7-icons">arrow_clockwise</i></a></div>
+        </div></div>
+        <div class="page-content"><div class="page-inner" id="devices">
+          <div class="block muted">Đang tải…</div>
+        </div></div>
+      </div>
+    </div>
+
+    <!-- ===== Cài đặt ===== -->
+    <div id="view-settings" class="view tab" data-url="/">
+      <div class="page" data-name="settings">
+        <div class="navbar"><div class="navbar-bg"></div><div class="navbar-inner">
+          <div class="title">Cài đặt</div>
+        </div></div>
+        <div class="page-content"><div class="page-inner">
+          <div class="list list-strong list-dividers inset media-list">
+            <ul>
+              <li class="list-group-title" style="display:flex;justify-content:space-between;align-items:center">
+                <span>Trợ lý</span>
+                <span style="display:flex;align-items:center;gap:8px;font-weight:400;font-size:14px">Nghe từ đánh thức
+                  <label class="toggle"><input type="checkbox" id="runToggle2"><span class="toggle-icon"></span></label></span></li>
+              <li><a href="/gemini/" class="item-link item-content"><div class="item-media"><i class="icon f7-icons" style="color:#2f80ed">sparkles</i></div>
+                <div class="item-inner"><div class="item-title">Gemini</div><div class="item-subtitle">API key, model, tính cách</div></div></a></li>
+              <li><a href="/voice/" class="item-link item-content"><div class="item-media"><i class="icon f7-icons" style="color:#2f80ed">waveform</i></div>
+                <div class="item-inner"><div class="item-title">Giọng đọc</div><div class="item-subtitle">Bộ đọc, giọng, tốc độ</div></div></a></li>
+              <li><a href="/stt/" class="item-link item-content"><div class="item-media"><i class="icon f7-icons" style="color:#2f80ed">text_bubble_fill</i></div>
+                <div class="item-inner"><div class="item-title">Nhận giọng nói & Gemini Live</div><div class="item-subtitle">Google STT, service account, trò chuyện liên tục</div></div></a></li>
+              <li><a href="/ha/" class="item-link item-content"><div class="item-media"><i class="icon f7-icons" style="color:#2f80ed">house_fill</i></div>
+                <div class="item-inner"><div class="item-title">Home Assistant</div><div class="item-subtitle">Địa chỉ, token, kiểm tra kết nối</div></div></a></li>
+            </ul>
+          </div>
+          <div class="list list-strong list-dividers inset media-list">
+            <ul>
+              <li class="list-group-title">Mic & Led</li>
+              <li><a href="/wake/" class="item-link item-content"><div class="item-media"><i class="icon f7-icons" style="color:#2f80ed">mic_fill</i></div>
+                <div class="item-inner"><div class="item-title">Từ đánh thức & micro</div><div class="item-subtitle">Model, ngưỡng, âm báo, độ nhạy mic</div></div></a></li>
+              <li><a href="/led/" class="item-link item-content"><div class="item-media"><i class="icon f7-icons" style="color:#2f80ed">lightbulb_fill</i></div>
+                <div class="item-inner"><div class="item-title">Đèn LED</div><div class="item-subtitle">Bật/tắt đèn theo trạng thái</div></div></a></li>
+            </ul>
+          </div>
+          <div class="list list-strong list-dividers inset media-list">
+            <ul>
+              <li class="list-group-title">Hệ thống</li>
+              <li><a href="/update/" class="item-link item-content"><div class="item-media"><i class="icon f7-icons" style="color:#2f80ed">arrow_down_circle_fill</i></div>
+                <div class="item-inner"><div class="item-title">Cập nhật app</div><div class="item-subtitle" id="verSub">Cài APK / file zip từ GitHub</div></div></a></li>
+            </ul>
+          </div>
+        </div></div>
+      </div>
+    </div>
   </div>
+</div>
 
-  <section class="card">
-    <h2>Cập nhật app <span class="muted" id="version"></span></h2>
-    <div class="row">
-      <input class="flex1" type="file" id="apk" accept=".apk,.zip">
-      <button class="primary" id="installBtn" onclick="installApk()">⬆ Cài</button>
-    </div>
-    <p class="muted" id="installMsg" style="margin:10px 0 0">Chọn file app-debug.apk (hoặc file .zip tải từ GitHub Actions). Cài đặt và API key được giữ nguyên.</p>
-  </section>
-
-  <section class="card">
-    <h2>Nhật ký</h2>
-    <div class="log" id="log"></div>
-  </section>
-</main>
-<div id="toast"></div>
-
+<script src="https://cdn.jsdelivr.net/npm/framework7@9.1.3/framework7-bundle.min.js"></script>
 <script>
+// ---------- Dữ liệu dùng chung ----------
+let S = null;              // /api/status mới nhất
+let volDragging = false;
 const STATES = {
-  starting: ['Đang khởi động', 'var(--muted)'], no_key: ['Chưa có API key', 'var(--warn)'],
-  idle: ['Chờ từ đánh thức', 'var(--ok)'], listening: ['Đang nghe', 'var(--accent)'],
-  thinking: ['Đang nghĩ', 'var(--warn)'], speaking: ['Đang nói', 'var(--accent)'],
-  paused: ['Tạm dừng', 'var(--muted)'], error: ['Lỗi', 'var(--err)']
+  starting: ['Đang khởi động', '#8e8e93'], no_key: ['Chưa có API key', '#ff9500'],
+  idle: ['Chờ từ đánh thức', '#34c759'], listening: ['Đang nghe', '#007aff'],
+  thinking: ['Đang nghĩ', '#ff9500'], speaking: ['Đang nói', '#007aff'],
+  paused: ['Tạm dừng', '#8e8e93'], error: ['Lỗi', '#ff3b30']
 };
-let loaded = false, paused = false, volDragging = false;
-
-function $(id) { return document.getElementById(id); }
-function toast(msg) { const t = $('toast'); t.textContent = msg; t.classList.add('show');
-  clearTimeout(t._h); t._h = setTimeout(() => t.classList.remove('show'), 1800); }
+const SECRETS = ['api_key', 'google_tts_key', 'ha_token'];
+const $ = id => document.getElementById(id);
+const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
 async function post(path, data) {
   const r = await fetch(path, { method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: data === undefined ? '' : JSON.stringify(data) });
   const j = await r.json().catch(() => ({}));
-  if (!r.ok) { toast('Lỗi: ' + (j.error || r.status)); throw new Error(j.error); }
+  if (!r.ok) { toast('Lỗi: ' + (j.error || r.status)); throw new Error(j.error || r.status); }
   return j;
 }
+function toast(text) { app.toast.create({ text, closeTimeout: 2000, position: 'center' }).open(); }
 
-function showEngine() {
-  const e = document.querySelector('[data-k=wake_engine]').value;
-  document.querySelectorAll('.mww').forEach(x => x.style.display = e === 'mww' ? '' : 'none');
-  document.querySelectorAll('.vosk').forEach(x => x.style.display = e === 'vosk' ? '' : 'none');
+// ---------- Trang con của Cài đặt (dựng từ cấu hình hiện tại) ----------
+function row(inner, footer) {
+  return `<li class="item-content item-input"><div class="item-inner">${inner}${footer ? `<div class="item-footer">${footer}</div>` : ''}</div></li>`;
 }
-
-function fillModels(s) {
-  const sel = $('mwwModel'), cur = s.config.mww_model, opts = [];
-  (s.builtin_models || []).filter(f => f.endsWith('.tflite'))
-    .forEach(f => opts.push([f.replace('.tflite', ''), f.replace('.tflite', '') + ' (có sẵn)']));
-  (s.uploaded_models || []).forEach(p => opts.push([p, p.split('/').pop() + ' (đã tải lên)']));
-  if (cur && !opts.some(o => o[0] === cur)) opts.push([cur, cur]);
-  sel.innerHTML = '';
-  opts.forEach(([v, t]) => { const o = document.createElement('option'); o.value = v; o.textContent = t; sel.appendChild(o); });
-  sel.value = cur;
+function inp(k, label, opt = {}) {
+  const t = opt.type || 'text', secret = SECRETS.includes(k);
+  return row(`<div class="item-title item-label">${label}</div><div class="item-input-wrap">
+    <input data-k="${k}" type="${secret ? 'password' : t}" placeholder="${esc(opt.ph || '')}" autocomplete="off"
+      ${opt.list ? `list="${opt.list}"` : ''} ${opt.min != null ? `min="${opt.min}"` : ''} ${opt.max != null ? `max="${opt.max}"` : ''} ${opt.step ? `step="${opt.step}"` : ''}></div>`, opt.foot);
 }
+function sel(k, label, opts, foot) {
+  return row(`<div class="item-title item-label">${label}</div><div class="item-input-wrap input-dropdown-wrap">
+    <select data-k="${k}">${opts.map(([v, t]) => `<option value="${esc(v)}">${esc(t)}</option>`).join('')}</select></div>`, foot);
+}
+function area(k, label) {
+  return row(`<div class="item-title item-label">${label}</div><div class="item-input-wrap"><textarea data-k="${k}" class="resizable"></textarea></div>`);
+}
+function tog(k, label, foot) {
+  return `<li class="item-content"><div class="item-inner"><div class="item-title">${label}${foot ? `<div class="item-footer">${foot}</div>` : ''}</div>
+    <div class="item-after"><label class="toggle"><input type="checkbox" data-k="${k}"><span class="toggle-icon"></span></label></div></div></li>`;
+}
+function rng(k, label, min, max, step, fmt, foot) {
+  return row(`<div class="item-title item-label">${label} <b data-rl="${k}"></b></div>
+    <div class="item-input-wrap" style="padding:6px 0"><input data-k="${k}" data-fmt="${fmt}" type="range" min="${min}" max="${max}" step="${step}" style="width:100%;accent-color:var(--f7-theme-color)"></div>`, foot);
+}
+const list = (title, items, footer) => `${title ? `<div class="block-title">${title}</div>` : ''}<div class="list list-strong list-dividers inset"><ul>${items.join('')}</ul></div>${footer ? `<div class="block-footer">${footer}</div>` : ''}`;
+function subpage(name, title, body) {
+  return `<div class="page" data-name="${name}">
+    <div class="navbar"><div class="navbar-bg"></div><div class="navbar-inner">
+      <div class="left"><a href="#" class="link back"><i class="icon icon-back"></i><span class="if-not-md">Cài đặt</span></a></div>
+      <div class="title">${title}</div>
+      <div class="right"><a href="#" class="link icon-only save-btn" title="Lưu"><i class="icon f7-icons">floppy_disk</i></a></div>
+    </div></div>
+    <div class="page-content"><div class="page-inner" style="padding-bottom:40px">${body}</div></div></div>`;
+}
+const hint = (set, extra) => set ? `<span class="muted">${extra || '(đã đặt, để trống = giữ nguyên, gõ - để xoá)'}</span>` : '<span class="muted">(chưa đặt)</span>';
 
-function fillConfig(s) {
-  document.querySelectorAll('[data-k]').forEach(el => {
-    const k = el.dataset.k;
-    if (k === 'api_key' || k === 'google_tts_key' || k === 'ha_token' || k === 'mww_model') return;
-    if (s.config[k] !== undefined) el.value = s.config[k];
+const PAGES = {
+  gemini: () => subpage('gemini', 'Gemini',
+    list('', [
+      inp('api_key', 'API key ' + hint(S.config.api_key_set, '(đã đặt ' + esc(S.config.api_key_hint) + ')'), { ph: 'Để trống = giữ nguyên' }),
+      inp('model', 'Model trả lời', { list: 'modelList', ph: 'gemini-2.5-flash', foot: 'Chọn trong danh sách hoặc gõ tên model khác.' }),
+      area('persona', 'Tính cách / chỉ dẫn'),
+    ]) + `<datalist id="modelList">
+      <option value="gemini-3.5-flash-lite">Gemini 3.5 Flash Lite (~1.2 s, nhanh nhất)</option>
+      <option value="gemini-3.5-flash">Gemini 3.5 Flash (~1.3 s)</option>
+      <option value="gemini-2.5-flash">Gemini 2.5 Flash (~1.4 s)</option>
+      <option value="gemini-2.5-flash-lite">Gemini 2.5 Flash-Lite</option>
+      <option value="gemini-3.8-flash">Gemini 3.8 Flash</option>
+      <option value="gemini-3.1-flash-lite">Gemini 3.1 Flash Lite</option></datalist>`),
+
+  voice: () => subpage('voice', 'Giọng đọc',
+    list('Bộ đọc', [
+      sel('tts_engine', 'Bộ đọc', [['gfree', 'Google Dịch (nhanh, miễn phí)'], ['google', 'Google Cloud TTS (cần key / service account)'], ['gemini', 'Gemini TTS (tự nhiên, chậm ~3–4 s)']]),
+      rng('tts_rate', 'Tốc độ đọc', 0.5, 2, 0.05, 'x'),
+      sel('google_voice', 'Giọng Google Cloud', [['vi-VN-Neural2-A', 'Neural2-A (nữ)'], ['vi-VN-Neural2-D', 'Neural2-D (nam)'], ['vi-VN-Wavenet-A', 'Wavenet-A (nữ)'],
+        ['vi-VN-Wavenet-B', 'Wavenet-B (nam)'], ['vi-VN-Wavenet-C', 'Wavenet-C (nữ)'], ['vi-VN-Wavenet-D', 'Wavenet-D (nam)'], ['vi-VN-Standard-A', 'Standard-A (nữ)'], ['vi-VN-Standard-B', 'Standard-B (nam)']]),
+      inp('google_tts_key', 'Key Google Cloud (AIza…) ' + hint(S.config.google_tts_key_set), { ph: 'Để trống = dùng service account / API key Gemini' }),
+    ], 'Cloud TTS dùng service account (nếu có) hoặc key Google Cloud. Lỗi thì bot tự dùng Gemini TTS.')
+    + list('Gemini TTS & Gemini Live', [
+      sel('voice', 'Giọng Gemini', ['Kore', 'Puck', 'Charon', 'Aoede', 'Leda', 'Fenrir', 'Zephyr', 'Orus'].map(v => [v, v])),
+      inp('tts_model', 'Model Gemini TTS'),
+    ])),
+
+  stt: () => subpage('stt', 'Nhận giọng nói & Live',
+    list('Nhận giọng nói', [
+      sel('stt_engine', 'Cách nghe câu hỏi', [['google', 'Google Cloud STT → chữ (nhanh, hỏi giờ trả lời tại loa)'], ['gemini', 'Gemini nghe trực tiếp (không cần Cloud)']]),
+      tog('local_time', 'Hỏi giờ / ngày / thứ trả lời tại loa', 'Không gửi Gemini, nhanh hơn'),
+    ])
+    + `<div class="block-title">Service account Google Cloud</div>
+      <div class="list list-strong list-dividers inset"><ul>
+        <li class="item-content"><div class="item-inner"><div class="item-title">${S.config.gcloud_sa_email ? esc(S.config.gcloud_sa_email) : 'Chưa có – dùng API key'}
+          <div class="item-footer">Dùng cho Google STT và Cloud TTS (project phải bật billing).</div></div></div></li>
+        <li class="item-content item-input"><div class="item-inner"><div class="item-input-wrap"><input type="file" id="saFile" accept=".json,application/json"></div></div></li>
+      </ul><div class="btn-row" style="padding-top:6px"><a href="#" class="button button-fill" id="saUpload">Lưu file JSON</a><a href="#" class="button button-tonal color-red" id="saClear">Xoá</a></div></div>`
+    + list('Gemini Live (trò chuyện liên tục)', [
+      tog('live', 'Bật Gemini Live', 'Gọi từ đánh thức một lần rồi nói chuyện liên tục; nói "tạm biệt" để dừng'),
+      inp('live_model', 'Model Live', { ph: 'gemini-2.5-flash-native-audio-latest' }),
+      inp('live_idle', 'Im lặng bao nhiêu giây thì kết thúc', { type: 'number', min: 5, max: 300 }),
+    ], 'Loa không khử được tiếng vọng nên không nói chen ngang được khi loa đang nói.')),
+
+  ha: () => subpage('ha', 'Home Assistant',
+    list('', [
+      inp('ha_url', 'Địa chỉ', { ph: 'http://192.168.2.100:8123', foot: 'Dùng IP trong mạng nhà (http), không dùng homeassistant.local hay https.' }),
+      inp('ha_token', 'Long-lived access token ' + hint(S.config.ha_token_set), { ph: 'Để trống = giữ nguyên' }),
+    ], 'Tạo token: trong HA bấm tên tài khoản → Bảo mật → Long-lived access tokens → Tạo token. Lưu rồi bấm Kiểm tra.')
+    + `<div class="block"><a href="#" class="button button-fill button-large" id="haTest">Kiểm tra kết nối</a>
+       <p class="muted" id="haMsg" style="text-align:center"></p></div>`),
+
+  wake: () => subpage('wake', 'Từ đánh thức & micro',
+    list('Từ đánh thức', [
+      sel('wake_engine', 'Bộ nhận', [['mww', 'microWakeWord (nhẹ)'], ['vosk', 'Vosk tiếng Việt']]),
+      row(`<div class="item-title item-label">Model microWakeWord</div><div class="item-input-wrap input-dropdown-wrap"><select data-k="mww_model" id="mwwModel"></select></div>`),
+      inp('mww_cutoff', 'Ngưỡng 0–1 (0 = theo model)', { type: 'number', min: 0, max: 1, step: 0.01, foot: 'Tăng nếu tự kích hoạt nhầm, giảm nếu gọi khó ăn.' }),
+      inp('wake_word', 'Cụm từ Vosk (cách nhau bằng dấu phẩy)', { ph: 'trợ lý ơi, loa ơi' }),
+    ])
+    + list('Khi đánh thức', [
+      sel('wake_sound', 'Âm báo', [['chime', 'Ding-dong'], ['voice', 'Giọng đáp (câu bên dưới)'], ['none', 'Không']]),
+      inp('wake_reply', 'Câu đáp khi gọi', { ph: 'Dạ?' }),
+      inp('follow_up', 'Nghe tiếp sau khi trả lời (giây, 0 = tắt)', { type: 'number', min: 0, max: 30 }),
+    ])
+    + list('Micro', [
+      rng('mic_gain', 'Khuếch đại micro', 0.5, 16, 0.5, 'x', 'Mic R1 thu nhỏ; đang dùng khoảng 4.'),
+    ])
+    + `<div class="block-title">Model tự huấn luyện (.tflite, kèm .json)</div>
+      <div class="list list-strong list-dividers inset"><ul><li class="item-content item-input"><div class="item-inner"><div class="item-input-wrap">
+      <input type="file" id="modelFile" accept=".tflite,.json" multiple></div></div></li></ul>
+      <div class="btn-row" style="padding-top:6px"><a href="#" class="button button-fill" id="modelUpload">Tải lên & chọn</a></div></div>`),
+
+  led: () => subpage('led', 'Đèn LED',
+    list('', [
+      tog('led', 'Đèn theo trạng thái bot', 'Nghe: thở xanh dương · Nghĩ: sao chổi + nhịp xanh lá · Nói: xanh lá · Lỗi: đỏ'),
+    ], 'Thử từng kiểu đèn ở tab Loa.')),
+
+  update: () => subpage('update', 'Cập nhật app',
+    `<div class="list list-strong list-dividers inset"><ul>
+      <li class="item-content"><div class="item-inner"><div class="item-title">Phiên bản đang chạy</div><div class="item-after">v${esc(S.version)}</div></div></li>
+      <li class="item-content item-input"><div class="item-inner"><div class="item-input-wrap"><input type="file" id="apkFile" accept=".apk,.zip"></div></div></li>
+    </ul><div class="btn-row" style="padding-top:6px"><a href="#" class="button button-fill" id="installBtn">Cài đặt</a></div></div>
+    <div class="block-footer" id="installMsg">Chọn app-debug.apk hoặc file .zip tải từ GitHub Actions. Cài đặt và API key được giữ nguyên.</div>`),
+};
+
+const routes = Object.keys(PAGES).map(name => ({
+  path: `/${name}/`,
+  async({ resolve }) { resolve({ content: PAGES[name]() }); },
+}));
+
+// ---------- Khởi tạo Framework7 ----------
+const app = new Framework7({
+  el: '#app', theme: 'ios', darkMode: 'auto', colors: { primary: '#2f80ed' }, routes,
+  on: { pageInit(page) { if (PAGES[page.name]) initSubpage(page); } },
+});
+['#view-chat', '#view-speaker', '#view-devices', '#view-settings'].forEach(v => app.views.create(v));
+
+function fillFields(el) {
+  el.querySelectorAll('[data-k]').forEach(f => {
+    const k = f.dataset.k, v = S.config[k];
+    if (SECRETS.includes(k)) return;
+    if (f.type === 'checkbox') f.checked = v === '1';
+    else if (v !== undefined && f.id !== 'mwwModel') f.value = v;
+    if (f.type === 'range') { const lab = el.querySelector(`[data-rl="${k}"]`); const upd = () => lab.textContent = '×' + (+f.value).toFixed(2);
+      upd(); f.addEventListener('input', upd); }
   });
-  $('keyHint').textContent = s.config.api_key_set ? '(đã đặt ' + s.config.api_key_hint + ')' : '(chưa đặt)';
-  $('gkeyHint').textContent = s.config.google_tts_key_set ? '(đã đặt, gõ - để xoá)' : '';
-  $('haHint').textContent = s.config.ha_token_set ? '(đã đặt, gõ - để xoá)' : '(chưa đặt)';
-  $('saHint').textContent = s.config.gcloud_sa_email ? '(đang dùng ' + s.config.gcloud_sa_email + ')' : '(chưa có – dùng API key)';
-  $('rateLabel').textContent = '×' + (+$('rate').value).toFixed(2);
-  fillModels(s);
-  showEngine();
-  showTts();
 }
 
-async function saUpload() {
-  const f = $('saFile').files[0]; if (!f) return toast('Chọn file .json trước');
-  let j; try { j = JSON.parse(await f.text()); } catch (e) { return toast('File không phải JSON'); }
-  if (j.type !== 'service_account' || !j.private_key) return toast('Không phải file service account');
-  await post('/api/config', { gcloud_sa: JSON.stringify(j) });
-  $('saFile').value = ''; loaded = false; await refresh(); toast('Đã lưu service account');
-}
-
-async function saClear() {
-  await post('/api/config', { gcloud_sa: '-' }); loaded = false; await refresh(); toast('Đã xoá service account');
-}
-
-async function haTest() {
-  $('haMsg').textContent = 'Đang kết nối…';
-  try { $('haMsg').textContent = (await post('/api/ha_test')).message; }
-  catch (e) { $('haMsg').textContent = 'Lỗi: ' + e.message + ' (nhớ bấm Lưu cấu hình trước)'; }
-}
-
-function showTts() {
-  const g = document.querySelector('[data-k=tts_engine]').value === 'google';
-  document.querySelectorAll('.gtts').forEach(x => x.style.display = g ? '' : 'none');
-}
-
-async function installApk() {
-  let f = $('apk').files[0]; if (!f) return toast('Chọn file APK trước');
-  const btn = $('installBtn'), msg = $('installMsg');
-  btn.disabled = true;
-  try {
-    if (f.name.toLowerCase().endsWith('.zip')) {
-      msg.textContent = 'Đang lấy APK trong file zip…';
-      f = await apkFromZip(f);
+function initSubpage(page) {
+  const el = page.el;
+  fillFields(el);
+  const mm = el.querySelector('#mwwModel');
+  if (mm) {
+    const cur = S.config.mww_model, opts = [];
+    (S.builtin_models || []).filter(f => f.endsWith('.tflite')).forEach(f => opts.push([f.replace('.tflite', ''), f.replace('.tflite', '') + ' (có sẵn)']));
+    (S.uploaded_models || []).forEach(p => opts.push([p, p.split('/').pop() + ' (đã tải lên)']));
+    if (cur && !opts.some(o => o[0] === cur)) opts.push([cur, cur]);
+    mm.innerHTML = opts.map(([v, t]) => `<option value="${esc(v)}">${esc(t)}</option>`).join('');
+    mm.value = cur;
+  }
+  el.querySelector('.save-btn').addEventListener('click', async e => {
+    e.preventDefault();
+    const data = {};
+    el.querySelectorAll('[data-k]').forEach(f => { data[f.dataset.k] = f.type === 'checkbox' ? (f.checked ? '1' : '0') : f.value; });
+    await post('/api/config', data);
+    el.querySelectorAll('input[type=password]').forEach(f => f.value = '');
+    await refresh(); toast('Đã lưu');
+  });
+  const on = (id, fn) => { const b = el.querySelector('#' + id); if (b) b.addEventListener('click', e => { e.preventDefault(); fn(); }); };
+  on('haTest', async () => {
+    const m = el.querySelector('#haMsg'); m.textContent = 'Đang kết nối…';
+    try { m.textContent = (await post('/api/ha_test')).message; } catch (e) { m.textContent = 'Lỗi: ' + e.message + ' (nhớ bấm 💾 lưu trước)'; }
+  });
+  on('saUpload', async () => {
+    const f = el.querySelector('#saFile').files[0]; if (!f) return toast('Chọn file .json trước');
+    let j; try { j = JSON.parse(await f.text()); } catch (e) { return toast('File không phải JSON'); }
+    if (j.type !== 'service_account' || !j.private_key) return toast('Không phải file service account');
+    await post('/api/config', { gcloud_sa: JSON.stringify(j) }); await refresh(); toast('Đã lưu service account'); page.router.back();
+  });
+  on('saClear', async () => { await post('/api/config', { gcloud_sa: '-' }); await refresh(); toast('Đã xoá service account'); page.router.back(); });
+  on('modelUpload', async () => {
+    const files = el.querySelector('#modelFile').files; if (!files.length) return toast('Chọn file trước');
+    let last = null;
+    for (const f of files) {
+      const r = await fetch('/api/upload?name=' + encodeURIComponent(f.name), { method: 'POST', body: f });
+      const j = await r.json(); if (!r.ok) return toast('Lỗi: ' + j.error);
+      if (f.name.endsWith('.tflite')) last = j.path;
     }
+    if (last) await post('/api/config', { mww_model: last });
+    await refresh(); toast('Đã tải lên và chọn model'); page.router.back();
+  });
+  on('installBtn', () => installApk(el));
+}
+
+// ---------- Cập nhật app ----------
+async function installApk(el) {
+  let f = el.querySelector('#apkFile').files[0]; if (!f) return toast('Chọn file APK trước');
+  const btn = el.querySelector('#installBtn'), msg = el.querySelector('#installMsg');
+  btn.classList.add('disabled');
+  try {
+    if (f.name.toLowerCase().endsWith('.zip')) { msg.textContent = 'Đang lấy APK trong file zip…'; f = await apkFromZip(f); }
     msg.textContent = 'Đang tải lên ' + (f.size / 1048576).toFixed(1) + ' MB…';
     const r = await fetch('/api/install', { method: 'POST', body: f });
     const j = await r.json().catch(() => ({}));
     if (!r.ok) throw new Error(j.error || r.status);
     msg.textContent = j.message;
-    const old = $('version').textContent;
-    // App bị tắt khi cài -> chờ nó chạy lại rồi tải lại trang
-    const t0 = Date.now();
+    const old = S.version, t0 = Date.now();
     let down = false;
+    // App bị tắt khi cài -> chờ nó chạy lại rồi tải lại trang
     const wait = setInterval(async () => {
       try {
         const s = await (await fetch('/api/status')).json();
-        if (down || ('v' + s.version) !== old) { clearInterval(wait); location.reload(); return; }
+        if (down || s.version !== old) { clearInterval(wait); location.reload(); return; }
         const res = (s.log || []).filter(l => l.includes('Kết quả cập nhật')).pop();
-        if (res && res.includes('Failure')) {
-          clearInterval(wait); msg.textContent = 'Cài lỗi: ' + res.split('Kết quả cập nhật: ')[1]; btn.disabled = false;
-        }
+        if (res && res.includes('Failure')) { clearInterval(wait); msg.textContent = 'Cài lỗi: ' + res.split('Kết quả cập nhật: ')[1]; btn.classList.remove('disabled'); }
       } catch (e) { down = true; }
-      if (Date.now() - t0 > 180000) { clearInterval(wait); msg.textContent = 'Hết giờ chờ, xem nhật ký.'; btn.disabled = false; }
+      if (Date.now() - t0 > 180000) { clearInterval(wait); msg.textContent = 'Hết giờ chờ, xem nhật ký.'; btn.classList.remove('disabled'); }
     }, 3000);
-  } catch (e) {
-    msg.textContent = 'Lỗi: ' + e.message; btn.disabled = false;
-  }
+  } catch (e) { msg.textContent = 'Lỗi: ' + e.message; btn.classList.remove('disabled'); }
 }
 
 // Lấy file .apk đầu tiên trong zip (artifact GitHub Actions nén kiểu deflate)
@@ -459,72 +519,143 @@ async function apkFromZip(zip) {
   throw new Error('Không có file .apk trong zip');
 }
 
-async function refresh() {
-  try {
-    const s = await (await fetch('/api/status')).json();
-    const [label, color] = STATES[s.state] || [s.state, 'var(--muted)'];
-    $('state').textContent = label; $('dot').style.background = color;
-    $('heard').textContent = s.last_heard || '—';
-    $('reply').textContent = s.last_reply || '—';
-    $('wakeinfo').textContent = s.wake_name ? 'Từ đánh thức: "' + s.wake_name + '"' : '';
-    $('version').textContent = s.version ? 'v' + s.version : '';
-    $('diag').textContent = 'mic ' + (s.mic_level || 0) + ' · điểm ' + (s.wake_score || 0).toFixed(2);
-    paused = s.paused;
-    $('pauseBtn').textContent = paused ? '▶ Tiếp tục' : '⏸ Tạm dừng';
-    if (!volDragging) { $('vol').max = s.volume_max; $('vol').value = s.volume; }
-    $('volLabel').textContent = s.volume + '/' + s.volume_max;
-    const log = $('log'), atBottom = log.scrollTop + log.clientHeight >= log.scrollHeight - 10;
-    log.textContent = (s.log || []).join('\n');
-    if (atBottom) log.scrollTop = log.scrollHeight;
-    if (!loaded) { fillConfig(s); loaded = true; }
-  } catch (e) {
-    $('state').textContent = 'Mất kết nối'; $('dot').style.background = 'var(--err)';
+// ---------- Chat: dựng hội thoại từ nhật ký ----------
+function chatFromLog(lines) {
+  const out = []; let pendingStt = null, lastTime = null;
+  const push = (who, text, time, tag) => {
+    if (time && lastTime && minutes(time) - minutes(lastTime) >= 3) out.push({ time });
+    if (time && !lastTime) out.push({ time });
+    if (time) lastTime = time;
+    out.push({ who, text, tag });
+  };
+  for (const l of lines) {
+    const m = l.match(/^(\d\d:\d\d):\d\d \w (.*)$/s); if (!m) continue;
+    const [, time, msg] = m; let x;
+    if ((x = msg.match(/^Hỏi \(Web\): (.*)$/s))) { pendingStt = null; push('user', x[1], time, 'gõ'); }
+    else if ((x = msg.match(/^Google STT \(\d+ ms\): (.*)$/s))) pendingStt = x[1];
+    else if ((x = msg.match(/^Nghe \(tại loa\): (.*) -> (.*)$/s))) { push('user', x[1], time, 'nói'); push('bot', x[2], time, 'trả lời tại loa'); }
+    else if ((x = msg.match(/^Nghe \(Live\): (.*)$/s))) push('user', x[1], time, 'Live');
+    else if ((x = msg.match(/^Nghe: (.*)$/s))) { pendingStt = null; if (x[1].trim()) push('user', x[1], time, 'nói'); }
+    else if ((x = msg.match(/^Trả lời tại loa: (.*)$/s))) { if (pendingStt) { push('user', pendingStt, time, 'nói'); pendingStt = null; } push('bot', x[1], time, 'trả lời tại loa'); }
+    else if ((x = msg.match(/^Trả lời \(Live\): (.*)$/s))) push('bot', x[1], time, 'Live');
+    else if ((x = msg.match(/^Trả lời: (.*)$/s))) push('bot', x[1], time);
+    else if ((x = msg.match(/^Home Assistant: (\w+\.\w+ .*)$/s))) push('bot', '⚙ ' + x[1], time, 'Home Assistant');
   }
+  return out;
 }
-
-function togglePause() { post('/api/pause', { paused: !paused }).then(refresh); }
-
+const minutes = t => +t.slice(0, 2) * 60 + +t.slice(3, 5);
+let chatSig = '';
+function renderChat() {
+  const items = chatFromLog(S.log || []), sig = JSON.stringify(items);
+  if (sig === chatSig) return; chatSig = sig;
+  const sc = $('chatScroll'), atBottom = sc.scrollTop + sc.clientHeight >= sc.scrollHeight - 40;
+  $('chatList').innerHTML = items.length ? items.map(i => i.time && !i.who ? `<div class="chat-time">${i.time}</div>`
+    : i.who === 'user' ? `<div class="msg user">${esc(i.text)}${i.tag ? `<span class="tag">${i.tag}</span>` : ''}</div>`
+    : `<div class="msg-row"><div class="avatar"><i class="icon f7-icons" style="font-size:15px">sparkles</i></div><div class="msg">${esc(i.text)}${i.tag ? `<span class="tag">${i.tag}</span>` : ''}</div></div>`).join('')
+    : '<div class="chat-empty">Chưa có hội thoại. Gọi từ đánh thức hoặc nhắn bên dưới.</div>';
+  if (atBottom) sc.scrollTop = sc.scrollHeight;
+}
 let sending = false;
-function sendText(path) {
-  const t = $('text').value.trim(); if (!t || sending) return;
+async function sendChat(path) {
+  const t = $('chatInput').value.trim(); if (!t || sending) return;
   sending = true;
-  post(path, { text: t })
-    .then(() => { toast(path.endsWith('ask') ? 'Đã gửi câu hỏi' : 'Đang đọc'); $('text').value = ''; })
-    .catch(() => {})
-    .finally(() => { sending = false; });
+  try { await post(path, { text: t }); $('chatInput').value = ''; if (path.endsWith('say')) toast('Loa đang đọc'); }
+  catch (e) {} finally { sending = false; }
 }
+$('sendBtn').addEventListener('click', e => { e.preventDefault(); sendChat('/api/ask'); });
+$('sayBtn').addEventListener('click', e => { e.preventDefault(); sendChat('/api/say'); });
+// Bộ gõ tiếng Việt có thể bắn Enter 2 lần khi đang ghép chữ -> bỏ qua lúc isComposing
+$('chatInput').addEventListener('keydown', e => {
+  if (e.key === 'Enter' && !e.isComposing && e.keyCode !== 229) { e.preventDefault(); sendChat('/api/ask'); }
+});
+const listen = e => { e.preventDefault(); post('/api/listen').then(() => toast('Đang nghe… hãy nói')); };
+$('listenBtn').addEventListener('click', listen);
+$('btnListen').addEventListener('click', listen);
 
-async function save() {
-  const data = {};
-  document.querySelectorAll('[data-k]').forEach(el => data[el.dataset.k] = el.value);
-  await post('/api/config', data);
-  document.querySelector('[data-k=api_key]').value = '';
-  document.querySelector('[data-k=google_tts_key]').value = '';
-  document.querySelector('[data-k=ha_token]').value = '';
-  loaded = false; await refresh(); toast('Đã lưu');
-}
-
-async function upload() {
-  const files = $('upload').files; if (!files.length) return toast('Chọn file trước');
-  let lastModel = null;
-  for (const f of files) {
-    const r = await fetch('/api/upload?name=' + encodeURIComponent(f.name), { method: 'POST', body: f });
-    const j = await r.json();
-    if (!r.ok) return toast('Lỗi: ' + j.error);
-    if (f.name.endsWith('.tflite')) lastModel = j.path;
-  }
-  if (lastModel) await post('/api/config', { mww_model: lastModel });
-  loaded = false; await refresh(); toast('Đã tải lên và chọn model');
-}
-
+// ---------- Loa ----------
+$('btnReset').addEventListener('click', e => { e.preventDefault(); post('/api/reset').then(() => toast('Đã xoá trí nhớ hội thoại')); });
+$('btnMic').addEventListener('click', e => { e.preventDefault(); $('micAudio').src = '/api/mic.wav?t=' + Date.now(); $('micAudio').play(); });
+document.querySelectorAll('[data-led]').forEach(b => b.addEventListener('click', e => { e.preventDefault(); post('/api/led', { state: b.dataset.led }); }));
+['runToggle', 'runToggle2'].forEach(id => $(id).addEventListener('change', e => post('/api/pause', { paused: !e.target.checked }).then(refresh)));
 $('vol').addEventListener('input', () => { volDragging = true; $('volLabel').textContent = $('vol').value + '/' + $('vol').max; });
 $('vol').addEventListener('change', () => { post('/api/volume', { level: +$('vol').value }).finally(() => volDragging = false); });
-// Bộ gõ tiếng Việt có thể bắn Enter 2 lần khi đang ghép chữ -> bỏ qua lúc isComposing
-$('text').addEventListener('keydown', e => {
-  if (e.key === 'Enter' && !e.isComposing && e.keyCode !== 229) { e.preventDefault(); sendText('/api/ask'); }
-});
 
-refresh();
+// ---------- Thiết bị (Home Assistant) ----------
+const DOMAINS = {
+  climate: ['Điều hoà', 'snow'], light: ['Đèn', 'lightbulb_fill'], switch: ['Công tắc', 'power'], fan: ['Quạt', 'wind'],
+  cover: ['Rèm / cửa', 'rectangle_split_3x1_fill'], media_player: ['Media', 'tv_fill'], scene: ['Cảnh', 'sparkles'],
+  script: ['Kịch bản', 'play_rectangle_fill'], input_boolean: ['Công tắc ảo', 'checkmark_square_fill'], vacuum: ['Máy hút bụi', 'circle_grid_hex_fill'],
+  humidifier: ['Máy tạo ẩm', 'drop_fill'], button: ['Nút', 'hand_point_right_fill'], input_button: ['Nút', 'hand_point_right_fill'],
+  lock: ['Khoá', 'lock_fill'], siren: ['Còi', 'speaker_zzz_fill'], valve: ['Van', 'drop'], water_heater: ['Bình nóng lạnh', 'flame_fill'],
+};
+const ON = ['on', 'open', 'opening', 'playing', 'cleaning', 'heat', 'cool', 'heat_cool', 'auto', 'dry', 'fan_only', 'unlocked'];
+const STATE_VI = { on: 'Bật', off: 'Tắt', open: 'Mở', closed: 'Đóng', playing: 'Đang phát', paused: 'Tạm dừng', idle: 'Rảnh',
+  unavailable: 'Mất kết nối', cool: 'Làm lạnh', heat: 'Sưởi', auto: 'Tự động', dry: 'Hút ẩm', fan_only: 'Quạt', locked: 'Đã khoá', unlocked: 'Mở khoá' };
+let devices = [], devTimer = null;
+async function loadDevices() {
+  try {
+    const r = await fetch('/api/ha/devices'), j = await r.json();
+    if (!r.ok) throw new Error(j.error || r.status);
+    devices = j.devices; renderDevices();
+  } catch (e) {
+    $('devices').innerHTML = `<div class="block"><p class="muted">${esc(e.message)}</p>
+      <a href="#" class="button button-tonal" onclick="app.tab.show('#view-settings');app.views.get('#view-settings').router.navigate('/ha/');return false;">Cài đặt Home Assistant</a></div>`;
+  }
+}
+function renderDevices() {
+  const groups = {};
+  devices.forEach(d => (groups[d.domain] = groups[d.domain] || []).push(d));
+  const order = Object.keys(DOMAINS).filter(k => groups[k]).concat(Object.keys(groups).filter(k => !DOMAINS[k]));
+  $('devices').innerHTML = order.map(dom => {
+    const [title, icon] = DOMAINS[dom] || [dom, 'circle'];
+    return `<div class="block-title">${title} (${groups[dom].length})</div><div class="list list-strong list-dividers inset"><div class="tiles">` +
+      groups[dom].map(d => `<div class="tile ${ON.includes(d.state) ? 'on' : ''}" data-id="${esc(d.id)}">
+        ${d.current || d.temp ? `<span class="t-badge">${esc(d.current || d.temp)}°C</span>` : ''}
+        <i class="icon f7-icons">${icon}</i>
+        <div><div class="t-name">${esc(d.name)}</div><div class="t-state">${esc(STATE_VI[d.state] || d.state)}</div></div></div>`).join('') + '</div></div>';
+  }).join('') || '<div class="block muted">Không có thiết bị điều khiển được.</div>';
+  $('devices').querySelectorAll('.tile').forEach(t => t.addEventListener('click', () => tapDevice(t)));
+}
+async function tapDevice(t) {
+  const d = devices.find(x => x.id === t.dataset.id); if (!d || t.classList.contains('busy')) return;
+  const on = ON.includes(d.state);
+  let service = 'toggle';
+  if (d.domain === 'climate') service = on ? 'turn_off' : 'turn_on';
+  else if (['scene', 'script'].includes(d.domain)) service = 'turn_on';
+  else if (['button', 'input_button'].includes(d.domain)) service = 'press';
+  else if (d.domain === 'lock') return toast('Khoá cửa chỉ điều khiển trong Home Assistant');
+  t.classList.add('busy');
+  try { await post('/api/ha/service', { entity_id: d.id, service }); setTimeout(loadDevices, 600); }
+  catch (e) { t.classList.remove('busy'); }
+}
+$('devReload').addEventListener('click', e => { e.preventDefault(); loadDevices(); });
+$('view-devices').addEventListener('tab:show', () => { loadDevices(); clearInterval(devTimer); devTimer = setInterval(loadDevices, 5000); });
+$('view-devices').addEventListener('tab:hide', () => clearInterval(devTimer));
+
+// ---------- Cập nhật trạng thái mỗi 1,5 giây ----------
+async function refresh() {
+  try {
+    S = await (await fetch('/api/status')).json();
+    const [label, color] = STATES[S.state] || [S.state, '#8e8e93'];
+    document.querySelectorAll('[data-state-text]').forEach(x => x.textContent = label);
+    document.querySelectorAll('[data-state-dot]').forEach(x => x.style.background = color);
+    $('version').textContent = 'v' + S.version;
+    $('verSub').textContent = 'Đang chạy v' + S.version + ' · cài APK / zip từ GitHub';
+    $('wakeName').textContent = S.wake_name || '—';
+    $('diag').textContent = (S.mic_level || 0) + ' · ' + (S.wake_score || 0).toFixed(2);
+    ['runToggle', 'runToggle2'].forEach(id => $(id).checked = !S.paused);
+    if (!volDragging) { $('vol').max = S.volume_max; $('vol').value = S.volume; }
+    $('volLabel').textContent = S.volume + '/' + S.volume_max;
+    const log = $('log'), atBottom = log.scrollTop + log.clientHeight >= log.scrollHeight - 10;
+    log.textContent = (S.log || []).join('\n');
+    if (atBottom) log.scrollTop = log.scrollHeight;
+    renderChat();
+  } catch (e) {
+    document.querySelectorAll('[data-state-text]').forEach(x => x.textContent = 'Mất kết nối');
+    document.querySelectorAll('[data-state-dot]').forEach(x => x.style.background = '#ff3b30');
+  }
+}
+refresh().then(() => { const sc = $('chatScroll'); sc.scrollTop = sc.scrollHeight; });
 setInterval(refresh, 1500);
 </script>
 </body>

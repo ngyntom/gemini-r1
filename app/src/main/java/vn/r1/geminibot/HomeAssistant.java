@@ -139,6 +139,41 @@ final class HomeAssistant {
         return new JSONObject().put("ok", true).put("new_states", states);
     }
 
+    /** Thiết bị điều khiển được cho tab Thiết bị trên Web UI: [{id, name, domain, state, temp, current}]. */
+    static JSONArray devices(Config cfg) throws Exception {
+        JSONArray states = new JSONArray(request(cfg, "GET", "/api/states", null));
+        JSONArray out = new JSONArray();
+        for (int i = 0; i < states.length(); i++) {
+            JSONObject s = states.getJSONObject(i);
+            String id = s.optString("entity_id");
+            String domain = id.contains(".") ? id.substring(0, id.indexOf('.')) : "";
+            if (!CONTROL.contains(domain) || domain.equals("automation")) continue;
+            JSONObject a = s.optJSONObject("attributes");
+            if (a == null) a = new JSONObject();
+            JSONObject d = new JSONObject()
+                    .put("id", id)
+                    .put("name", a.optString("friendly_name", id))
+                    .put("domain", domain)
+                    .put("state", s.optString("state"));
+            if (a.has("temperature") && !a.isNull("temperature")) d.put("temp", a.optString("temperature"));
+            if (a.has("current_temperature") && !a.isNull("current_temperature")) d.put("current", a.optString("current_temperature"));
+            out.put(d);
+        }
+        return out;
+    }
+
+    /** Bật / tắt một thiết bị từ Web UI (người dùng tự bấm nên không cần kiểm tra loại như Gemini). */
+    static void uiService(Config cfg, String entityId, String service) throws Exception {
+        String domain = entityId.contains(".") ? entityId.substring(0, entityId.indexOf('.')) : "";
+        if (!CONTROL.contains(domain)) throw new Exception("Không được phép điều khiển nhóm " + domain);
+        if (!service.equals("turn_on") && !service.equals("turn_off") && !service.equals("toggle")
+                && !service.equals("press")) {
+            throw new Exception("Lệnh không hợp lệ: " + service);
+        }
+        BotLog.i("Web UI: " + domain + "." + service + " " + entityId);
+        request(cfg, "POST", "/api/services/" + domain + "/" + service, new JSONObject().put("entity_id", entityId));
+    }
+
     /** Kiểm tra kết nối cho Web UI: trả về số thiết bị đọc được. */
     static String test(Config cfg) throws Exception {
         Set<String> ids = new HashSet<>();
