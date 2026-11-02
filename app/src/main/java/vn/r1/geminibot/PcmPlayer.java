@@ -27,6 +27,42 @@ public final class PcmPlayer {
         }
     }
 
+    private static volatile Thread keeper;
+
+    /**
+     * Giữ đường phát của loa luôn "thức" bằng một luồng im lặng. Không có luồng phát nào thì Android cho
+     * HAL âm thanh nghỉ sau ~3 s và ampli R1 tắt; lúc bật lại, ampli tăng tiếng từ từ nên đầu câu trả lời
+     * nghe nhỏ rồi mới to. Bật từ lúc nghe thấy từ đánh thức tới khi quay lại chờ từ đánh thức.
+     */
+    static synchronized void keepAwake(boolean on) {
+        if (on == (keeper != null)) return;
+        if (!on) {
+            keeper.interrupt();
+            keeper = null;
+            return;
+        }
+        keeper = new Thread(() -> {
+            int rate = 16000;
+            int min = AudioTrack.getMinBufferSize(rate, AudioFormat.CHANNEL_OUT_MONO, AudioFormat.ENCODING_PCM_16BIT);
+            AudioTrack t = new AudioTrack(AudioManager.STREAM_MUSIC, rate, AudioFormat.CHANNEL_OUT_MONO,
+                    AudioFormat.ENCODING_PCM_16BIT, Math.max(min, rate / 5), AudioTrack.MODE_STREAM);
+            byte[] silence = new byte[rate / 10 * 2]; // 100 ms
+            try {
+                t.play();
+                // write() chặn theo tốc độ phát nên vòng này gần như không tốn CPU
+                while (!Thread.currentThread().isInterrupted()) t.write(silence, 0, silence.length);
+            } finally {
+                t.stop();
+                t.release();
+            }
+        }, "amp-keep");
+        keeper.start();
+    }
+
+    static boolean awake() {
+        return keeper != null;
+    }
+
     static int generation() {
         return generation;
     }

@@ -201,6 +201,7 @@ public class BotService extends Service {
                     }
                     if (paused) {
                         BotLog.state = "paused";
+                        PcmPlayer.keepAwake(false);
                         recorder.close(); // nhả micro cho app khác
                         Thread.sleep(500);
                         continue;
@@ -234,8 +235,10 @@ public class BotService extends Service {
                         followUp = false;
                         wake.configure(cfg);
                         BotLog.state = "idle";
+                        if (!barged) PcmPlayer.keepAwake(false); // rảnh: cho ampli nghỉ
                         String hit = barged ? "ngắt lời" : wake.waitFor(recorder);
                         barged = false;
+                        if (hit != null) PcmPlayer.keepAwake(true); // giữ ampli thức tới lúc trả lời xong
                         if (hit == null) {
                             Thread.sleep(50);
                             continue;
@@ -360,6 +363,7 @@ public class BotService extends Service {
             }
         } catch (InterruptedException ignored) {
         } finally {
+            PcmPlayer.keepAwake(false);
             recorder.close();
             if (wake != null) wake.close();
         }
@@ -414,7 +418,8 @@ public class BotService extends Service {
             try {
                 int gen = PcmPlayer.generation(); // bị ngắt lúc đang tạo giọng thì không phát nữa
                 PcmPlayer.Pcm p = synth(cfg, say);
-                PcmPlayer.play(p.data, p.rate, gen);
+                // Ampli chưa được giữ thức (vd. đọc từ Web UI) -> đệm im lặng đầu cho ampli kịp bật
+                PcmPlayer.play(PcmPlayer.awake() ? p.data : withLead(p), p.rate, gen);
             } catch (Throwable e) {
                 BotLog.e("TTS lỗi", e);
             } finally {
