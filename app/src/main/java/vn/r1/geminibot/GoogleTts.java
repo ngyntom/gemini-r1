@@ -53,8 +53,8 @@ final class GoogleTts {
         }
     }
 
-    /** LINEAR16 trả về file WAV; lấy phần dữ liệu của chunk "data". */
-    private static byte[] pcmFromWav(byte[] wav) {
+    /** LINEAR16 trả về file WAV; lấy phần dữ liệu của chunk "data". Dữ liệu không phải WAV thì giữ nguyên. */
+    static byte[] pcmFromWav(byte[] wav) {
         if (wav.length < 12 || wav[0] != 'R' || wav[1] != 'I' || wav[2] != 'F' || wav[3] != 'F') return wav;
         int p = 12;
         while (p + 8 <= wav.length) {

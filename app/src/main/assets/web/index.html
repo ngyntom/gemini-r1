@@ -375,6 +375,14 @@ function subpage(name, title, body) {
 }
 const hint = (set, extra) => set ? `<span class="muted">${extra || '(đã đặt, để trống = giữ nguyên, gõ - để xoá)'}</span>` : '<span class="muted">(chưa đặt)</span>';
 
+// 30 giọng có sẵn của Gemini TTS / Live (nam / nữ theo tài liệu của Google)
+const GEMINI_VOICES = [['Kore', 'nữ'], ['Puck', 'nam'], ['Charon', 'nam'], ['Aoede', 'nữ'], ['Leda', 'nữ'], ['Fenrir', 'nam'],
+  ['Zephyr', 'nữ'], ['Orus', 'nam'], ['Achernar', 'nữ'], ['Achird', 'nam'], ['Algenib', 'nam'], ['Algieba', 'nam'],
+  ['Alnilam', 'nam'], ['Autonoe', 'nữ'], ['Callirrhoe', 'nữ'], ['Despina', 'nữ'], ['Enceladus', 'nam'], ['Erinome', 'nữ'],
+  ['Gacrux', 'nữ'], ['Iapetus', 'nam'], ['Laomedeia', 'nữ'], ['Pulcherrima', 'nữ'], ['Rasalgethi', 'nam'], ['Sadachbia', 'nam'],
+  ['Sadaltager', 'nam'], ['Schedar', 'nam'], ['Sulafat', 'nữ'], ['Umbriel', 'nam'], ['Vindemiatrix', 'nữ'], ['Zubenelgenubi', 'nam']]
+  .map(([v, g]) => [v, `${v} (${g})`]);
+
 const PAGES = {
   gemini: () => subpage('gemini', 'Gemini',
     list('', [
@@ -398,9 +406,15 @@ const PAGES = {
       inp('google_tts_key', 'Key Google Cloud (AIza…) ' + hint(S.config.google_tts_key_set), { ph: 'Để trống = dùng service account / API key Gemini' }),
     ], 'Cloud TTS dùng service account (nếu có) hoặc key Google Cloud. Lỗi thì bot tự dùng Gemini TTS.')
     + list('Gemini TTS & Gemini Live', [
-      sel('voice', 'Giọng Gemini', ['Kore', 'Puck', 'Charon', 'Aoede', 'Leda', 'Fenrir', 'Zephyr', 'Orus'].map(v => [v, v])),
-      inp('tts_model', 'Model Gemini TTS'),
-    ])),
+      sel('voice', 'Giọng Gemini (dùng cho cả Gemini TTS và Live)', GEMINI_VOICES),
+      inp('tts_model', 'Model Gemini TTS', { list: 'ttsList', ph: 'gemini-2.5-flash-preview-tts',
+        foot: 'Thời gian đo với một câu ngắn. Chọn trong danh sách hoặc gõ tên khác.' }),
+    ]) + `<datalist id="ttsList">
+      <option value="gemini-3.8-flash-lite-tts">3.8 Flash Lite TTS (~2.5 s, nhanh nhất)</option>
+      <option value="gemini-3.1-flash-tts-preview">3.1 Flash TTS preview (~2.8 s)</option>
+      <option value="gemini-3.8-flash-tts">3.8 Flash TTS (~3.1 s)</option>
+      <option value="gemini-2.5-flash-preview-tts">2.5 Flash TTS preview (~3.4 s)</option>
+      <option value="gemini-2.5-pro-preview-tts">2.5 Pro TTS preview (~4.7 s, hay nhất)</option></datalist>`),
 
   stt: () => subpage('stt', 'Nhận giọng nói & Live',
     list('Nhận giọng nói', [

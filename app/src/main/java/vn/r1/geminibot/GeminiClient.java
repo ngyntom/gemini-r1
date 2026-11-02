@@ -255,7 +255,8 @@ public class GeminiClient {
         JSONObject part = firstPart(post(cfg, cfg.ttsModel, body));
         JSONObject data = part.has("inlineData") ? part.getJSONObject("inlineData")
                 : part.getJSONObject("inline_data");
-        return Base64.decode(data.getString("data"), Base64.DEFAULT);
+        // Model TTS 3.8 trả "audio/wav" (24 kHz mono, có header) thay vì PCM thô như 2.5 / 3.1 -> bỏ header
+        return GoogleTts.pcmFromWav(Base64.decode(data.getString("data"), Base64.DEFAULT));
     }
 
     public synchronized void clearHistory() {
