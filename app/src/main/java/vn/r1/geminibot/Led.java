@@ -292,18 +292,25 @@ final class Led {
         if (level == null) throw new Exception("không có bộ nhớ ngoài");
         int[] order = new int[MusicLight.RING];
         for (int i = 0, a = 0, b = 23; i < order.length; i++) order[i] = 16 + (i % 2 == 0 ? a++ : b--);
-        StringBuilder sb = new StringBuilder(RING_OFF).append("\np=-1\nwhile [ ! -f ").append(STOPF).append(" ]; do\n")
+        // Driver đèn xếp lệnh vào hàng rồi chạy dần (~100 ms mỗi lệnh, ghi thì trả về ngay - đo trên loa):
+        // ghi nhanh hơn thế thì hàng dồn lại, đèn chạy lệch / như không sáng (lỗi bản đầu, 2 lệnh mỗi 40 ms).
+        // Nên mỗi lần đổi chỉ MỘT lệnh: tăng thì bật đèn 1..l (đèn đã sáng ghi lại không sao), giảm thì tắt
+        // đèn l+1..24; nhiều nhất ~5 lần mỗi giây.
+        StringBuilder sb = new StringBuilder(RING_OFF).append("\np=0\nwhile [ ! -f ").append(STOPF).append(" ]; do\n")
                 .append("  read l < ").append(level.getAbsolutePath()).append("\n")
-                .append("  if [ \"$l\" != \"$p\" ]; then\n    case \"$l\" in\n");
-        for (int n = 0; n <= MusicLight.RING; n++) {
-            StringBuilder on = new StringBuilder(), off = new StringBuilder();
-            for (int i = 0; i < order.length; i++) (i < n ? on : off).append(' ').append(order[i]);
-            List<String> cmds = new ArrayList<>();
-            if (n > 0) cmds.add(setColor(RING_COLOR, n + on.toString(), "ffffff"));
-            if (n < order.length) cmds.add(blackAll(RING_COLOR, (order.length - n) + off.toString()));
-            sb.append("      ").append(n).append(") ").append(TextUtils.join("; ", cmds)).append(" ;;\n");
+                .append("  if [ -n \"$l\" ] && [ \"$l\" -gt \"$p\" ]; then\n    case \"$l\" in\n");
+        for (int n = 1; n <= MusicLight.RING; n++) {
+            StringBuilder on = new StringBuilder();
+            for (int i = 0; i < n; i++) on.append(' ').append(order[i]);
+            sb.append("      ").append(n).append(") ").append(setColor(RING_COLOR, n + on.toString(), "ffffff")).append(" ;;\n");
         }
-        sb.append("    esac\n    p=$l\n  fi\n  sleep 0.04\ndone\n")
+        sb.append("    esac\n    p=$l\n  elif [ -n \"$l\" ] && [ \"$l\" -lt \"$p\" ]; then\n    case \"$l\" in\n");
+        for (int n = 0; n < MusicLight.RING; n++) {
+            StringBuilder off = new StringBuilder();
+            for (int i = n; i < order.length; i++) off.append(' ').append(order[i]);
+            sb.append("      ").append(n).append(") ").append(blackAll(RING_COLOR, (order.length - n) + off.toString())).append(" ;;\n");
+        }
+        sb.append("    esac\n    p=$l\n  fi\n  sleep 0.2\ndone\n")
           .append(RING_OFF).append('\n')
           .append("rm -f ").append(STOPF).append(' ').append(PID).append('\n');
         return writeScript(ctx, "led_music.sh", sb.toString());

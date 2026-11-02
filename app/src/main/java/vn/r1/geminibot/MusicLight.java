@@ -72,8 +72,9 @@ final class MusicLight {
         if (peak < 1500) peak = 1500;
         // Lên nhanh, xuống từ từ (~0,3 s mỗi gói ~23 ms): bản trước tụt về 0 giữa các nhịp, đèn chớp tắt
         smooth = rms > smooth ? smooth * 0.4 + rms * 0.6 : smooth * 0.93 + rms * 0.07;
-        int level = (int) Math.round(Math.min(1.0, smooth / peak) * RING);
-        if (level < 1) level = 1; // đang có nhạc: luôn còn ít nhất 1 đèn
+        // Bước 2 đèn: ít lần đổi hơn (driver đèn chậm, xem Led.writeMusic)
+        int level = (int) Math.round(Math.min(1.0, smooth / peak) * RING / 2) * 2;
+        if (level < 2) level = 2; // đang có nhạc: luôn còn ít nhất 2 đèn
         if (pending.size() > 200) pending.pollFirst();
         pending.addLast(new long[]{at, level});
     }
