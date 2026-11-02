@@ -4,7 +4,6 @@ import android.bluetooth.BluetoothAdapter;
 import android.content.Context;
 import android.media.AudioFormat;
 import android.media.AudioManager;
-import android.media.AudioTimestamp;
 import android.media.AudioTrack;
 
 import org.json.JSONArray;
@@ -365,7 +364,6 @@ final class Group {
         private AudioTrack track;
         private int rate;
         private long written;
-        private final AudioTimestamp ts = new AudioTimestamp();
 
         Player(String name) {
             this.name = name;
@@ -397,8 +395,8 @@ final class Group {
                     int r = (Integer) m[2], ch = (Integer) m[3], role = (Integer) m[4];
                     short[] mono = toMono((byte[]) m[1], ch, role);
                     if (track == null || r != rate) open(r);
-                    // Ghi trước tối đa ~250 ms: chờ tới gần lúc phát
-                    long wait = playAt - System.nanoTime() - 250_000_000L;
+                    // Ghi trước ~150 ms (đệm AudioTrack 250 ms, đủ chỗ để write() không bị chặn)
+                    long wait = playAt - System.nanoTime() - 150_000_000L;
                     if (wait > 0) Thread.sleep(wait / 1_000_000, (int) (wait % 1_000_000));
                     if (playAt < System.nanoTime() - 50_000_000L && written > 0 && !playing()) {
                         continue; // quá trễ (loa vừa bận), bỏ gói
@@ -436,44 +434,34 @@ final class Group {
         private long sumErr, nErr;
 
         /**
-         * Lúc mẫu kế tiếp (written) sẽ ra loa, theo System.nanoTime; -1 = loa đang trống (mới mở / vừa hết
-         * dữ liệu), cần bắt đầu lại. Ưu tiên AudioTrack.getTimestamp nếu mốc còn mới (< 0,5 s); mốc cũ
-         * (loa bị đói dữ liệu) làm ước lượng sai rất xa - lỗi khiến cả nhóm im lặng ở bản đầu.
+         * Canh bằng lượng chờ trong AudioTrack: mẫu đầu gói phải ra loa lúc playAt, tức lúc ghi thì trong loa
+         * phải còn đúng (playAt - bây giờ - trễ ra loa) âm thanh chưa phát. Còn nhiều hơn = đang trễ -> bỏ bớt
+         * đầu gói; ít hơn = đang sớm -> chèn im lặng. Lượng chờ = đã ghi - vị trí phát (getPlaybackHeadPosition);
+         * không dùng getTimestamp (bản trước: mốc cũ làm mọi gói bị coi là trễ đúng 1 gói, bỏ sạch, im lặng).
+         * Trễ ra loa sau AudioTrack giống nhau trên mọi R1 nên không ảnh hưởng độ khớp giữa các loa.
          */
-        private long nextFrameTime() {
-            if (written == 0) return -1;
-            long now = System.nanoTime();
-            long head = track.getPlaybackHeadPosition() & 0xffffffffL;
-            if (head >= written) return -1; // đã phát hết những gì ghi: loa trống
-            if (track.getTimestamp(ts) && ts.framePosition > 0 && now - ts.nanoTime < 500_000_000L) {
-                return ts.nanoTime + (written - ts.framePosition) * 1_000_000_000L / rate;
-            }
-            return now + (written - head) * 1_000_000_000L / rate + OUT_LATENCY_NS;
-        }
-
         private void write(short[] pcm, long playAt) {
             long now = System.nanoTime();
-            long next = nextFrameTime();
+            long head = track.getPlaybackHeadPosition() & 0xffffffffL;
+            long buffered = Math.max(0, written - head);
+            long want = (playAt - now - OUT_LATENCY_NS) * rate / 1_000_000_000L;
+            long err = buffered - want; // > 0: trễ, < 0: sớm (đơn vị mẫu)
             int start = 0;
-            if (next < 0) {
-                // Loa trống: chèn im lặng cho tới đúng lúc rồi phát; quá trễ thì bỏ phần đã qua
-                long gap = playAt - now - OUT_LATENCY_NS;
-                if (gap > 0) silence((int) Math.min(gap * rate / 1_000_000_000L, rate / 2));
-                else start = (int) Math.min(-gap * rate / 1_000_000_000L, pcm.length);
+            if (want < 0 && buffered == 0) {
+                start = (int) Math.min(-want, pcm.length); // loa trống và gói đã quá giờ: bỏ phần đã qua
             } else {
-                long errFrames = (next - playAt) * rate / 1_000_000_000L; // > 0: đang trễ
-                sumErr += errFrames;
+                sumErr += err;
                 nErr++;
-                long big = rate / 50;     // 20 ms
-                long small = rate / 1000; // 1 ms
-                long dead = rate / 500;   // 2 ms
-                if (errFrames > big) {
-                    start = (int) Math.min(errFrames, pcm.length);
-                } else if (errFrames < -big) {
-                    silence((int) Math.min(-errFrames, rate / 2));
-                } else if (errFrames > dead) {
+                long big = rate / 33;     // 30 ms: sửa ngay
+                long small = rate / 1000; // 1 ms mỗi gói: sửa dần cho khỏi nghe thấy
+                long dead = rate / 100;   // 10 ms: vị trí phát của AudioTrack chỉ nhảy theo từng chu kỳ
+                if (err > big) {
+                    start = (int) Math.min(err, pcm.length);
+                } else if (err < -big) {
+                    silence((int) Math.min(-err, rate / 2));
+                } else if (err > dead) {
                     start = (int) Math.min(small, pcm.length);
-                } else if (errFrames < -dead) {
+                } else if (err < -dead) {
                     silence((int) small);
                 }
             }
