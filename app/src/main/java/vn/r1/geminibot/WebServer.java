@@ -122,6 +122,7 @@ class WebServer {
                     if (e > 0) query.put(kv.substring(0, e), URLDecoder.decode(kv.substring(e + 1), "UTF-8"));
                 }
             }
+            if (MusicApi.handle(bot, s, method, path, query, headers, body)) return;
             route(s, method, path, query, body);
         } catch (Exception e) {
             try {
@@ -140,6 +141,17 @@ class WebServer {
             throws Exception {
         if (method.equals("GET") && (path.equals("/") || path.equals("/index.html"))) {
             send(s, 200, "text/html; charset=utf-8", readAsset("web/index.html"));
+            return;
+        }
+        // Trang Nhạc (chép từ Voicebot trên Pi) và CSS của nó: assets/web/static/...
+        if (method.equals("GET") && path.startsWith("/static/") && !path.contains("..")) {
+            String type = path.endsWith(".css") ? "text/css; charset=utf-8"
+                    : path.endsWith(".js") ? "application/javascript; charset=utf-8" : "text/html; charset=utf-8";
+            try {
+                send(s, 200, type, readAsset("web" + path));
+            } catch (IOException e) {
+                send(s, 404, "text/plain", "Not found".getBytes("UTF-8"));
+            }
             return;
         }
         if (method.equals("GET") && path.equals("/api/status")) {

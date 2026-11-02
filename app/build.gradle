@@ -11,8 +11,8 @@ android {
         // Phicomm R1 chạy Android 5.1 (API 22)
         minSdk 21
         targetSdk 22
-        versionCode 41
-        versionName '1.40'
+        versionCode 42
+        versionName '1.41'
         // R1 dùng chip RK3229 (ARMv7) – bỏ các ABI khác cho APK nhẹ
         ndk { abiFilters 'armeabi-v7a' }
     }
@@ -32,6 +32,8 @@ android {
     }
 
     compileOptions {
+        // NewPipeExtractor dùng java.time / java.nio.file: Android 5.1 không có -> desugaring
+        coreLibraryDesugaringEnabled true
         sourceCompatibility JavaVersion.VERSION_1_8
         targetCompatibility JavaVersion.VERSION_1_8
     }
@@ -43,6 +45,8 @@ android {
 
     packaging {
         jniLibs { pickFirsts += ['**/libc++_shared.so'] }
+        // Thư viện Java (NewPipeExtractor, Rhino…) kèm file giấy phép trùng tên
+        resources { excludes += ['META-INF/DEPENDENCIES', 'META-INF/LICENSE*', 'META-INF/NOTICE*', 'META-INF/*.md'] }
     }
 
     // Bộ tiền xử lý âm thanh micro_speech cho microWakeWord (C++, xem src/main/cpp)
@@ -61,6 +65,10 @@ dependencies {
     implementation 'org.tensorflow:tensorflow-lite:2.11.0'
     // WebSocket cho Gemini Live; 3.12.x là nhánh cuối còn hỗ trợ Android 5
     implementation 'com.squareup.okhttp3:okhttp:3.12.13'
+    // Nhạc: tìm / lấy link YouTube (như yt-dlp trên Pi) và phát (luồng m4a / webm của YouTube)
+    implementation 'com.github.teamnewpipe:NewPipeExtractor:v0.26.5'
+    implementation 'com.google.android.exoplayer:exoplayer-core:2.19.1'
+    coreLibraryDesugaring 'com.android.tools:desugar_jdk_libs_nio:2.0.4'
 }
 
 def fetchFile = { String url, File dest ->

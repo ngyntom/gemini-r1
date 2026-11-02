@@ -1,0 +1,2714 @@
+/* CSS dùng chung cho toàn app - trước đây nằm trong <style> ngay trong
+   <head> của templates/index.html, tách ra file riêng cho dễ bảo trì.
+
+   THỨ TỰ NẠP QUAN TRỌNG: file này PHẢI nạp qua <link> nằm TRƯỚC các thẻ
+   <script> (framework7-bundle.min.js/app.js) trong index.html, giữ nguyên vị
+   trí như <style> cũ - F7 tự chèn 1 <style> RIÊNG (bảng màu Material You,
+   tính từ tham số colors lúc new Framework7()) vào cuối <head> lúc khởi tạo,
+   tức là SAU link này trong DOM - cùng độ ưu tiên thì luật NẠP SAU thắng, nên
+   không được đặt --f7-theme-color tĩnh ở đây (sẽ bị F7 ghi đè, setColorTheme()
+   ở tab Giao diện mới cần thắng được biến đó, không phải file CSS tĩnh này).
+*/
+
+/* KHÔNG đặt --f7-theme-color tĩnh ở đây nữa - <style> này nằm SAU <style>
+   mà F7 tự chèn (app.setColorTheme() ở tab Giao diện) trong <head>, nên
+   cùng độ ưu tiên thì luật ở ĐÂY luôn thắng, khiến đổi màu chủ đề không
+   bao giờ có tác dụng (đã gặp lỗi này thật). Màu mặc định #4285F4 giờ
+   truyền qua "colors" lúc tạo Framework7 (xem app.js) - đúng cơ chế của
+   F7 nên sau đó setColorTheme() mới ghi đè lại được. */
+html, body { height: 100%; }
+
+/* ---------- Cỡ chữ tuỳ chỉnh (tab Giao diện > "Cỡ chữ", xem theme.html) ----------
+   --ty-le-co-chu: tỷ lệ nhân chung, 1 = 100% (mặc định gốc). common.js đặt
+   lại giá trị này qua document.documentElement.style.setProperty() NGAY lúc
+   trang vừa tải (đọc từ localStorage, xem FONT_SCALE_KEY - đặt ở common.js,
+   không phải app.js, để áp trước khi F7 khởi tạo/vẽ ra màn hình, tránh nhấp
+   nháy cỡ mặc định rồi mới nhảy sang cỡ đã lưu), và theme.html tự đặt lại
+   mỗi khi người dùng kéo thanh trượt "Cỡ chữ".
+
+   CỐ Ý KHÔNG dùng CSS "zoom" (phóng cả layout/khoảng cách, không riêng chữ) -
+   app này có nhiều vị trí tuyệt đối canh chỉnh chi tiết theo pixel cố định
+   (khoảng cách tabbar-Capacitor, đáy khung nhập chat...), zoom sẽ làm lệch
+   hết những chỗ đó. Thay vào đó ĐỊNH NGHĨA LẠI các biến CSS cỡ chữ CÓ SẴN của
+   chính F7 (font-size của F7 hầu hết là px cứng, không phải rem, nên đổi
+   font-size gốc của <html> không có tác dụng gì - đã kiểm tra) thành
+   "calc(size-gốc * tỷ-lệ)" - chỉ chữ co giãn, mọi padding/margin/vị trí
+   tuyệt đối vẫn giữ nguyên px như cũ, không vỡ layout ở bất kỳ mức nào.
+
+   Chỉ định nghĩa lại các biến font-size của những component F7 THẬT SỰ đang
+   dùng trong app này (đã rà soát class thật trong templates/) - bỏ qua các
+   biến của component KHÔNG dùng (calendar, picker ngày/giờ, table, treeview,
+   breadcrumbs, stepper, area-chart...) cho gọn, không phải vì thiếu sót. */
+:root {
+  --ty-le-co-chu: 1;
+
+  --f7-font-size: calc(14px * var(--ty-le-co-chu));
+  --f7-label-font-size: calc(12px * var(--ty-le-co-chu));
+
+  --f7-navbar-font-size: calc(17px * var(--ty-le-co-chu));
+  --f7-navbar-title-font-size: calc(22px * var(--ty-le-co-chu));
+  --f7-navbar-large-title-font-size: calc(34px * var(--ty-le-co-chu));
+  --f7-navbar-subtitle-font-size: calc(10px * var(--ty-le-co-chu));
+  --f7-toolbar-font-size: calc(17px * var(--ty-le-co-chu));
+
+  --f7-list-font-size: calc(17px * var(--ty-le-co-chu));
+  --f7-list-item-text-font-size: calc(15px * var(--ty-le-co-chu));
+  --f7-list-item-subtitle-font-size: calc(15px * var(--ty-le-co-chu));
+  --f7-list-item-footer-font-size: calc(12px * var(--ty-le-co-chu));
+  --f7-list-item-header-font-size: calc(12px * var(--ty-le-co-chu));
+  --f7-list-item-after-font-size: calc(14px * var(--ty-le-co-chu));
+  --f7-list-group-title-font-size: calc(16px * var(--ty-le-co-chu));
+
+  --f7-block-title-font-size: calc(17px * var(--ty-le-co-chu));
+  --f7-block-title-large-font-size: calc(22px * var(--ty-le-co-chu));
+  --f7-block-title-medium-font-size: calc(20px * var(--ty-le-co-chu));
+
+  --f7-button-font-size: calc(15px * var(--ty-le-co-chu));
+  --f7-button-large-font-size: calc(17px * var(--ty-le-co-chu));
+  --f7-button-small-font-size: calc(14px * var(--ty-le-co-chu));
+
+  --f7-card-header-font-size: calc(17px * var(--ty-le-co-chu));
+
+  --f7-chip-font-size: calc(14px * var(--ty-le-co-chu));
+  --f7-chip-media-font-size: calc(16px * var(--ty-le-co-chu));
+  --f7-badge-font-size: calc(12px * var(--ty-le-co-chu));
+
+  --f7-dialog-font-size: calc(14px * var(--ty-le-co-chu));
+  --f7-dialog-title-font-size: calc(17px * var(--ty-le-co-chu));
+  --f7-dialog-button-font-size: calc(17px * var(--ty-le-co-chu));
+  --f7-dialog-input-font-size: calc(14px * var(--ty-le-co-chu));
+  --f7-toast-font-size: calc(14px * var(--ty-le-co-chu));
+
+  /* Khung nhập chat (messagebar) CỐ Ý không co theo --ty-le-co-chu - đổi font
+     ở đây làm đổi chiều cao thật của messagebar (--f7-messagebar-height, do
+     F7 tự tính theo nội dung), trong khi vị trí "bottom" của nó lại canh
+     cứng theo var(--f7-tabbar-icons-height) (xem luật #view-chat .messagebar
+     phía dưới file này) - chiều cao đổi làm khung bị đẩy lệch khỏi vị trí đã
+     canh, không giống các phần tử khác chỉ đổi cỡ chữ tại chỗ. Giữ cố định
+     17px cho khung nhập là an toàn nhất. Bong bóng tin nhắn (message-bubble)
+     vẫn co giãn bình thường - không ảnh hưởng vị trí gì cả. */
+  --f7-messagebar-font-size: 17px;
+  --f7-messagebar-textarea-font-size: 17px;
+  --f7-message-bubble-font-size: calc(17px * var(--ty-le-co-chu));
+  --f7-message-footer-font-size: calc(11px * var(--ty-le-co-chu));
+  --f7-message-header-font-size: calc(12px * var(--ty-le-co-chu));
+  --f7-message-name-font-size: calc(12px * var(--ty-le-co-chu));
+  --f7-message-text-footer-font-size: calc(12px * var(--ty-le-co-chu));
+  --f7-message-text-header-font-size: calc(12px * var(--ty-le-co-chu));
+  --f7-messages-title-font-size: calc(11px * var(--ty-le-co-chu));
+
+  --f7-tabbar-label-font-size: calc(12px * var(--ty-le-co-chu));
+  --f7-tabbar-label-tablet-font-size: calc(14px * var(--ty-le-co-chu));
+
+  --f7-range-label-font-size: calc(12px * var(--ty-le-co-chu));
+  --f7-range-scale-font-size: calc(12px * var(--ty-le-co-chu));
+
+  --f7-timeline-item-title-font-size: calc(17px * var(--ty-le-co-chu));
+  --f7-timeline-item-subtitle-font-size: calc(15px * var(--ty-le-co-chu));
+  --f7-timeline-item-time-font-size: calc(13px * var(--ty-le-co-chu));
+
+  --f7-input-font-size: calc(16px * var(--ty-le-co-chu));
+  --f7-input-error-font-size: calc(12px * var(--ty-le-co-chu));
+  --f7-input-info-font-size: calc(12px * var(--ty-le-co-chu));
+  --f7-searchbar-input-font-size: calc(17px * var(--ty-le-co-chu));
+
+  --f7-color-picker-label-font-size: calc(14px * var(--ty-le-co-chu));
+  --f7-color-picker-value-font-size: calc(16px * var(--ty-le-co-chu));
+}
+
+/* Các chỗ TỰ VIẾT (không qua biến F7) đặt font-size bằng style="font-size:
+   Npx" tại chỗ trong HTML rải khắp nhiều file - đổi hết sang class dùng
+   chung ".co-chu-tuy-chinh" kèm style="--px:N" (giữ đúng số gốc). "--px" là
+   BIẾN CSS (custom property), không phải property "font-size" thật - biến
+   CSS gán bằng style="" tại chỗ vẫn ĐỌC ĐƯỢC bình thường từ luật font-size
+   viết trong file .css này (khác hẳn việc override thẳng "font-size", nơi
+   style="" tại chỗ luôn thắng mọi luật trong file .css) - nhờ vậy không cần
+   JS gán tay từng chỗ, đổi "--ty-le-co-chu" ở :root là mọi nơi tự co giãn
+   theo. */
+.co-chu-tuy-chinh {
+  font-size: calc(var(--px) * 1px * var(--ty-le-co-chu));
+}
+
+/* Đã xác nhận nguyên nhân THẬT của lỗi kéo/cuộn NGANG trên trang Mic & loa
+   là do <select> (xem luật ngay dưới đây), KHÔNG phải do nút kéo (knob) của
+   .range-slider tràn ra ngoài khung chứa ở 2 đầu mút như từng nghi ngờ - đã
+   thử bỏ hẳn phần đệm 19px cho range-slider và lỗi kéo ngang vẫn hết, xác
+   nhận phần đệm đó không cần thiết cho lỗi này (dù về lý thuyết CSS gốc của
+   F7 vẫn để nút kéo tràn 19px ở 0%/100%, chỉ là không đủ để gây kéo ngang cả
+   trang trong thực tế) - bỏ hẳn, không giữ code không cần thiết. */
+
+/* Riêng Safari/WebKit, thẻ <select> gốc trình duyệt có xu
+   hướng tự lấy ĐỘ RỘNG TỐI THIỂU theo đúng chữ của OPTION đang chọn (kiểu
+   min-width: min-content ngầm định của UA stylesheet), BỎ QUA "width:100%"
+   từ CSS của trang - khác hẳn div/span thường (luôn co theo đúng khung cha).
+   <select id="cfg-ALSA_PLAYBACK_DEVICE"> dò danh sách card thật từ Pi (xem
+   /api/audio/output_devices trong webui.py) nên nhãn có thể khá dài (vd "Card
+   0: bcm2835 Headphones"), đủ để đẩy tràn khung trên màn hình hẹp. Ép thẳng
+   min-width:0 để buộc <select> tuân theo đúng khung cha như mọi input khác. */
+/* <select> KHÔNG tự có đường gạch chân như <input> cùng ô (đã đọc CSS gốc
+   F7 xác nhận: input dựa vào 1 cơ chế riêng của theme để vẽ đường này,
+   select thì không có gì cả - "background-color:transparent", không viền)
+   - thêm tay 1 đường viền dưới, dùng đúng biến màu F7 (--f7-list-item-
+   border-color) để tự đổi theo sáng/tối, khớp với đường kẻ input/dòng kế
+   bên, cho 2 loại field trong cùng 1 trang nhìn đồng nhất. */
+.item-input-wrap select {
+  min-width: 0;
+  border-bottom: 1px solid var(--f7-list-item-border-color, rgba(0, 0, 0, 0.15));
+}
+
+/* Vuốt dọc để cuộn trang lỡ chạm trúng thanh trượt (range-slider) làm đổi
+   nhầm giá trị - F7 tự đặt "touch-action:pan-y" cho range-slider ngang (cho
+   phép trình duyệt xử lý cuộn DỌC tự nhiên, JS của F7 chỉ can thiệp khi ngón
+   tay di chuyển theo chiều NGANG), nhưng đặt tường minh lại lần nữa ở đây (đè
+   !important) để chắc chắn không bị quy tắc CSS nào khác vô tình ghi đè mất -
+   không có tác dụng phụ vì trùng đúng giá trị mặc định của F7. LƯU Ý: đây là
+   giới hạn vật lý khi vuốt xéo/chạm ngay đúng nút kéo tròn (chính bản thân nó
+   LÀ điểm cần kéo ngang) khó tránh khỏi 100% trên mọi thiết bị cảm ứng, không
+   riêng app này - cải thiện được phần nào chứ không chắc hết hẳn. */
+.range-slider {
+  touch-action: pan-y !important;
+}
+
+/* Bật "With Scale" (khung chia %) cho thanh Cỡ chữ (theme.html) - F7 vẽ các
+   vạch chia + nhãn % bằng position:absolute NGAY DƯỚI bản thân thanh trượt
+   (xem framework7-bundle.min.css: ".range-scale{position:absolute;top:50%}"),
+   KHÔNG cộng vào chiều cao của .range-slider - nên khung trắng .item-input-
+   wrap/list vốn chỉ cao đúng bằng thanh trượt bị cắt cụt trước khi vẽ hết
+   vạch/nhãn, tràn ra ngoài nền trắng. Chừa thêm khoảng trống DƯỚI bằng
+   padding-bottom đặt trên CHÍNH .item-input-wrap (#theme-font-scale-wrap),
+   KHÔNG đặt margin-bottom thẳng lên .range-slider - vì hàng flex canh giữa
+   icon+thanh trượt (xem theme.html) dùng align-items:center canh theo MARGIN
+   BOX của từng phần tử, margin-bottom trên chính thanh trượt sẽ kéo tâm canh
+   giữa lệch xuống, làm 2 icon 2 bên lệch so với thanh trượt thật - đặt
+   padding-bottom ở khung NGOÀI (không tham gia hàng flex canh giữa) tránh
+   hẳn lỗi đó. Khoảng chừa đúng bằng phần vạch+nhãn tràn ra (step-height 5px +
+   label-offset 4px + chiều cao dòng nhãn, co giãn theo --ty-le-co-chu vì
+   nhãn cũng dùng font-size co giãn qua --f7-range-scale-font-size ở trên). */
+#theme-font-scale-wrap {
+  padding-bottom: calc(14px + 14px * var(--ty-le-co-chu));
+  padding-top: 10px;
+}
+
+/* messagebar (khung nhập chat) và tabbar chính đều tự neo xuống đáy màn
+   hình -> chồng lên nhau. Đặt messagebar nằm ngay TRÊN tabbar chính, và
+   chừa khoảng trống tương ứng ở cuối khung tin nhắn để không bị che.
+   "--f7-tabbar-labels-height" KHÔNG PHẢI biến thật của F7 (không tồn tại
+   trong CSS của F7 9.x) - luôn âm thầm rớt về mặc định 56px dù tabbar có
+   icon+label thật ra cao 80px ("--f7-tabbar-icons-height", biến F7 tự đặt
+   khi toolbar có cả 2 class .tabbar.tabbar-icons - xem framework7.io/docs
+   /toolbar-tabbar). KHÔNG tự cộng thêm --f7-safe-area-bottom ở đây - CSS
+   gốc của F7 cho .messagebar đã tự có sẵn "padding-bottom:
+   var(--f7-safe-area-bottom)" bên trong nó rồi, cộng thêm ở "bottom" nữa
+   là tính 2 LẦN, đẩy khung chat lên cao dư hẳn 1 khoảng trống (đã gặp lỗi
+   này thật, xem ảnh chụp màn hình thực tế). */
+#view-chat .messagebar {
+  position: absolute;
+  bottom: var(--f7-tabbar-icons-height, 80px);
+  left: 0; right: 0;
+  z-index: 10;
+}
+#view-chat .messages-content {
+  /* Dùng đúng chiều cao thật của messagebar (--f7-messagebar-height) thay
+     vì --f7-toolbar-height chung chung - safe-area cộng ở đây thì ĐÚNG
+     (phần đó nằm TRONG padding-bottom riêng của messages-content, không
+     trùng với "bottom" của messagebar ở trên). */
+  padding-bottom: calc(var(--f7-tabbar-icons-height, 80px) + var(--f7-messagebar-height, 60px) + var(--f7-safe-area-bottom, 0px) + var(--mini-player-offset, 0px) + var(--chat-cach-tab, 0px));
+}
+
+/* Trang Nhật ký hoạt động - tô màu chủ đề cho dòng "✦ Được đánh thức!" (xem
+   log.html) để dễ lướt mắt tìm ra ngay lúc nào bot được gọi, giữa hàng trăm
+   dòng log khác đều màu xám mặc định (var(--f7-list-item-text-color)) như
+   nhau - chỉ tô CHỮ (không tô khung giờ), để khung giờ giữ nguyên vai trò
+   thuần mốc thời gian, còn chữ mới đúng là nơi mắt cần dừng lại đọc. */
+#log-timeline .log-text-danh-thuc {
+  color: var(--f7-theme-color, #4285F4);
+  font-weight: 600;
+}
+
+/* Nhãn tag (main/wake/ha/mic/tts...) - trước chỉ là chữ thường (F7 mặc định
+   dùng luôn màu chữ chính), khó phân biệt với nội dung log ngay bên dưới,
+   nhất là ở chế độ tối (dark mode) khi cả 2 gần như cùng 1 sắc xám. Đổi
+   thành khung nhãn nhỏ (badge/pill) tô theo màu chủ đề bằng color-mix() ở
+   độ mờ thấp - CÙNG kỹ thuật app.css đã dùng cho .ha-dash-card đang bật
+   (không hard-code 1 màu nền cố định) nên tự đẹp ở CẢ 2 chế độ sáng/tối,
+   không cần viết riêng luật cho html.dark. */
+#log-timeline .timeline-item-title {
+  display: inline-block;
+  padding: 1px 8px;
+  border-radius: 20px;
+  background: color-mix(in srgb, var(--f7-theme-color, #4285F4) 16%, transparent);
+  color: var(--f7-theme-color, #4285F4);
+  font-weight: 600;
+}
+
+/* Chú thích dưới mỗi thanh trượt nằm sát ngay thanh trượt phía trên - thêm
+   khoảng cách cho dễ đọc, tách biệt rõ với phần điều khiển. Trước đây có
+   thêm border-top kẻ ngang phân cách - bỏ theo yêu cầu thực tế (dư thừa,
+   khoảng cách margin/padding đã đủ tách biệt), giữ nguyên phần khoảng cách. */
+.item-input .item-footer {
+  margin-top: 10px;
+  padding-top: 6px;
+}
+
+/* Chú thích chung cho CẢ list (không phải riêng 1 item) - đặt .item-footer
+   làm anh em (sibling) ngay sau .list, không nằm trong <li> nào - vẫn
+   dùng đúng màu/kiểu chữ chuẩn của F7 cho item-footer, chỉ thêm khoảng
+   cách và giảm size 1 nấc cho gọn hơn theo yêu cầu thực tế. */
+.list + .item-footer {
+  display: block;
+  padding: 8px 16px 16px;
+  margin-top: 4px;
+  font-size: 11px;
+}
+
+/* F7 CỐ Ý ẩn line sau item CUỐI CÙNG của .list-dividers-ios (kiểu "grouped
+   table" trong Settings app của iOS - !important, xem framework7-bundle.
+   min.css: ".list li:last-child>.item-inner:after{display:none!important}").
+   Muốn line hiện đủ trên MỌI item (kể cả list chỉ có 1 dòng) nên đè lại ở
+   đây - specificity ngang bằng luật gốc, đặt SAU nên thắng. Dùng chung cho
+   mọi trang có class .list-dividers-ios, không cần lặp lại ở từng trang.
+   CHỈ áp cho item-input (".item-input") - các li khác (nút bấm, toggle,
+   link điều hướng...) vẫn giữ đúng hành vi gốc của F7 (ẩn line cuối), chỉ
+   ô nhập liệu mới cần "đường gạch dưới" cho MỌI dòng kể cả dòng cuối.
+
+   LƯU Ý: chỉ hoạt động đúng khi item-input KHÔNG có .item-footer ngay bên
+   trong .item-inner của nó (đường kẻ này F7 tự vẽ theo ĐÁY .item-inner, có
+   thêm .item-footer sẽ đẩy đường kẻ tụt xuống dưới cả phần chú thích) - vì
+   vậy các ô như CUSTOM_PROMPT/HA_NOTIFY_SERVICE (api.html) đặt chú thích
+   thành 1 <p> RIÊNG sau .list (giống cách ô "Token" vẫn làm), không đặt
+   .item-footer trong .item-inner nữa - xem api.html. */
+.list-dividers-ios li.item-input:last-child > .item-inner:after,
+.list-dividers-ios li.item-input:last-child > .item-content > .item-inner:after {
+  display: block !important;
+}
+
+/* Đảm bảo nút đang chọn trong segmented luôn nổi bật rõ ràng, không phụ
+   thuộc hoàn toàn vào CSS mặc định của F7 cho .button-active. */
+.segmented .button-active {
+  background: var(--f7-theme-color, #4285F4) !important;
+  color: #fff !important;
+}
+
+/* .message-avatar mặc định chỉ dùng cho ảnh (background-image) - ở đây
+   chèn icon mic thay ảnh thật (voicebot không có ảnh đại diện) nên phải
+   tự căn giữa icon bên trong vòng tròn. */
+#view-chat .message-avatar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: var(--f7-theme-color, #4285F4);
+}
+#view-chat .message-avatar i.f7-icons {
+  color: #fff;
+  font-size: 16px;
+}
+
+/* F7 mặc định KHÔNG tô icon trong list theo màu chủ đề (chỉ kế thừa màu
+   chữ thường) - tô riêng icon menu tab Cài đặt theo var(--f7-theme-color)
+   để đổi màu chủ đề (tab Giao diện) cũng đổi luôn icon ở đây cho đồng bộ. */
+#view-settings .item-media i.f7-icons {
+  color: var(--f7-theme-color, #4285F4);
+}
+
+/* Lưới thiết bị kiểu dashboard ở trang Thiết bị (templates/pages/
+   devices.html) - mỗi thẻ vuông icon+tên+trạng thái, thẻ "đang bật"
+   (.ha-dash-on) sáng/nổi hẳn lên, thẻ tắt mờ đi - giống ảnh mẫu ứng dụng
+   nhà thông minh người dùng gửi. auto-fill/minmax để tự co giãn số cột
+   theo bề rộng máy, không cứng số cột. */
+/* Tên nhóm domain (Đèn/Công tắc/Điều hoà...) giờ nằm trong card-header của
+   từng card riêng (xem renderDashboard() trong devices.html - JS tự tạo 1
+   card cho mỗi nhóm) - không còn .ha-dash-group-title rời rạc như trước.
+   Tô theo màu chủ đề (đổi màu ở tab Giao diện thì đổi theo luôn) thay vì màu
+   chữ mặc định - nổi bật hơn, giống cách #view-settings đã tô icon menu
+   theo màu chủ đề. */
+#view-devices .card-header {
+  color: var(--f7-theme-color, #4285F4);
+}
+#view-devices .ha-dash-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(104px, 1fr));
+  gap: 10px;
+  padding: 12px;
+}
+#view-devices .ha-dash-card {
+  position: relative;
+  aspect-ratio: 1 / 1;
+  border-radius: 16px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  background: rgba(115, 115, 115, 0.25);
+  opacity: 0.6;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: opacity 0.15s, background 0.15s, box-shadow 0.15s;
+  overflow: hidden;
+}
+/* Thẻ đang BẬT "ửng màu" nhẹ theo màu chủ đề (thay vì trắng/xám phẳng) -
+   color-mix() trộn màu chủ đề vào nền ở tỉ lệ thấp, tự đổi theo màu chủ đề
+   người dùng chọn ở tab Giao diện (không phải màu vàng/cam cố định). Khai
+   báo "background: #fff" TRƯỚC làm dự phòng cho trình duyệt cũ không hiểu
+   color-mix() - dòng đó bị bỏ qua thì vẫn còn nền trắng an toàn, không mất
+   hẳn màu nền. */
+#view-devices .ha-dash-card.ha-dash-on {
+  opacity: 1;
+  background: #fff;
+  background: color-mix(in srgb, var(--f7-theme-color, #4285F4) 12%, var(--f7-page-bg-color, #fff));
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.12);
+}
+html.dark #view-devices .ha-dash-card.ha-dash-on {
+  background: color-mix(in srgb, var(--f7-theme-color, #4285F4) 22%, var(--f7-page-bg-color, #1c1c1e));
+}
+#view-devices .ha-dash-card.ha-dash-on .ha-dash-badge {
+  border-color: color-mix(in srgb, var(--f7-theme-color, #4285F4) 45%, transparent);
+  color: var(--f7-theme-color, #4285F4);
+}
+#view-devices .ha-dash-card:active {
+  opacity: 0.85;
+}
+/* Giữ lâu trên thẻ = đổi tên (devices.html doiTenThietBi) - tắt menu "sao chép/
+   chọn chữ" mặc định của iOS Safari khi giữ lâu, không thì nó bật lên đè hộp
+   thoại đổi tên. */
+#view-devices .ha-dash-card {
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+#view-devices .ha-dash-card-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: auto;
+}
+#view-devices .ha-dash-icon {
+  font-size: 26px;
+  color: var(--f7-text-color, #000);
+}
+#view-devices .ha-dash-card.ha-dash-on .ha-dash-icon {
+  color: var(--f7-theme-color, #4285F4);
+}
+/* width/height CỐ ĐỊNH (không phải min-width) + không cho chữ tự xuống
+   dòng - bắt buộc mới luôn ra hình TRÒN đều, vì nội dung ("100%"/"29°C")
+   dài ngắn khác nhau, dùng min-width sẽ kéo dài thành hình bầu dục. */
+#view-devices .ha-dash-badge {
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: 1.5px solid var(--f7-list-item-border-color, rgba(0, 0, 0, 0.15));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  line-height: 1;
+  white-space: nowrap;
+  color: var(--f7-text-color, #000);
+}
+/* Loader chờ phản hồi thật sau khi chạm 1 thẻ - CÙNG kích thước với
+   .ha-dash-badge để chiếm đúng chỗ đó (góc phải), .preloader của F7 tự
+   canh giữa nhờ position:absolute + left/top:50% (cần cha position:relative). */
+#view-devices .ha-dash-loader {
+  position: relative;
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+}
+#view-devices .ha-dash-loader .preloader {
+  color: var(--f7-theme-color, #4285F4);
+}
+/* Tên thiết bị XUỐNG DÒNG (tối đa 2 dòng, chữ nhỏ hơn 1 chút) thay vì cắt
+   "..." ở 1 dòng như trước - tên HA dài (vd "Máy lạnh phòng con") bị mất
+   phần đuôi, không phân biệt được các thiết bị gần giống tên nhau. 3 dòng ở
+   14px thì tràn thẻ vuông, bị che (đã gặp) - 2 dòng 12.5px vừa khít. */
+#view-devices .ha-dash-name {
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--f7-text-color, #000);
+  line-height: 1.25;
+  margin-top: 8px;
+  overflow-wrap: anywhere;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+}
+#view-devices .ha-dash-state {
+  font-size: 12px;
+  color: var(--f7-list-item-footer-text-color, #888);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+#view-devices .ha-dash-skeleton {
+  background: var(--skeleton-color);
+  opacity: 1;
+  cursor: default;
+}
+/* Icon "chỉnh sửa" trên tiêu đề mỗi nhóm domain (Đèn/Công tắc/...) - bấm vào
+   bật/tắt "chế độ sửa" RIÊNG cho nhóm đó (devices.html: dangSuaDomain), hiện
+   thêm icon xoá (x đỏ) góc trên phải mỗi thẻ trong nhóm để bỏ thiết bị khỏi
+   bot ngay tại lưới chính, không cần mở popup "Thêm/bớt thiết bị" nữa.
+   .card-header đã sẵn display:flex;justify-content:space-between (CSS gốc
+   F7, xem framework7-bundle.min.css) nên chỉ cần thêm phần tử thứ 2 là 2 đầu
+   dòng tự đẩy ra 2 bên, không cần viết flex riêng ở đây. */
+#view-devices .ha-dash-edit-btn {
+  color: inherit;
+  flex-shrink: 0;
+  margin-left: 8px;
+}
+#view-devices .ha-dash-edit-btn i {
+  font-size: 20px;
+}
+/* Cùng kích thước 32x32 với .ha-dash-badge/.ha-dash-loader (chiếm đúng chỗ
+   góc phải thẻ) để không làm lệch bố cục khi chuyển qua lại giữa 3 trạng thái
+   (huy hiệu %/°C, loader chờ phản hồi, icon xoá). */
+#view-devices .ha-dash-delete-badge {
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--f7-color-red, #ff3b30);
+  color: #fff;
+  cursor: pointer;
+}
+#view-devices .ha-dash-delete-badge i {
+  font-size: 17px;
+}
+/* Thanh giả cho card-header lúc đang tải (khung xương) - card thật giờ có
+   tên nhóm domain trong card-header, khung xương cũng cần 1 card-header y
+   hệt (chỉ thay chữ bằng thanh xám nhấp nháy) để không bị "nhảy" bố cục lúc
+   dữ liệu thật tải xong. */
+#view-devices .ha-dash-skeleton-header {
+  width: 110px;
+  height: 14px;
+  border-radius: 4px;
+}
+#view-devices .ha-dash-empty {
+  text-align: center;
+  padding: 60px 24px;
+  color: var(--f7-list-item-footer-text-color, #888);
+  font-size: 14px;
+}
+/* Kiểm tra lại: luật này trước đó áp dụng KHÔNG ĐIỀU KIỆN (mọi lúc), nên
+   dù đúng khi xem qua Safari đã Lưu ra màn hình chính (standalone - không
+   còn thanh Safari + vùng an toàn tính khác), nó sẽ đẩy tabbar xuống THẤP
+   QUÁ khi vẫn mở bình thường qua tab Safari (không standalone) - 2 chế độ
+   cần layout khác nhau. Giới hạn lại chỉ áp dụng lúc THẬT SỰ đang chạy
+   như app đã lưu (display-mode: standalone - iOS Safari đã hỗ trợ từ iOS
+   12.2, đúng cách CSS chuẩn để phát hiện việc này), HOẶC đang chạy trong
+   app iOS thật (Capacitor) - "html.device-capacitor" do chính F7 tự gắn
+   (thư viện Device của F7 phát hiện "window.Capacitor"), CÙNG lý do: không
+   còn thanh Safari + vùng an toàn safe-area tính khác kiểu PWA standalone,
+   nên cần bù y hệt. Thiếu vế Capacitor này khiến tabbar app iOS cài qua
+   Capacitor nằm cao hơn hẳn so với webapp/PWA đã lưu ra màn hình chính (đã
+   gặp lỗi thật này: "display-mode: standalone" KHÔNG khớp trong WKWebView
+   của Capacitor dù giao diện/safe-area giống hệt trường hợp PWA). */
+@media (display-mode: standalone) {
+  .toolbar-pane {
+    margin-bottom: -50px;
+  }
+  #view-chat .messagebar {
+    bottom: calc(var(--f7-tabbar-icons-height, 80px) - 10px);
+  }
+}
+html.device-capacitor .toolbar-pane {
+  margin-bottom: -50px;
+}
+/* Tabbar chính "thấp" hơn 50px vì luật -50px ngay trên - messagebar của
+   khung chat (neo bằng "bottom: var(--f7-tabbar-icons-height, 80px)" cố
+   định) không tự biết điều đó, nên nổi lệch lên cao hơn tabbar đúng 50px
+   (đã gặp lỗi này thật khi thêm luật -50px ở trên mà quên trường hợp này).
+   Trừ lại cùng 50px cho khớp. */
+html.device-capacitor #view-chat .messagebar {
+  /* ---- CHỈNH SỐ NGAY DƯỚI ĐÂY để đổi khoảng cách giữa khung nhập chat
+     (ô "Nhắn cho voicebot...") và tabbar dưới cùng - CHỈ áp dụng trong app
+     iOS thật (Capacitor cài qua SideStore/LiveContainer), KHÔNG ảnh hưởng
+     webapp/Safari (xem luật html.device-capacitor phía trên).
+     - Số CÀNG LỚN (trừ càng nhiều) => khung nhập càng SÁT tabbar hơn (kéo
+       xuống thấp hơn).
+     - Số CÀNG NHỎ (trừ càng ít) => khung nhập càng CÁCH XA tabbar hơn (đẩy
+       lên cao hơn).
+     Đã tăng từ 15px lên 45px (xem ảnh chụp thực tế trong lịch sử trò
+     chuyện - khung nhập còn cách tabbar 1 khoảng trống rõ) - đây là số ước
+     lượng, có thể còn cần chỉnh thêm. Cách tự chỉnh: sửa số "30px" ngay
+     dưới, lưu file, rồi đẩy lại đúng file này lên Pi
+     (static/css/app.css) + "sudo systemctl restart webui" trên Pi - không
+     cần sửa gì khác, không cần build lại app iOS. */
+  --khoang-cach-tru-tabbar-chat: 30px;
+  bottom: calc(var(--f7-tabbar-icons-height, 80px) - var(--khoang-cach-tru-tabbar-chat));
+}
+
+/* Chặn chọn/bôi đen chữ + menu Copy/Look Up khi long-press - CHỈ trong app
+   iOS thật (html.device-capacitor), không áp dụng cho webapp/Safari (ở đó
+   chọn/copy chữ vẫn là hành vi bình thường, hữu ích). F7 đã tự đặt
+   "-webkit-touch-callout:none" cho MỌI phần tử (chặn menu Copy/Look Up khi
+   long-press) nhưng KHÔNG tự chặn việc bôi đen/chọn chữ (user-select) - long-
+   press vào nút/icon/tabbar vẫn có thể vô tình chọn trúng chữ xung quanh,
+   cảm giác không giống app native. Trừ input/textarea - vẫn cần chọn được
+   chữ trong đó để sửa/copy giá trị đang gõ. */
+html.device-capacitor {
+  -webkit-user-select: none;
+  user-select: none;
+}
+html.device-capacitor input,
+html.device-capacitor textarea {
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+/* list-outline-ios (Cài đặt/Hệ thống Pi/Mic.../Đèn LED...) đặt BÊN TRONG
+   .card (khác cách dùng mặc định của F7 - list-outline-ios thường dùng ĐỘC
+   LẬP/inset, tự có viền+bo góc riêng) - .card có border-radius riêng nhưng
+   KHÔNG có overflow:hidden, nên bình thường nhìn dòng ĐẦU/CUỐI vẫn có vẻ bo
+   tròn theo card (nền list không có gì "lộ góc vuông" ra ngoài để so sánh).
+   Nhưng lúc CHẠM vào đúng dòng đầu/cuối, lớp tô nền phản hồi chạm
+   (".item-link.active-state", tô theo biến --f7-list-link-pressed-bg-color)
+   là 1 hình chữ nhật VUÔNG GÓC vẽ đè lên - không tự bo theo góc card, lộ hẳn
+   góc vuông đè lên phần bo của card (đã gặp lỗi thật này, xem ảnh chụp thực
+   tế: 2 dòng đầu/cuối bo bình thường, riêng lúc tô đen lại vuông góc). Bo
+   thẳng góc trên của dòng ĐẦU + góc dưới của dòng CUỐI trong CHÍNH .item-link
+   (phần tử nhận class active-state) - khớp đúng border-radius của .card bao
+   ngoài, để lớp tô đen bo theo cùng hình dạng luôn, không chỉ lúc tĩnh.
+
+   Góc TRÊN chỉ bo khi .card KHÔNG có .card-header (vd card "Giao diện") -
+   card CÓ .card-header (Trợ lý/Âm thanh & ánh sáng/Hệ thống Pi...) thì chính
+   .card-header mới là mép trên thật của card (tự có border-radius riêng,
+   xem CSS gốc F7: ".card-header{border-radius:var(--f7-card-border-radius)
+   var(--f7-card-border-radius) 0 0}"), .card-content lúc đó là phần VUÔNG
+   nối tiếp ngay dưới header - bo luôn góc trên dòng đầu ở đây thành SAI, tạo
+   ra 1 góc bo lơ lửng giữa card không khớp mép nào thật cả (đã gặp lỗi thật
+   này khi áp dụng chung 1 luật cho mọi card, không phân biệt có/không
+   header). :has() được Safari/WKWebView hỗ trợ từ 15.4, an toàn dùng ở đây. */
+.card:not(:has(.card-header)) .card-content .list-outline-ios li:first-child > .item-link {
+  border-top-left-radius: var(--f7-card-border-radius);
+  border-top-right-radius: var(--f7-card-border-radius);
+}
+.card-content .list-outline-ios li:last-child > .item-link {
+  border-bottom-left-radius: var(--f7-card-border-radius);
+  border-bottom-right-radius: var(--f7-card-border-radius);
+}
+
+/* Thẻ chọn giao diện kiểu trực quan (xem templates/pages/theme.html) -
+   mỗi lựa chọn là 1 hình mô phỏng thu nhỏ + tên bên dưới, thay cho hàng
+   nút segmented chữ khô khan trước đây - giống kiểu WiFiman Desktop
+   Settings > Theme. Màu trong hình mô phỏng CỐ Ý viết chết (không dùng
+   biến --f7-* đổi theo dark mode hiện tại của APP) - hình "Sáng" phải
+   LUÔN trông sáng, hình "Tối" phải LUÔN trông tối, bất kể app đang ở chế
+   độ nào, vì đó là bản xem trước cho LỰA CHỌN đó, không phải theo trạng
+   thái hiện tại. */
+.theme-preview-row {
+  display: flex;
+  gap: 12px;
+}
+.theme-preview-card {
+  flex: 1;
+  min-width: 0;
+  background: none;
+  border: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.theme-preview-thumb {
+  width: 100%;
+  aspect-ratio: 3 / 4;
+  border-radius: 12px;
+  overflow: hidden;
+  border: 2px solid transparent;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.18);
+  display: flex;
+  flex-direction: column;
+  transition: border-color 0.15s;
+}
+/* Riêng mục Sáng/Tối đổi thành hình vuông (mục Kiểu giao diện không còn dùng
+   .theme-preview-thumb nữa - đã đổi sang icon logo, xem .theme-preview-icon-
+   wrap bên dưới - nên luật aspect-ratio 3/4 mặc định ở trên chỉ còn áp dụng
+   cho Sáng/Tối, luật này ép lại thành vuông cho đúng ý ban đầu). */
+#theme-dark-preview .theme-preview-thumb {
+  aspect-ratio: 1 / 1;
+}
+.theme-preview-card.active .theme-preview-thumb {
+  border-color: var(--f7-theme-color, #4285F4);
+}
+/* Mục "Kiểu giao diện" (iOS/Material/Tự động) - dùng icon logo thật thay cho
+   khung mô phỏng vẽ tay, vuông giống Sáng/Tối, icon căn giữa. */
+.theme-preview-icon-wrap {
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  border-radius: 12px;
+  /* Viền giống hệt cách Sáng/Tối làm (.theme-preview-thumb phía trên) - trong
+     suốt chờ active, chỉ hiện màu khi được chọn, KHÔNG hiện viền mặc định. */
+  border: 2px solid transparent;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.18);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--f7-page-bg-color, #fff);
+  transition: border-color 0.15s;
+}
+.theme-preview-icon-wrap i.f7-icons {
+  font-size: 34px;
+  color: var(--f7-text-color, #000);
+}
+.theme-preview-card.active .theme-preview-icon-wrap {
+  border-color: var(--f7-theme-color, #4285F4);
+}
+.theme-preview-card.active .theme-preview-icon-wrap i.f7-icons {
+  color: var(--f7-theme-color, #4285F4);
+}
+/* Icon Apple/Android lấy đúng màu logo hệ thống thật (đen/trắng tuỳ sáng-tối
+   cho Apple, xanh lá đặc trưng cho Android) thay vì nhuộm theo màu chủ đề app
+   - vì đây là icon đại diện cho MỘT HỆ ĐIỀU HÀNH cụ thể, khác icon "Tự động"
+   (wand_stars) vẫn nhuộm theo màu chủ đề như luật phía trên. Luật này đặt SAU
+   luật ".active" ở trên để ghi đè đúng cả lúc đang được chọn. */
+#theme-ios-md-preview .theme-preview-card[data-value="ios"] .theme-preview-icon-wrap i.f7-icons {
+  color: #000;
+}
+html.dark #theme-ios-md-preview .theme-preview-card[data-value="ios"] .theme-preview-icon-wrap i.f7-icons {
+  color: #fff;
+}
+#theme-ios-md-preview .theme-preview-card[data-value="md"] .theme-preview-icon-wrap i.f7-icons {
+  color: #3ddc84;
+}
+.theme-preview-navbar {
+  height: 20%;
+  flex-shrink: 0;
+}
+.theme-preview-body {
+  flex: 1;
+  padding: 10%;
+  display: flex;
+  flex-direction: column;
+  gap: 12%;
+}
+.theme-preview-line {
+  height: 10%;
+  border-radius: 2px;
+}
+.theme-preview-line.short { width: 55%; }
+.theme-preview-label {
+  font-size: 13px;
+  color: var(--f7-text-color);
+}
+
+/* --- Sáng / Tối / Tự động --- */
+.theme-preview-thumb-light { background: #f2f2f7; }
+.theme-preview-thumb-light .theme-preview-navbar { background: #ffffff; }
+.theme-preview-thumb-light .theme-preview-line { background: rgba(0, 0, 0, 0.12); }
+
+.theme-preview-thumb-dark { background: #1c1c1e; }
+.theme-preview-thumb-dark .theme-preview-navbar { background: #000000; }
+.theme-preview-thumb-dark .theme-preview-line { background: rgba(255, 255, 255, 0.18); }
+
+.theme-preview-thumb-auto-lightdark {
+  background: linear-gradient(to right, #f2f2f7 50%, #1c1c1e 50%);
+}
+.theme-preview-thumb-auto-lightdark .theme-preview-navbar {
+  background: linear-gradient(to right, #ffffff 50%, #000000 50%);
+}
+.theme-preview-thumb-auto-lightdark .theme-preview-line {
+  background: linear-gradient(to right, rgba(0, 0, 0, 0.12) 50%, rgba(255, 255, 255, 0.18) 50%);
+}
+
+/* #app cần "position:relative" để MỌI phần tử con dùng position:absolute
+   (màn đăng nhập, popup...) chắc chắn định vị theo khung #app thay vì
+   trôi theo toàn bộ cửa sổ trình duyệt - áp dụng LUÔN (không riêng desktop)
+   để đúng nguyên tắc containing block chuẩn, phòng ngừa lỗi tương tự vụ
+   popup bị lớp phủ tối trùm hết trang trước đây. */
+#app { position: relative; }
+
+/* Thiết bị di động thật (điện thoại) do THƯ VIỆN DEVICE của F7 tự nhận
+   diện (framework7.io/docs/device.html - gắn class "device-desktop" vào
+   <html> khi KHÔNG phải điện thoại/máy tính bảng) vẫn dùng tabbar dưới
+   như cũ. Máy tính (desktop) đổi sang thanh điều hướng bên trái kiểu
+   "Menu List" (framework7.io/docs/menu-list.html) - không giả lập khung
+   điện thoại thu nhỏ giữa màn hình nữa (cách cũ), tận dụng đúng bề ngang
+   rộng thật của máy tính, giống bố cục sidebar quen thuộc (Slack/Discord). */
+#desktop-sidebar { display: none; }
+
+/* Bỏ hẳn kiểu "khung nổi giữa trang" (card thu nhỏ + nền xám + đổ bóng)
+   - #app giờ tràn kín cửa sổ trình duyệt thật, đúng cảm giác 1 app desktop
+   thật (Slack/Discord/Mail) chứ không phải trang web co lại giả lập gì cả. */
+html.device-desktop #app {
+  display: flex;
+  flex-direction: row;
+  align-items: stretch;
+  height: 100vh;
+  width: 100%;
+  max-width: none;
+  margin: 0;
+  box-shadow: none;
+}
+html.device-desktop #mobile-tabbar {
+  display: none;
+}
+html.device-desktop .views.tabs {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+}
+/* Nội dung từng trang bị KÉO DÃN hết bề ngang cửa sổ desktop (có thể tới cả
+   nghìn px) trong khi mọi kích thước (chữ, icon, khoảng cách list...) vẫn y
+   hệt bản điện thoại - nhìn "to" bất thường không phải vì phóng to thật, mà
+   vì dãn ra quá rộng so với mật độ nội dung. Giới hạn lại 1 cột đọc vừa mắt,
+   canh giữa - đúng cách các app desktop (Slack/Notion/Linear Settings...) vẫn
+   làm với nội dung dạng danh sách/form. Lưới thiết bị (Thiết bị) CỐ Ý bỏ
+   giới hạn này - trang đó tận dụng bề ngang thật để xếp nhiều thẻ, không
+   phải dạng danh sách đọc tuyến tính. Chat KHÔNG còn nằm trong diện ngoại lệ
+   này nữa - từ lúc bọc khung tin nhắn trong .card (giống Cài đặt/Thiết bị).
+
+   DÙNG PADDING (2 bên, tính bằng calc để tự canh giữa) THAY VÌ "max-width +
+   margin:auto" như bản cũ - đã gặp lỗi thật: margin:auto để lại 2 dải trống
+   ở 2 bên KHÔNG THUỘC .page-content (nó chỉ rộng 640px, phần margin nằm
+   NGOÀI phần tử này) - đây mới chính là phần tử có overflow:auto (thật sự
+   cuộn được) của F7, nên con lăn chuột/2 ngón tay trackpad đặt ở 2 dải trống
+   đó không cuộn được gì cả, phải rê đúng vào giữa mới cuộn. Đổi sang padding
+   giữ .page-content rộng HẾT CỠ (bắt được cuộn ở MỌI vị trí ngang) trong khi
+   nội dung bên trong vẫn nhìn được canh giữa 640px y hệt như trước. */
+html.device-desktop .page-content {
+  max-width: none;
+  padding-left: max(16px, calc((100% - 640px) / 2));
+  padding-right: max(16px, calc((100% - 640px) / 2));
+}
+html.device-desktop #view-devices .page-content {
+  padding-left: 16px;
+  padding-right: 16px;
+}
+/* Desktop ẩn tabbar dưới (dùng #desktop-sidebar) nhưng F7 vẫn chừa chỗ cho
+   nó: .views có .toolbar-bottom nên MỌI .page-content bị cộng padding-bottom =
+   --f7-page-toolbar-bottom-offset (80px) - dư 1 dải trống dưới đáy (thấy rõ ở
+   trang Nhạc vừa khít màn hình). Ghi đè đúng biến đó về 0 trên desktop. */
+html.device-desktop .views .page {
+  --f7-page-toolbar-bottom-offset: 0px;
+}
+/* Thanh cuộn kiểu macOS - mảnh, trong suốt, chỉ hiện màu khi rê chuột vào
+   đúng vùng đang cuộn (giống overlay scrollbar của macOS, ẩn hẳn lúc không
+   dùng tới). Chỉ áp cho desktop - điện thoại thật vẫn dùng thanh cuộn hệ
+   thống mặc định. Selector "*" rộng nhưng vô hại: chỉ phần tử ĐANG có thanh
+   cuộn thật mới bị ảnh hưởng bởi ::-webkit-scrollbar. */
+html.device-desktop * {
+  scrollbar-width: thin;
+  scrollbar-color: transparent transparent;
+}
+html.device-desktop *:hover {
+  scrollbar-color: rgba(0, 0, 0, 0.28) transparent;
+}
+html.dark.device-desktop *:hover {
+  scrollbar-color: rgba(255, 255, 255, 0.28) transparent;
+}
+html.device-desktop ::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+html.device-desktop ::-webkit-scrollbar-track {
+  background: transparent;
+}
+html.device-desktop ::-webkit-scrollbar-thumb {
+  background-color: transparent;
+  border-radius: 8px;
+  transition: background-color 0.2s;
+}
+html.device-desktop *:hover::-webkit-scrollbar-thumb {
+  background-color: rgba(0, 0, 0, 0.28);
+}
+html.dark.device-desktop *:hover::-webkit-scrollbar-thumb {
+  background-color: rgba(255, 255, 255, 0.28);
+}
+/* Phong cách sidebar macOS 26 (Tahoe/"Liquid Glass") - nền kính mờ
+   (backdrop-filter blur, thấy lờ mờ nội dung phía sau thay vì màu đặc),
+   không viền cứng phân cách (macOS dùng chính lớp mờ + đổ bóng nhẹ để
+   tách vùng, không kẻ 1 đường thẳng cứng như web thường làm). */
+html.device-desktop #desktop-sidebar {
+  display: block;
+  flex-shrink: 0;
+  width: 270px;
+  height: 100%;
+  margin: 0;
+  overflow-y: auto;
+  box-sizing: border-box;
+  padding: 24px 0;
+  border-right: none;
+  box-shadow: 1px 0 0 rgba(0, 0, 0, 0.06);
+  background: color-mix(in srgb, var(--f7-page-bg-color, #fff) 70%, transparent);
+  backdrop-filter: blur(28px) saturate(180%);
+  -webkit-backdrop-filter: blur(28px) saturate(180%);
+}
+#desktop-sidebar-brand {
+  font-size: 15px;
+  font-weight: 600;
+  padding: 0 22px 18px;
+  color: var(--f7-text-color, #000);
+}
+/* Cấu trúc item-media/item-inner/item-title-wrap/item-subtitle ĐÚNG như
+   docs Menu List của F7 (framework7.io/docs/menu-list.html, biến thể
+   "media-list" có dòng phụ đề) - F7 tự canh trái icon+chữ theo chuẩn
+   .item-content của nó, ở đây chỉ chỉnh khoảng cách/bo góc/màu cho hợp bố
+   cục sidebar (không cần viết lại flex/align từ đầu). Bo góc 14px + mục
+   đang chọn dạng "viên thuốc" kính mờ - đúng tinh thần bo tròn nhiều/kính
+   mờ của macOS 26, không vuông vức như trước. */
+#desktop-sidebar .tab-link {
+  margin: 2px 12px;
+  /* padding: 10px 14px; */
+  /* border-radius: 14px; */
+  color: var(--f7-text-color, #000);
+  text-decoration: none;
+  min-height: 0;
+  transition: background 0.15s;
+}
+#desktop-sidebar .tab-link:hover {
+  background: color-mix(in srgb, var(--f7-text-color, #000) 5%, transparent);
+}
+/* #desktop-sidebar .tab-link .item-media i.f7-icons {
+  font-size: 19px;
+}
+#desktop-sidebar .tab-link .item-title {
+  font-size: 14px;
+  font-weight: 500;
+} */
+#desktop-sidebar .tab-link .item-subtitle {
+  font-size: 13px;
+  color: var(--f7-list-item-footer-text-color, #888);
+  white-space: normal;
+}
+/* F7 tự thêm/gỡ class "tab-link-active" khi chuyển tab (giống cách nó
+   làm với tabbar dưới) - không cần JS riêng để tô đậm mục đang chọn. */
+#desktop-sidebar .tab-link.tab-link-active,
+#desktop-sidebar .tab-link.tab-link-active:hover {
+  background: color-mix(in srgb, var(--f7-theme-color, #4285F4) 16%, transparent);
+  color: var(--f7-theme-color, #4285F4);
+}
+/* #desktop-sidebar .tab-link.tab-link-active .item-subtitle {
+  color: inherit;
+  opacity: 0.75;
+} */
+/* Không còn tabbar dưới chiếm chỗ trên desktop - khung chat neo sát đáy
+   thật, khớp lại padding-bottom của khung tin nhắn (bỏ phần chừa chỗ cho
+   tabbar, xem luật gốc #view-chat .messagebar/.messages-content phía trên).
+   max-width + margin auto khớp lại đúng bề rộng 640px của .page-content (từ
+   lúc Chat hết nằm trong diện ngoại lệ bên trên) - .messagebar là 1 <div>
+   RIÊNG, nằm NGOÀI .page-content (position:absolute theo .page, xem luật
+   gốc #view-chat .messagebar), không tự co hẹp theo .page-content, phải
+   canh tay lại cùng bề rộng/căn giữa, không thì khung tin nhắn hẹp lại
+   nhưng ô nhập bên dưới vẫn tràn hết bề ngang cửa sổ - lệch nhau. */
+html.device-desktop #view-chat .messagebar {
+  bottom: 0;
+  max-width: 640px;
+  margin-left: auto;
+  margin-right: auto;
+}
+html.device-desktop #view-chat .messages-content {
+  padding-bottom: calc(var(--f7-messagebar-height, 60px) + var(--f7-safe-area-bottom, 0px));
+}
+
+/* Màn đăng nhập kiểu màn khoá máy macOS - ảnh đại diện tròn + tên + ô mật
+   khẩu có gạch chân + nút mũi tên tròn. #login-screen (id) thắng
+   .login-screen (class, CSS gốc F7 định nghĩa background: var(--f7-login-
+   screen-bg-color)) mà không cần !important nhờ độ ưu tiên ID cao hơn.
+
+   BỎ ảnh nền gradient xanh-lục cố định (không liên quan gì tới màu chủ đề
+   app) - giờ pha màu chủ đề (--f7-theme-color, đổi được ở tab Giao diện)
+   vào nền ở tỉ lệ thấp bằng color-mix() thay cho ảnh nền cứng - đổi màu
+   chủ đề thì màn đăng nhập cũng tự đổi theo, không còn "gradient wallpaper"
+   không ăn nhập gì với phần còn lại của app. */
+#login-screen {
+  background: transparent;
+}
+#login-screen .voicebot-login-bg {
+  height: 100%;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  padding: 24px;
+  overflow: auto;
+  background: color-mix(in srgb, var(--f7-theme-color, #4285F4) 10%, var(--f7-page-bg-color, #fff));
+}
+html.dark #login-screen .voicebot-login-bg {
+  background: color-mix(in srgb, var(--f7-theme-color, #4285F4) 22%, var(--f7-page-bg-color, #1c1c1e));
+}
+#login-screen .voicebot-login-card {
+  width: 100%;
+  max-width: 300px;
+  background: var(--f7-page-bg-color, #fff);
+  border-radius: 16px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.25);
+  padding: 32px 24px 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+#login-screen .voicebot-login-avatar {
+  width: 84px;
+  height: 84px;
+  border-radius: 50%;
+  object-fit: cover;
+  box-shadow: 0 0 0 3px rgba(0, 0, 0, 0.08);
+  margin-bottom: 14px;
+}
+#login-screen .voicebot-login-name {
+  font-size: 17px;
+  font-weight: 600;
+  color: var(--f7-text-color, #000);
+  margin-bottom: 22px;
+}
+#login-screen #login-form {
+  width: 100%;
+}
+#login-screen .voicebot-login-sub {
+  font-size: 13px;
+  color: var(--f7-list-item-footer-text-color, #888);
+  margin: -16px 0 22px;
+}
+#login-screen .voicebot-login-user { margin-bottom: 16px; }
+#login-screen .voicebot-login-input-wrap > .icon {
+  font-size: 17px;
+  width: 20px;
+  flex-shrink: 0;
+  color: var(--f7-list-item-footer-text-color, #888);
+}
+#login-screen .voicebot-login-input-wrap:focus-within > .icon { color: var(--f7-theme-color, #4285F4); }
+#login-screen .voicebot-login-input-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border-bottom: 1px solid var(--f7-list-item-border-color, rgba(0, 0, 0, 0.15));
+  padding-bottom: 6px;
+  transition: border-color 0.15s;
+}
+#login-screen .voicebot-login-input-wrap:focus-within {
+  border-color: var(--f7-theme-color, #4285F4);
+}
+#login-screen .voicebot-login-input-wrap input {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  outline: none;
+  background: transparent;
+  font-size: 15px;
+  color: var(--f7-text-color, #000);
+  padding: 4px 2px;
+}
+/* Kỹ thuật chuẩn để BIẾT chính xác lúc nào trình duyệt tự điền mật khẩu (Face
+   ID/Touch ID hoặc gợi ý mật khẩu đã lưu trên Safari/Chrome) - khác hẳn gõ
+   tay: input thường KHÔNG bắn sự kiện "input"/"change" đáng tin cậy khi bị
+   tự điền (mỗi trình duyệt xử lý khác nhau, có nơi im lặng hoàn toàn), nhưng
+   MỌI trình duyệt dựa trên WebKit/Blink đều tự gắn pseudo-class
+   ":-webkit-autofill" lên ô đó ngay khi tự điền xong - gắn 1 animation gần
+   như tức thời (0.0001s, mắt không thấy gì) vào đúng lúc đó, rồi lắng nghe sự
+   kiện "animationstart" trong app.js để biết chắc chắn 100% là VỪA được tự
+   điền (không phải gõ tay), từ đó tự bấm đăng nhập luôn không cần chờ người
+   dùng bấm nút. */
+@keyframes voicebotAutofillStart { from {} to {} }
+#login-password:-webkit-autofill {
+  animation-name: voicebotAutofillStart;
+  animation-duration: 0.0001s;
+}
+#login-screen .voicebot-login-submit {
+  flex-shrink: 0;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  border: 1px solid var(--f7-list-item-border-color, rgba(0, 0, 0, 0.25));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--f7-text-color, #000);
+  opacity: 0.55;
+  transition: all 0.15s;
+}
+#login-screen .voicebot-login-input-wrap:focus-within .voicebot-login-submit {
+  opacity: 1;
+  border-color: var(--f7-theme-color, #4285F4);
+  color: var(--f7-theme-color, #4285F4);
+}
+#login-screen .voicebot-login-submit i {
+  font-size: 15px;
+}
+#login-screen .voicebot-login-error {
+  min-height: 16px;
+  margin-top: 14px;
+  font-size: 12px;
+  color: var(--f7-color-red, #ff3b30);
+}
+#login-screen .voicebot-login-forgot {
+  display: block;
+  margin-top: 4px;
+  font-size: 12.5px;
+  color: var(--f7-list-item-footer-text-color, #888);
+  text-decoration: none;
+}
+#login-screen .voicebot-login-forgot:hover {
+  color: var(--f7-theme-color, #4285F4);
+}
+
+/* Loader bên phải mỗi mục menu trang Cài đặt (settings.html) - THAY THẾ hẳn
+   mũi tên ">" lúc đang bấm chờ tải trang (mỗi mục là 1 componentUrl, phải
+   fetch HTML qua mạng trước khi chuyển trang). Mũi tên ">" của F7 là pseudo-
+   element CSS (.item-link .item-inner:before, xem framework7-bundle.min.css)
+   chứ không phải icon thật nên phải ẩn bằng CSS, không xoá được bằng JS -
+   định vị loader đúng vị trí đó (cùng công thức right/top như F7 dùng cho
+   mũi tên) để trông như loader THAY THẾ mũi tên, không phải thêm cạnh nó. */
+.item-nav-loader {
+  display: none;
+  position: absolute;
+  top: 50%;
+  right: calc(var(--f7-list-item-padding-horizontal) + var(--f7-safe-area-right));
+  transform: translateY(-50%);
+  margin: 0;
+}
+.item-link.dang-tai-trang .item-inner:before {
+  display: none;
+}
+.item-link.dang-tai-trang .item-nav-loader {
+  display: block;
+}
+
+/* Trang Thiết bị - popup thêm/bớt thiết bị: tên thiết bị HA thường dài (vd
+   "switch nha sau switch 1"), F7 mặc định cắt bằng "..." (white-space:nowrap
+   + text-overflow:ellipsis) nên mất phần đuôi để phân biệt các thiết bị gần
+   giống tên nhau - cho xuống dòng. Công tắc bên phải (.item-after) F7 đã để
+   flex-shrink:0 nên không bị đẩy/bóp. */
+#ha-device-list .item-title,
+#ha-device-list .item-subtitle {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+/* Trang Nhạc vừa khít màn hình: card điều khiển giữ nguyên chiều cao, card
+   "Danh sách phát" chiếm HẾT phần còn lại và CHỈ danh sách bài cuộn bên trong
+   card (không cuộn cả trang). Màn hình quá thấp (xoay ngang) thì danh sách
+   vẫn cao tối thiểu 200px, lúc đó cả trang mới cuộn - không bị bóp mất. */
+.page-content.music-vua-man-hinh {
+  display: flex;
+  flex-direction: column;
+}
+.page-content.music-vua-man-hinh > * {
+  flex-shrink: 0;
+}
+.page-content.music-vua-man-hinh > #music-list-card {
+  flex: 1 1 auto;
+  min-height: 200px;
+  display: flex;
+  flex-direction: column;
+}
+#music-list-card > * {
+  flex-shrink: 0;
+}
+#music-list-card > #music-results {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+  /* Chừa chỗ cho thanh cuộn - không thì nó đè lên nút tim sát mép phải.
+     scrollbar-gutter cho trình duyệt hỗ trợ, padding cho thanh cuộn kiểu
+     "nổi" (macOS/iOS) không chiếm chỗ. Kéo lề âm ra ngoài đúng bằng padding
+     để nội dung vẫn thẳng hàng với phần đầu (chip/tiêu đề). */
+  scrollbar-gutter: stable;
+  padding-right: 10px;
+  margin-right: -10px;
+}
+
+/* ---------- Mini player nổi trên tabbar (index.html #mini-player, JS ở
+   static/js/mini-player.js). Nằm BÊN TRONG .toolbar-pane (iOS: position:
+   relative, overflow visible - đã đọc CSS thật của F7 9.1.3) nên luôn bám đúng
+   tabbar dù tabbar bị dời khác nhau giữa Safari/PWA/Capacitor. Theme Material:
+   .toolbar-pane là display:contents (neo theo .toolbar-inner) và .toolbar-inner
+   có overflow:hidden -> phải mở overflow riêng cho tabbar này. ---------- */
+:root {
+  --mini-player-cao: 56px;
+  --mini-player-offset: 0px;      /* = cao + khoảng hở khi đang hiện, xem html.co-mini-player */
+}
+html.co-mini-player {
+  --mini-player-offset: calc(var(--mini-player-cao) + 8px);
+}
+/* iOS: mini player ÔM SÁT tabbar (1 khối kính chung) -> không có khe hở. */
+html.ios.co-mini-player {
+  --mini-player-offset: var(--mini-player-cao);
+}
+html.co-mini-player {
+  /* Biến CHÍNH THỨC của F7 (.page-content padding-bottom) - chừa chỗ cuối
+     mọi trang để mini player không che nội dung. */
+  --f7-page-content-extra-padding-bottom: var(--mini-player-offset);
+}
+/* Khung nhập chat neo riêng (xem luật #view-chat .messagebar ở trên, có biến
+   thể PWA/Capacitor) - dời thêm lên đúng bằng mini player, dùng "translate"
+   (cộng dồn lên mọi biến thể "bottom" đó, không phải viết lại từng cái). */
+#view-chat .messagebar {
+  translate: 0 calc(-1 * (var(--mini-player-offset, 0px) + var(--chat-cach-tab, 0px)));
+}
+.md #mobile-tabbar .toolbar-inner {
+  overflow: visible;
+}
+#mini-player {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  width: max(100%, 320px);
+  max-width: calc(100vw - 16px);
+  bottom: calc(100% + 8px);
+  height: var(--mini-player-cao);
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0 6px 0 6px;
+  border-radius: calc(var(--mini-player-cao) / 2);
+  overflow: hidden;
+  background: var(--f7-glass-bg-color, var(--f7-bars-bg-color, #fff));
+  backdrop-filter: saturate(180%) blur(16px);
+  -webkit-backdrop-filter: saturate(180%) blur(16px);
+  box-shadow: var(--f7-glass-shadow, 0 2px 14px rgba(0, 0, 0, 0.2));
+  z-index: 2;
+}
+.md #mini-player {
+  border-radius: 16px;
+  max-width: calc(100% - 16px);
+  width: calc(100% - 16px);
+}
+#mini-player .mini-player-chinh {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 100%;
+  color: var(--f7-text-color, #000);
+  text-decoration: none;
+}
+#mini-player .mini-player-anh {
+  position: relative;
+  flex-shrink: 0;
+  width: 44px;
+  height: 44px;
+  border-radius: 22px;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: color-mix(in srgb, var(--f7-theme-color, #4285F4) 18%, transparent);
+  color: var(--f7-theme-color, #4285F4);
+}
+#mini-player .mini-player-anh img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+#mini-player .mini-player-chu {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  line-height: 1.25;
+}
+#mini-player .mini-player-ten {
+  font-size: 14px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+#mini-player .mini-player-phu {
+  font-size: 12px;
+  color: var(--f7-list-item-footer-text-color, #888);
+  white-space: nowrap;
+}
+#mini-player .link.icon-only {
+  flex-shrink: 0;
+  width: 40px;
+  height: 40px;
+  color: var(--f7-text-color, #000);
+}
+#mini-player .mini-player-tien-trinh {
+  position: absolute;
+  left: 24px;
+  right: 24px;
+  bottom: 3px;
+  height: 2px;
+  border-radius: 1px;
+  background: color-mix(in srgb, var(--f7-text-color, #000) 12%, transparent);
+  overflow: hidden;
+}
+#mini-player .mini-player-tien-trinh > span {
+  display: block;
+  height: 100%;
+  width: 0;
+  background: var(--f7-theme-color, #4285F4);
+  transition: width 0.9s linear;
+  position: relative;
+}
+/* Phần ĐÃ TẢI (kiểu YouTube) - nằm dưới phần đã phát. */
+#mini-player .mini-player-tien-trinh > .mini-player-da-tai {
+  position: absolute;
+  left: 0;
+  top: 0;
+  background: color-mix(in srgb, var(--f7-text-color, #000) 22%, transparent);
+}
+#music-progressbar .range-bar-tai {
+  position: absolute;
+  left: 0;
+  top: 0;
+  height: 100%;
+  width: 0;
+  border-radius: inherit;
+  background: color-mix(in srgb, var(--f7-text-color, #000) 30%, transparent);
+  transition: width 0.9s linear;
+  pointer-events: none;
+}
+
+/* ---------- Khung nhập chat: TO hơn mặc định F7, KHOÁ cứng kích thước bằng px
+   (không co theo cỡ chữ trong Cài đặt > Giao diện - messagebar là 1 .toolbar
+   nên vẫn ăn --f7-toolbar-font-size co giãn ở :root, kéo theo chiều cao/nút
+   gửi đổi), và đẩy cao hơn tabbar 1 chút (--chat-cach-tab). Áp dụng RIÊNG
+   khung chat, không đụng tabbar/toolbar khác. ---------- */
+#view-chat {
+  --chat-cach-tab: 10px;              /* CHỈNH SỐ NÀY để đổi khoảng cách tới tabbar */
+  /* Ô nhập cao 48px thay vì 40px mặc định iOS -> khung cao thêm 8px; biến này
+     dùng để chừa chỗ cuối danh sách tin nhắn (luật .messages-content ở trên). */
+  --f7-messagebar-height: 68px;
+}
+/* Máy tính không có tabbar (thanh bên) - không cần đẩy lên. */
+html.device-desktop #view-chat {
+  --chat-cach-tab: 0px;
+}
+#view-chat .messagebar {
+  --f7-toolbar-font-size: 17px;
+  --f7-messagebar-font-size: 17px;
+  --f7-messagebar-textarea-font-size: 17px;
+  --f7-messagebar-textarea-line-height: 22px;
+  --f7-messagebar-textarea-height: 48px;
+  --f7-messagebar-textarea-padding: 13px 18px;
+  --f7-messagebar-textarea-border-radius: 24px;
+  font-size: 17px;
+}
+#view-chat .messagebar #chat-send .icon {
+  font-size: 40px;
+  width: 40px;
+  height: 40px;
+}
+#view-chat .messagebar #chat-send {
+  min-width: 44px;
+  height: 48px;
+}
+
+/* Trang Nhạc - gợi ý từ khoá: khung thả xuống NỔI, con trực tiếp của .page
+   (music.html #music-suggest), top/left/width do JS đặt theo đúng ô nhập
+   (dinhViGoiY). z-index trên navbar; màu nền/chữ ghi rõ (không ăn màu link). */
+.page[data-name="music"] > #music-suggest {
+  position: absolute;
+  margin: 0;
+  max-height: 55vh;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+  border-radius: 14px;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.25);
+  z-index: 600;
+  background: var(--f7-list-strong-bg-color, var(--f7-page-bg-color, #fff));
+}
+.page[data-name="music"] > #music-suggest ul {
+  background: transparent;
+  border-radius: 14px;
+  overflow: hidden;
+}
+.page[data-name="music"] > #music-suggest .item-title {
+  color: var(--f7-list-item-title-text-color, var(--f7-text-color, #000));
+}
+/* Trang Nhạc - popover âm lượng (music.html #music-volume-popover): cột dọc
+   gồm số %, nút +, thanh trượt DỌC, nút -, nút tắt tiếng. Range dọc của F7
+   cần chiều cao cố định trên chính .range-slider. */
+.music-volume-popover {
+  width: 84px;
+}
+.music-vol-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 14px 0 10px;
+}
+.music-vol-so {
+  font-size: 15px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.music-vol-wrap #music-volume-range,
+.music-vol-wrap #mps-vol-range {
+  height: 170px;
+  margin: 8px 0;
+}
+.music-vol-wrap .link.icon-only .icon {
+  font-size: 26px;
+}
+
+/* ---------- Khung phát nhạc (music.html #music-player) - 1 bố cục CSS Grid.
+   Điện thoại: 3 hàng dưới danh sách (bài+tim / tiến trình / nút | âm lượng+nơi
+   phát). Desktop: THANH CỐ ĐỊNH đáy cửa sổ kiểu Tidal - trái: ảnh+tên+tim,
+   giữa: nút trên + tiến trình dưới, phải: âm lượng + nơi phát. ---------- */
+#music-player {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas:
+    "trai trai"
+    "tien tien"
+    "nut  phai";
+  align-items: center;
+  row-gap: 6px;
+  padding: 12px 12px 8px;
+}
+#music-player .music-player-trai { grid-area: trai; display: flex; align-items: center; gap: 12px; min-width: 0; }
+#music-player .music-player-nut { grid-area: nut; display: flex; align-items: center; justify-content: space-evenly; }
+#music-player .music-player-tien-trinh { grid-area: tien; display: flex; align-items: center; gap: 8px; }
+#music-player .music-player-phai { grid-area: phai; display: flex; align-items: center; gap: 4px; }
+#music-player .music-player-anh {
+  position: relative;
+  flex-shrink: 0;
+  width: 52px;
+  height: 52px;
+  border-radius: 8px;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: color-mix(in srgb, var(--f7-theme-color, #4285F4) 18%, transparent);
+  color: var(--f7-theme-color, #4285F4);
+}
+#music-player .music-player-anh img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+#music-player .music-player-chu { flex: 1; min-width: 0; line-height: 1.3; }
+#music-player .music-player-ten {
+  font-size: 15px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+#music-player .music-player-phu {
+  font-size: 12.5px;
+  color: var(--f7-list-item-footer-text-color, #888);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+#music-player .music-player-tien-trinh > span {
+  flex-shrink: 0;
+  min-width: 36px;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  color: var(--f7-list-item-footer-text-color, #888);
+}
+#music-player .music-player-tien-trinh > span:last-child { text-align: right; }
+#music-player .music-player-range { flex: 1; min-width: 0; padding: 0 4px; }
+#music-player .link.icon-only .icon { font-size: 26px; }
+#music-player .music-player-nut-chinh .icon { font-size: 36px; }
+#music-player .music-player-phai .icon { font-size: 22px; }
+#music-player #music-player-tim .icon { font-size: 22px; }
+/* Tim chưa thích = màu chữ thường (không ăn màu link xanh), đã thích = đỏ (JS). */
+#music-player #music-player-tim { color: var(--f7-text-color, #fff); }
+/* Danh sách và khung phát sát nhau hơn (2 lề card cộng lại quá rộng). */
+.page-content.music-vua-man-hinh > #music-list-card { margin-bottom: 0; }
+.page-content.music-vua-man-hinh > #music-player { margin-top: 6px; }
+
+/* Desktop: thanh cố định đáy, chừa thanh bên trái (#desktop-sidebar 270px). */
+html.device-desktop #music-player {
+  position: fixed;
+  left: 270px;
+  right: 0;
+  bottom: 0;
+  height: 96px;
+  margin: 0;
+  border: none;
+  border-top: 1px solid var(--f7-card-outline-border-color, rgba(128, 128, 128, 0.25));
+  border-radius: 0;
+  box-sizing: border-box;
+  padding: 0 24px;
+  z-index: 20;
+  background: color-mix(in srgb, var(--f7-page-bg-color, #000) 82%, transparent);
+  backdrop-filter: blur(24px) saturate(180%);
+  -webkit-backdrop-filter: blur(24px) saturate(180%);
+  /* Trái rộng hơn phải (tên bài dài, phải chỉ có 2 icon) - giống Tidal. */
+  grid-template-columns: minmax(0, 1.3fr) minmax(300px, 1.5fr) minmax(0, 0.7fr);
+  grid-template-rows: auto auto;
+  grid-template-areas:
+    "trai nut  phai"
+    "trai tien phai";
+  column-gap: 24px;
+  row-gap: 2px;
+  align-content: center;
+}
+html.device-desktop #music-player .music-player-nut { justify-content: center; gap: 26px; }
+/* Cụm nút kiểu Tidal: icon màu chữ (không xanh link), Trộn/Lặp nhỏ + mờ khi
+   tắt, Phát/Tạm dừng to ở giữa. */
+html.device-desktop #music-player .music-player-nut .link,
+html.device-desktop #music-player .music-player-phai .link:not(#music-output-btn),
+html.device-desktop #music-player #music-player-them { color: var(--f7-text-color, #fff); }
+html.device-desktop #music-player .music-player-nut .link .icon { font-size: 24px; }
+html.device-desktop #music-player .music-player-nut .music-tron .icon,
+html.device-desktop #music-player .music-player-nut .music-lap .icon { font-size: 20px; }
+html.device-desktop #music-player .music-player-nut .music-player-nut-chinh .icon { font-size: 38px; }
+html.device-desktop #music-player #music-player-them .icon { font-size: 22px; }
+/* Thanh tiến trình mảnh kiểu Tidal: rãnh 3px, núm tròn nhỏ màu chữ. */
+html.device-desktop #music-player .range-slider {
+  --f7-range-size: 16px;
+  --f7-range-bar-size: 3px;
+  --f7-range-bar-border-radius: 2px;
+  --f7-range-knob-width: 12px;
+  --f7-range-knob-height: 12px;
+  --f7-range-knob-color: var(--f7-text-color, #fff);
+  --f7-range-knob-box-shadow: none;
+  --f7-range-bar-active-bg-color: var(--f7-text-color, #fff);
+}
+html.device-desktop #music-player .music-player-phai { justify-content: flex-end; gap: 10px; }
+html.device-desktop #music-player .music-player-anh { width: 64px; height: 64px; }
+/* Thanh cố định nằm NGOÀI dòng chảy - chừa đúng chiều cao nó ở cuối trang. */
+html.device-desktop .page-content.music-vua-man-hinh.co-khung-phat {
+  padding-bottom: 96px;
+}
+
+/* ---------- Mini player ÔM SÁT tabbar kiểu Tidal (iOS): khung kính của
+   .toolbar-pane kéo dài LÊN TRÊN bằng ::before để bao luôn hàng mini player -
+   1 khối kính chung (bài hát trên, tab dưới) thay vì 2 khối rời. Pane gốc bỏ
+   nền/bóng riêng lúc đó (::before vẽ thay), mini player trong suốt nằm sát
+   ngay trên các tab + vạch kéo ở giữa (vuốt lên = mở trình phát mở rộng). */
+html.ios.co-mini-player #mobile-tabbar .toolbar-pane {
+  background: transparent;
+  box-shadow: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+html.ios.co-mini-player #mobile-tabbar .toolbar-pane::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  top: calc(-1 * var(--mini-player-cao));
+  border-radius: 32px;
+  background: var(--f7-glass-bg-color);
+  backdrop-filter: saturate(180%) blur(16px);
+  -webkit-backdrop-filter: saturate(180%) blur(16px);
+  box-shadow: var(--f7-glass-shadow);
+  z-index: -1;
+  pointer-events: none;
+}
+html.ios #mini-player {
+  left: 0;
+  right: 0;
+  width: auto;
+  max-width: none;
+  transform: none;
+  bottom: 100%;
+  border-radius: 32px 32px 0 0;
+  background: transparent;
+  box-shadow: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  padding: 6px 10px 0 12px;
+}
+#mini-player .mini-player-keo {
+  position: absolute;
+  top: 5px;
+  left: 50%;
+  width: 36px;
+  height: 4px;
+  margin-left: -18px;
+  border-radius: 2px;
+  background: color-mix(in srgb, var(--f7-text-color, #000) 25%, transparent);
+}
+html.ios #mini-player .mini-player-tien-trinh { bottom: 0; left: 18px; right: 18px; }
+
+/* Điện thoại: khung phát trong trang Nhạc nhường chỗ cho mini player + trình
+   phát mở rộng (luôn có ở mọi tab) - chỉ desktop giữ thanh phát kiểu Tidal. */
+html:not(.device-desktop) #music-player {
+  display: none !important;
+}
+
+/* ---------- Trình phát mở rộng (index.html #mini-player-sheet) - bố cục
+   kiểu Tidal: đầu (⌄ | ĐANG PHÁT + nơi phát | ⋯), ảnh lớn, tên + kênh | tim,
+   tiến trình mảnh, Trước | nút tròn TRẮNG lớn | Tiếp, hàng dưới thiết bị |
+   âm lượng + danh sách. Icon màu chữ thường (không màu link). ---------- */
+.mini-player-sheet {
+  height: auto;
+  max-height: 94vh;
+  border-radius: 24px 24px 0 0;
+  overflow: hidden;
+}
+.mini-player-sheet .sheet-modal-inner {
+  overflow-y: auto;
+}
+.mini-player-sheet .link { color: var(--f7-text-color, #000); }
+.mps-noi-dung {
+  padding: 10px calc(24px + var(--f7-safe-area-right, 0px)) calc(18px + var(--f7-safe-area-bottom, 0px))
+    calc(24px + var(--f7-safe-area-left, 0px));
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.mps-dau {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: 0 -8px;
+}
+.mps-dau .link .icon { font-size: 24px; }
+.mps-dau-giua { text-align: center; min-width: 0; }
+.mps-dau-nhan {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  color: var(--f7-list-item-footer-text-color, #888);
+}
+.mps-dau-nguon { font-size: 14px; font-weight: 600; margin-top: 1px; }
+.mps-anh {
+  position: relative;
+  /* Theo cả chiều cao màn hình - đủ chỗ cho các hàng nút, không phải cuộn. */
+  width: min(100%, 360px, 38vh);
+  aspect-ratio: 1 / 1;
+  align-self: center;
+  border-radius: 12px;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: color-mix(in srgb, var(--f7-text-color, #000) 8%, transparent);
+  color: var(--f7-list-item-footer-text-color, #888);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.4);
+}
+.mps-anh .icon { font-size: 72px; }
+.mps-anh img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.mps-dong-ten { display: flex; align-items: center; gap: 12px; margin-top: 4px; }
+.mps-chu { flex: 1; min-width: 0; }
+.mps-ten {
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 1.25;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.mps-phu {
+  font-size: 15px;
+  color: var(--f7-list-item-footer-text-color, #888);
+  margin-top: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+#mps-tim .icon { font-size: 26px; }
+/* Thanh tiến trình mảnh kiểu Tidal: rãnh 3px, núm tròn nhỏ màu chữ. */
+#mps-tua {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 18px;
+  margin: 0;
+  background: transparent;
+  --pt: 0%;
+  --tai: 0%;
+}
+#mps-tua::-webkit-slider-runnable-track {
+  height: 3px;
+  border-radius: 2px;
+  background: linear-gradient(to right, var(--f7-text-color, #000) var(--pt),
+    color-mix(in srgb, var(--f7-text-color, #000) 45%, transparent) var(--pt) max(var(--pt), var(--tai)),
+    color-mix(in srgb, var(--f7-text-color, #000) 22%, transparent) max(var(--pt), var(--tai)));
+}
+#mps-tua::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 12px;
+  height: 12px;
+  margin-top: -4.5px;
+  border-radius: 50%;
+  background: var(--f7-text-color, #000);
+}
+#mps-tua::-moz-range-track { height: 3px; border-radius: 2px; background: color-mix(in srgb, var(--f7-text-color, #000) 22%, transparent); }
+#mps-tua::-moz-range-progress { height: 3px; border-radius: 2px; background: var(--f7-text-color, #000); }
+#mps-tua::-moz-range-thumb { width: 12px; height: 12px; border: none; border-radius: 50%; background: var(--f7-text-color, #000); }
+.mps-thoi-gian {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 2px;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  color: var(--f7-list-item-footer-text-color, #888);
+}
+.mps-nut { display: flex; align-items: center; justify-content: center; gap: 44px; }
+.mps-nut .link .icon { font-size: 34px; }
+/* Nút Phát/Tạm dừng: hình tròn TRẮNG (màu chữ), icon màu nền - như Tidal. */
+.mps-nut .mps-nut-chinh {
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  background: var(--f7-text-color, #000);
+  justify-content: center;
+}
+.mps-nut .mps-nut-chinh .icon { font-size: 34px; color: var(--f7-page-bg-color, #fff); }
+/* Tam giác play: hộp icon đúng giữa nhưng phần "nặng" dồn về cạnh trái nên
+   mắt thấy lệch trái - đẩy sang phải chút (bù thị giác như Apple/Tidal). */
+.icon-play-bu { transform: translateX(0.08em); }
+/* Nút lặp lại (thanh phát desktop + trình phát mở rộng): tắt = mờ, bật (cả
+   danh sách / 1 bài - icon repeat_1) = màu chủ đề. */
+.link.music-lap .icon, .link.music-tron .icon { opacity: .55; }
+.link.music-lap.dang-bat .icon, .link.music-tron.dang-bat .icon { opacity: 1; color: var(--f7-theme-color, #4285F4); }
+.mps-hang-duoi { display: flex; align-items: center; gap: 18px; margin-top: 2px; }
+.mps-gian { flex: 1; }
+.mps-hang-duoi .link .icon { font-size: 22px; }
+.mps-thiet-bi,
+.mps-am-luong-nut {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 600;
+}
+.mps-thiet-bi { color: var(--f7-theme-color, #4285F4) !important; }
+.mps-am-luong-nut span { color: var(--f7-list-item-footer-text-color, #888); font-weight: 500; }
+
+/* ---------- Danh sách nhạc kiểu Tidal (music.html .music-ds): không khung
+   card, chip bo tròn, tiêu đề lớn + dòng phụ, nút Phát/Trộn bài, từng dòng
+   bài ảnh vuông + tên + kênh·thời lượng + tim; bài đang phát có cột sóng nhạc
+   động phủ ảnh. ---------- */
+.music-ds {
+  /* + safe-area 2 bên (biến của F7, từ env(safe-area-inset-*)) - xoay ngang
+     thì notch/Dynamic Island không che chữ/ảnh đầu dòng. */
+  padding: 4px calc(16px + var(--f7-safe-area-right, 0px)) 0 calc(16px + var(--f7-safe-area-left, 0px));
+}
+.music-ds-dau {
+  padding: 8px 0 10px;
+}
+.music-ds-chip {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 18px;
+  /* 3 chip có thể dài hơn màn điện thoại - cuộn NGANG (ẩn thanh cuộn) như
+     hàng chip của Tidal, thay vì tràn ra mép phải. */
+  overflow-x: auto;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+.music-ds-chip::-webkit-scrollbar { display: none; }
+.music-chip {
+  /* F7 đặt button{width:100%} - chip chỉ rộng vừa chữ như Tidal. */
+  width: auto;
+  flex: none;
+  appearance: none;
+  border: none;
+  cursor: pointer;
+  padding: 8px 16px;
+  border-radius: 999px;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--f7-text-color, #000);
+  background: color-mix(in srgb, var(--f7-text-color, #000) 9%, transparent);
+  transition: background 0.15s, color 0.15s;
+}
+.music-chip.active {
+  background: var(--f7-text-color, #000);
+  color: var(--f7-page-bg-color, #fff);
+}
+.music-chip span { opacity: 0.6; margin-left: 2px; }
+.music-ds-tieu-de {
+  font-size: 28px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  line-height: 1.15;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.music-ds-phu {
+  margin-top: 4px;
+  font-size: 13px;
+  color: var(--f7-list-item-footer-text-color, #888);
+}
+.music-ds-trang-thai {
+  margin: 18px 0 0;
+  font-size: 14px;
+  color: var(--f7-list-item-footer-text-color, #888);
+}
+.music-ds-bai {
+  list-style: none;
+  margin: 0;
+  padding: 0 0 12px;
+}
+.music-bai-dong {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  /* Lề ngang + kéo âm ra lại - nền hover của dòng không dính sát ảnh/tim. */
+  padding: 7px 8px;
+  margin: 0 -8px;
+  border-radius: 8px;
+}
+.music-bai-anh {
+  position: relative;
+  flex-shrink: 0;
+  width: 52px;
+  height: 52px;
+  border-radius: 6px;
+  overflow: hidden;
+  background: color-mix(in srgb, var(--f7-text-color, #000) 8%, transparent);
+}
+.music-bai-anh img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.music-bai-chu {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  color: var(--f7-text-color, #000);
+}
+.music-bai-ten {
+  font-size: 15px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.music-bai-phu {
+  font-size: 13px;
+  color: var(--f7-list-item-footer-text-color, #888);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.music-bai-chu { cursor: pointer; }
+/* Tên ca sĩ/kênh chạm được -> mở danh sách bài của kênh (moKenh). */
+.music-kenh {
+  color: var(--f7-text-color, #000);
+  opacity: 0.75;
+  cursor: pointer;
+}
+.music-kenh:active { opacity: 0.45; }
+/* Màn cảm ứng: tên kênh chỉ cao ~16px, khó chạm trúng - giãn dòng dưới ra
+   (padding trên .music-bai-phu) rồi cho vùng chạm của tên kênh phủ cả phần
+   giãn đó (inline-block + padding/margin âm, vẫn nằm TRONG hộp overflow:hidden
+   của .music-bai-phu nên không bị cắt mất vùng chạm). */
+@media (pointer: coarse) {
+  .music-bai-chu { gap: 0; }
+  .music-bai-phu { font-size: 14px; padding: 6px 0; }
+  .music-kenh { display: inline-block; padding: 6px 10px 6px 0; margin: -6px -10px -6px 0; vertical-align: top;
+                max-width: 75%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+}
+.music-bai-dong .music-them { flex-shrink: 0; color: var(--f7-list-item-footer-text-color, #888); margin-left: -6px; }
+.music-bai-dong .music-them .icon { font-size: 20px; }
+/* Tab Yêu thích: hàng thẻ playlist cuộn NGANG (veHangPlaylist) - thẻ đầu
+   "＋ Tạo playlist". Kéo lề âm ra 2 mép để cuộn tràn sát cạnh màn hình. */
+.music-pl-hang {
+  display: flex;
+  gap: 12px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+  padding: 4px 0 14px;
+  margin-bottom: 4px;
+  border-bottom: 1px solid color-mix(in srgb, var(--f7-text-color, #000) 10%, transparent);
+}
+.music-pl-hang::-webkit-scrollbar { display: none; }
+.music-pl-the {
+  flex: 0 0 112px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  color: var(--f7-text-color, #000);
+  min-width: 0;
+}
+.music-pl-bia {
+  position: relative;
+  width: 112px;
+  height: 112px;
+  border-radius: 8px;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: color-mix(in srgb, var(--f7-text-color, #000) 8%, transparent);
+  color: var(--f7-list-item-footer-text-color, #888);
+}
+.music-pl-bia img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.music-pl-bia .icon { font-size: 34px; }
+.music-pl-tao .music-pl-bia { border: 1.5px dashed color-mix(in srgb, var(--f7-text-color, #000) 30%, transparent); background: transparent; }
+.music-pl-ten { font-size: 14px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.music-pl-so { font-size: 12px; color: var(--f7-list-item-footer-text-color, #888); }
+.music-ds-quay-lai {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  margin: -6px 0 6px -4px;
+  font-size: 15px;
+  color: var(--f7-theme-color, #4285F4);
+}
+.music-ds-quay-lai .icon { font-size: 18px; }
+#music-pl-menu { color: var(--f7-list-item-footer-text-color, #888); }
+.music-bai-dong .music-tim { flex-shrink: 0; color: var(--f7-list-item-footer-text-color, #888); }
+.music-bai-dong .music-tim .icon { font-size: 22px; }
+.music-bai-dong .music-tim.da-thich { color: var(--f7-color-red, #ff3b30); }
+.music-bai-dong:active .music-bai-chu { opacity: 0.6; }
+.music-bai-dong.dang-phat .music-bai-ten { color: var(--f7-theme-color, #4285F4); }
+/* Cột sóng nhạc động phủ ảnh bài đang phát (đứng yên khi tạm dừng). */
+.music-song {
+  display: none;
+  position: absolute;
+  inset: 0;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 3px;
+  padding-bottom: 14px;
+  background: rgba(0, 0, 0, 0.45);
+}
+.music-bai-dong.dang-phat .music-song { display: flex; }
+/* Rê chuột vào dòng bài (máy tính) -> ảnh tối đi + icon ▶ giữa ảnh, như
+   Tidal. Chỉ thiết bị có chuột (hover: hover) - điện thoại không bị kẹt
+   trạng thái hover. Bài đang phát giữ cột sóng nhạc. */
+.music-choi {
+  display: none;
+  position: absolute;
+  inset: 0;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.5);
+  color: #fff;
+}
+.music-choi .icon { font-size: 22px; }
+@media (hover: hover) {
+  .music-bai-dong:not(.dang-phat):hover .music-choi { display: flex; }
+  .music-bai-dong:hover { background: color-mix(in srgb, var(--f7-text-color, #000) 5%, transparent); }
+}
+.music-song i {
+  width: 4px;
+  height: 18px;
+  border-radius: 2px;
+  background: var(--f7-theme-color, #4285F4);
+  transform-origin: bottom;
+  animation: music-song 0.9s ease-in-out infinite;
+}
+.music-song i:nth-child(2) { animation-delay: -0.3s; }
+.music-song i:nth-child(3) { animation-delay: -0.6s; }
+.music-bai-dong.tam-dung .music-song i { animation-play-state: paused; }
+@keyframes music-song {
+  0%, 100% { transform: scaleY(0.3); }
+  50% { transform: scaleY(1); }
+}
+.music-bai-dong.skeleton-text .music-bai-anh { background: none; }
+
+/* Màn hình THẤP (điện thoại xoay ngang ~340px): bỏ kiểu "vừa khít, chỉ danh
+   sách cuộn" - phần đầu (chip/tiêu đề/nút) đã chiếm gần hết chiều cao, danh
+   sách bị bóp còn ~20px (đã đo thật). Cho CẢ TRANG cuộn bình thường: phần đầu
+   trôi lên khi cuộn, nhường chỗ hết cho danh sách. */
+@media (max-height: 520px) {
+  .page-content.music-vua-man-hinh {
+    display: block;
+  }
+  .page-content.music-vua-man-hinh > #music-list-card {
+    display: block;
+    min-height: 0;
+  }
+  #music-list-card > #music-results {
+    overflow: visible;
+    margin-right: 0;
+    padding-right: 0;
+  }
+  /* Phần đầu gọn lại - thấy được nhiều bài hơn ngay khi vừa xoay ngang. */
+  .music-ds-dau { padding: 2px 0 6px; }
+  .music-ds-chip { margin-bottom: 8px; }
+  .music-chip { padding: 5px 14px; font-size: 13px; }
+  .music-ds-tieu-de { font-size: 20px; }
+  .music-ds-phu { margin-top: 2px; }
+}
+
+/* Danh sách ở tab Đang phát (veHangChoVao) - dùng lại kiểu dòng bài
+   .music-bai-dong; bài đã qua mờ đi. */
+.music-hang-cho { padding: 0 0 16px; }
+.music-hang-cho .music-bai-dong { cursor: pointer; }
+.music-hang-cho .music-bai-dong.da-qua { opacity: 0.45; }
+
+/* Menu popover (F7 Actions hiện thành popover - moMenu() trong music.html): F7 mặc
+   định chỉ chừa 8px 10px cho dòng tiêu đề (tên bài dài sát mép card) và nút
+   xuống dòng. Chừa lề như list thường, nút 1 dòng. */
+.popover-from-actions-label {
+  padding: 12px 16px 10px;
+  font-size: 13px;
+  line-height: 1.35;
+}
+.popover-from-actions .list-button {
+  padding: 0 16px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ---------- Menu ⋯ của 1 bài kiểu Tidal (moMenuBai trong music.html) ----------
+   Chung: đầu = ảnh + tên + kênh; mục = icon | chữ | (› menu con / số bài). */
+.mmb-dau { display: flex; align-items: center; gap: 12px; padding: 14px 16px 8px; }
+/* Ảnh hqdefault của YouTube (4:3) có SẴN 2 dải đen trên/dưới bọc hình 16:9 -
+   phóng chiều cao 133.4% để cắt bỏ dải đen, lấy phần giữa thành ảnh vuông. */
+.mmb-anh {
+  width: 48px;
+  height: 48px;
+  border-radius: 4px;
+  flex-shrink: 0;
+  background: color-mix(in srgb, var(--f7-text-color, #000) 10%, transparent) center / auto 133.4% no-repeat;
+}
+.mmb-chu { flex: 1; min-width: 0; }
+.mmb-ten, .mmb-phu { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mmb-ten { font-size: 15px; font-weight: 600; color: var(--f7-text-color, #000); }
+.mmb-phu { font-size: 13px; color: var(--f7-list-item-footer-text-color, #888); margin-top: 2px; }
+.mmb-ds { padding: 4px 0 8px; }
+.mmb-muc {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 11px 16px;
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--f7-text-color, #000) !important;
+}
+.mmb-muc > .icon { font-size: 20px; width: 24px; text-align: center; flex-shrink: 0; color: var(--f7-list-item-footer-text-color, #888); }
+.mmb-muc > span { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mmb-muc > em { font-style: normal; font-size: 13px; color: var(--f7-list-item-footer-text-color, #888); }
+.mmb-muc > .mmb-con { font-size: 14px; width: auto; }
+.mmb-muc:active, .mmb-muc:hover { background: color-mix(in srgb, var(--f7-text-color, #000) 8%, transparent); }
+.mmb-muc.mmb-do, .mmb-muc.mmb-do > .icon { color: var(--f7-color-red, #ff3b30) !important; }
+.mmb-ds-pl .mmb-muc:first-child { font-weight: 600; }
+
+/* Máy tính: popover. Danh sách phát dài thì cuộn trong menu. */
+.popover.music-menu-bai { width: 300px; }
+.popover.music-menu-bai .mmb-ds { max-height: 60vh; overflow-y: auto; }
+
+/* Điện thoại: màn tối toàn trang, nội dung dồn xuống dưới như Tidal. */
+.popup.music-menu-bai-dt {
+  background: var(--f7-page-bg-color, #000);
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  padding: calc(16px + var(--f7-safe-area-top, 0px)) calc(24px + var(--f7-safe-area-right, 0px))
+           calc(8px + var(--f7-safe-area-bottom, 0px)) calc(24px + var(--f7-safe-area-left, 0px));
+}
+.music-menu-bai-dt .mmb-vung { min-height: 0; overflow-y: auto; }
+.music-menu-bai-dt .mmb-dau { flex-direction: column; align-items: flex-start; gap: 10px; padding: 0 0 12px; }
+.music-menu-bai-dt .mmb-anh { width: 128px; height: 128px; border-radius: 8px; }
+.music-menu-bai-dt .mmb-chu { width: 100%; }
+.music-menu-bai-dt .mmb-ten { font-size: 16px; }
+.music-menu-bai-dt .mmb-phu { font-size: 15px; }
+.music-menu-bai-dt .mmb-muc { padding: 13px 0; gap: 22px; font-size: 17px; }
+.music-menu-bai-dt .mmb-muc:hover { background: none; }
+.music-menu-bai-dt .mmb-muc > .icon { font-size: 24px; color: var(--f7-text-color, #000); opacity: .75; }
+.music-menu-bai-dt .mmb-muc.mmb-do > .icon { opacity: 1; }
+.mmb-huy {
+  /* Nút X tròn (thay chữ "Đóng") ở cuối bảng menu bài / chọn nơi phát. */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 48px;
+  height: 48px;
+  margin: 14px auto 8px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--f7-text-color, #000) 9%, transparent);
+  color: var(--f7-text-color, #000) !important;
+}
+.mmb-huy .icon { font-size: 20px; font-weight: 600; }
+
+/* Loader trên ảnh bài vừa chạm, chưa có tiếng (datBaiDangMo trong music.html). */
+.music-tai {
+  display: none;
+  position: absolute;
+  inset: 0;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.55);
+}
+.music-tai .preloader { --f7-preloader-size: 22px; --f7-preloader-color: #fff; color: #fff; }
+.music-bai-dong.dang-tai .music-tai { display: flex; }
+.music-bai-dong.dang-tai .music-song,
+.music-bai-dong.dang-tai .music-choi { display: none !important; }
+
+/* Nút Phát/Tạm dừng đang tải bài: ẩn icon, hiện vòng xoay (desktop, mini
+   player, trình phát mở rộng - lớp .dang-tai do music.html/mini-player.js gắn). */
+/* !important: F7 tự chèn lề cho phần tử đứng sau icon trong .link (lệch 2px
+   ngang) và tabbar ép icon luôn hiện + xếp dọc (mini player: vòng xoay bị đẩy
+   xuống 16px dưới icon) - đo thật, phải thắng các quy tắc đó mới đồng tâm. */
+/* Cỡ vòng xoay đặt qua --f7-preloader-size (KHÔNG width/height trực tiếp): F7
+   xếp 8 vạch theo biến này - đặt width/height thì nét vẽ lệch chéo ~3px khỏi
+   tâm dù hộp nằm giữa (đo thật). */
+.nut-tai { display: none; --f7-preloader-size: 24px; margin: 0 !important; flex-shrink: 0; }
+.link.dang-tai > .nut-tai { display: block !important; }
+/* F7 chèn margin-left 4px cho "span + span" trong .link -> 7/8 vạch của vòng
+   xoay bị đẩy, nét lệch chéo ~2.8px (đo thật). Bỏ lề đó cho các vạch. */
+.nut-tai .preloader-inner > span { margin: 0 !important; }
+.link.dang-tai > .icon { display: none !important; }
+.mps-nut-chinh .nut-tai { --f7-preloader-size: 30px; --f7-preloader-color: var(--f7-page-bg-color, #fff); color: var(--f7-page-bg-color, #fff); }
+#mini-player-playpause .nut-tai, #music-playpause-btn .nut-tai { --f7-preloader-color: var(--f7-text-color, #000); color: var(--f7-text-color, #000); }
+
+/* Hiệu ứng rê chuột kiểu Tidal (chỉ máy có chuột): icon thanh phát desktop
+   bình thường hơi mờ; rê vào thì PHÓNG TO nhẹ + sáng hẳn (nút đang mờ như
+   Trộn/Lặp khi tắt cũng sáng lên); bấm thì nhún xuống. Không có nền tròn. */
+html.device-desktop #music-player .music-player-nut .link,
+html.device-desktop #music-player .music-player-phai .link,
+html.device-desktop #music-player #music-player-tim,
+html.device-desktop #music-player #music-player-them {
+  opacity: .78;
+  transition: opacity .15s ease, transform .15s ease;
+}
+html.device-desktop #music-player .music-player-nut .music-player-nut-chinh { opacity: 1; }
+html.device-desktop #music-player .link .icon { transition: opacity .15s ease; }
+@media (hover: hover) {
+  html.device-desktop #music-player .music-player-nut .link:hover,
+  html.device-desktop #music-player .music-player-phai .link:hover,
+  html.device-desktop #music-player #music-player-tim:hover,
+  html.device-desktop #music-player #music-player-them:hover { opacity: 1; transform: scale(1.1); }
+  html.device-desktop #music-player .link.music-tron:hover .icon,
+  html.device-desktop #music-player .link.music-lap:hover .icon { opacity: 1; }
+}
+html.device-desktop #music-player .music-player-nut .link:active,
+html.device-desktop #music-player .music-player-phai .link:active,
+html.device-desktop #music-player #music-player-tim:active,
+html.device-desktop #music-player #music-player-them:active { transform: scale(.94); }
+
+/* ---------- Tab Khám phá (veKhamPha trong music.html): các hàng thẻ cuộn
+   ngang kiểu Tidal - tên hàng (chạm = mở cả hàng) + dòng phụ, thẻ ảnh vuông
+   (ảnh YouTube 4:3 có dải đen -> phóng 133.4% cắt bỏ), tên 2 dòng, kênh. */
+.mkp-hang { margin: 4px 0 22px; }
+.mkp-dau { display: flex; align-items: baseline; gap: 10px; margin-bottom: 10px; min-width: 0; }
+.mkp-ten {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  flex-shrink: 0;
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--f7-text-color, #000) !important;
+}
+.mkp-ten .icon { font-size: 15px; opacity: .55; }
+.mkp-phu { font-size: 13px; color: var(--f7-list-item-footer-text-color, #888); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mkp-cuon {
+  display: flex;
+  gap: 14px;
+  overflow-x: auto;
+  /* Không bắt dính (scroll-snap): vuốt ngang trôi theo quán tính tự nhiên
+     như cuộn dọc - snap làm thẻ khựng lại/giật về mép khi buông tay. */
+  overscroll-behavior-x: contain;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+  padding-bottom: 4px;
+}
+.mkp-cuon::-webkit-scrollbar { display: none; }
+.mkp-the { flex: 0 0 148px; min-width: 0; color: var(--f7-text-color, #000) !important; }
+html.device-desktop .mkp-the { flex-basis: 176px; }
+/* Thẻ rộng gấp đôi (viTriTheRong): rộng = 2 thẻ + khe, CAO bằng thẻ thường,
+   ảnh ngang. hqdefault 4:3 có viền đen trên/dưới - cỡ 100% chiều ngang thì
+   phần hình 16:9 ở giữa phủ kín khung (khung ~2.1:1 thấp hơn 16:9). */
+.mkp-the.mkp-the-rong { flex-basis: calc(148px * 2 + 14px); }
+html.device-desktop .mkp-the.mkp-the-rong { flex-basis: calc(176px * 2 + 14px); }
+.mkp-the-rong .mkp-anh { aspect-ratio: auto; height: 148px; background-size: 100% auto; }
+html.device-desktop .mkp-the-rong .mkp-anh { height: 176px; }
+.mkp-the-rong .mkp-ten-bai { font-size: 15.5px; -webkit-line-clamp: 1; }
+/* Nhãn lý do trên thẻ rộng ("🔥 12 Tr lượt xem", "Vừa nghe"...) - góc trên trái, kính tối. */
+.mkp-nhan {
+  position: absolute; top: 8px; left: 8px; z-index: 1;
+  padding: 3px 9px; border-radius: 999px;
+  font-size: 12px; font-weight: 600; color: #fff;
+  background: rgba(0, 0, 0, .45);
+  -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px);
+  pointer-events: none;
+}
+.mkp-anh {
+  position: relative;
+  display: block;
+  width: 100%;
+  aspect-ratio: 1;
+  border-radius: 8px;
+  overflow: hidden;
+  background: color-mix(in srgb, var(--f7-text-color, #000) 8%, transparent) center / auto 133.4% no-repeat;
+}
+.mkp-ten-bai {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  margin-top: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.3;
+}
+.mkp-kenh { display: block; margin-top: 2px; font-size: 12.5px; color: var(--f7-list-item-footer-text-color, #888); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mkp-the.dang-phat .mkp-ten-bai { color: var(--f7-theme-color, #4285F4); }
+/* Rê chuột vào thẻ (kiểu Tidal): 3 nút nổi ở đáy ảnh - Phát (tròn trắng) |
+   ⋯ menu | tim; ảnh tối dần phía dưới cho nút dễ thấy. Điện thoại: giữ lâu
+   thẻ để mở menu (không có rê chuột). */
+.mkp-anh::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to top, rgba(0, 0, 0, .55), transparent 55%);
+  opacity: 0;
+  transition: opacity .15s ease;
+  pointer-events: none;
+}
+.mkp-nut {
+  position: absolute;
+  left: 10px;
+  right: 10px;
+  bottom: 10px;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  opacity: 0;
+  transform: translateY(6px);
+  transition: opacity .15s ease, transform .15s ease;
+  /* Ẩn thì KHÔNG bắt chạm - điện thoại (không rê chuột) chạm phần dưới ảnh
+     từng mở nhầm menu ⋯ thay vì phát bài. */
+  pointer-events: none;
+}
+.mkp-choi {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #fff;
+  color: #000;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, .4);
+  transition: transform .15s ease;
+}
+.mkp-choi .icon { font-size: 20px; }
+.mkp-nut-phu {
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  filter: drop-shadow(0 1px 3px rgba(0, 0, 0, .6));
+  transition: transform .15s ease;
+}
+.mkp-nut-phu .icon { font-size: 22px; }
+.mkp-tim.da-thich { color: #ff375f; }
+@media (hover: hover) {
+  .mkp-the:hover .mkp-nut { opacity: 1; transform: none; pointer-events: auto; }
+  .mkp-the:hover .mkp-anh::after { opacity: 1; }
+  .mkp-choi:hover, .mkp-nut-phu:hover { transform: scale(1.12); }
+}
+.mkp-the.dang-tai .music-tai { display: flex; }
+.mkp-the.dang-tai .mkp-nut { display: none; }
+/* Thẻ xương lúc hàng đang tải. */
+.mkp-xuong .mkp-anh, .mkp-xuong .mkp-ten-bai, .mkp-xuong .mkp-kenh {
+  background: color-mix(in srgb, var(--f7-text-color, #000) 9%, transparent);
+  border-radius: 6px;
+  animation: mkp-nhap-nhay 1.2s ease-in-out infinite;
+}
+.mkp-xuong .mkp-ten-bai { width: 85%; }
+.mkp-xuong .mkp-kenh { width: 55%; }
+@keyframes mkp-nhap-nhay { 50% { opacity: .45; } }
+
+/* ---------- Trang Nhạc trên máy tính: DÙNG HẾT bề ngang (bỏ cột đọc 640px
+   chung của các trang khác - các hàng thẻ Khám phá cần chỗ như Tidal). ---------- */
+html.device-desktop #view-music .page-content {
+  padding-left: 32px;
+  padding-right: 32px;
+}
+
+/* Khám phá: nút ‹ › mỗi hàng (chỉ máy có chuột - điện thoại vuốt ngang). */
+.mkp-mui { display: none; margin-left: auto; flex-shrink: 0; gap: 6px; align-self: center; }
+@media (hover: hover) { .mkp-mui { display: inline-flex; } }
+.mkp-mui .link {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  justify-content: center;
+  color: var(--f7-text-color, #fff) !important;
+  background: color-mix(in srgb, var(--f7-text-color, #fff) 10%, transparent);
+  transition: background .15s ease, opacity .15s ease, transform .15s ease;
+}
+.mkp-mui .link .icon { font-size: 15px; }
+.mkp-mui .link:hover { background: color-mix(in srgb, var(--f7-text-color, #fff) 20%, transparent); transform: scale(1.08); }
+.mkp-mui .link.mkp-het { opacity: .3; pointer-events: none; }
+/* Nút ⟳ Làm mới cạnh tiêu đề Khám phá; xoay khi đang tải. */
+/* Nút tròn bên phải tiêu đề danh sách (⟳ Khám phá, ⋯ playlist đang mở). */
+.music-ds-nut-phai { float: right; margin-top: 4px; color: var(--f7-text-color, #fff) !important; opacity: .75; }
+.music-ds-nut-phai:hover { opacity: 1; }
+.music-ds-nut-phai .icon { font-size: 22px; }
+/* Xoay quanh TÂM VÒNG TRÒN của hình (thấp hơn tâm hộp 7.5% - đo pixel thật,
+   đầu mũi tên ở trên kéo lệch), không thì icon lắc lên xuống khi xoay. */
+.music-kp-lam-moi .icon { transform-origin: 50% 57.5%; }
+.music-kp-lam-moi.dang-xoay .icon { animation: kp-xoay 1s linear infinite; }
+@keyframes kp-xoay { to { transform: rotate(360deg); } }
+
+/* Huy hiệu chất lượng bên phải thanh phát desktop (kiểu ô chất lượng Tidal). */
+.music-chat-luong {
+  flex-shrink: 0;
+  margin-left: 6px;
+  padding: 7px 14px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: .02em;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+  color: var(--f7-text-color, #fff);
+  border: 1px solid color-mix(in srgb, var(--f7-text-color, #fff) 22%, transparent);
+  background: color-mix(in srgb, var(--f7-text-color, #fff) 6%, transparent);
+}
+
+/* ---------- Trình phát mở rộng kiểu Tidal (điện thoại) - ghi đè bố cục cũ.
+   Luôn tông tối như Tidal: nền nhuộm màu chủ đạo ảnh bìa (--mps-nen do
+   mini-player.js nhuomNen đặt), chữ/icon trắng. ---------- */
+.mini-player-sheet {
+  --f7-text-color: #fff;
+  --f7-list-item-footer-text-color: rgba(255, 255, 255, .62);
+  color: #fff;
+  background: linear-gradient(180deg, var(--mps-nen, #1c1c1e) 0%, color-mix(in srgb, var(--mps-nen, #1c1c1e) 72%, #000) 100%);
+  /* KHÔNG viết gộp "transition: background ..." - nó ghi đè luôn transition
+     transform trượt lên/xuống của F7 -> sheet bật lên tức thì, không trượt
+     (đo thật: 100% ngay khung đầu). Chỉ thêm thuộc tính, thời gian theo F7. */
+  transition-property: transform, background;
+  max-height: 96vh;
+}
+.mini-player-sheet .swipe-handler { background: transparent; }
+.mini-player-sheet .mps-noi-dung { gap: 14px; padding-top: 12px; }
+.mini-player-sheet .mps-dau { margin: 0; gap: 10px; justify-content: flex-start; }
+.mps-anh-nho {
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  overflow: hidden;
+  flex-shrink: 0;
+  background: rgba(255, 255, 255, .15);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, .35);
+}
+.mps-anh-nho img { width: 100%; height: 100%; object-fit: cover; }
+.mps-vien {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 46px;
+  padding: 0 18px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, .28);
+  background: rgba(255, 255, 255, .12);
+  color: #fff !important;
+  font-size: 15px;
+  font-weight: 600;
+}
+.mini-player-sheet .mps-am-luong-nut span { color: #fff; font-weight: 600; }
+.mps-tron-trang {
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  justify-content: center;
+  background: #fff;
+  color: #000 !important;
+}
+.mps-tron-trang .icon { font-size: 22px; }
+.mini-player-sheet .mps-anh {
+  /* Theo chiều cao màn hình để cả trình phát vừa 1 màn, không phải cuộn. */
+  width: min(100%, 36vh);
+  border-radius: 6px;
+  box-shadow: 0 18px 44px rgba(0, 0, 0, .45);
+  margin-top: 6px;
+}
+.mini-player-sheet .mps-ten { font-size: 22px; }
+.mini-player-sheet .mps-phu { font-size: 17px; }
+#mps-tim .icon { font-size: 28px; }
+.mini-player-sheet .mps-thoi-gian { align-items: center; font-size: 13px; margin-top: 4px; }
+.mps-chat-luong {
+  flex: 1;
+  text-align: center;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: .04em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  padding: 0 8px;
+}
+.mini-player-sheet .mps-nut { justify-content: space-between; gap: 0; margin: 2px 4px 0; }
+.mini-player-sheet .mps-nut .link .icon { font-size: 32px; }
+.mini-player-sheet .mps-nut .music-tron .icon,
+.mini-player-sheet .mps-nut .music-lap .icon { font-size: 24px; }
+/* Phát/Tạm dừng: icon trắng to, KHÔNG vòng tròn (như ảnh Tidal). */
+.mini-player-sheet .mps-nut .mps-nut-chinh { width: 64px; height: 64px; background: none; }
+.mini-player-sheet .mps-nut .mps-nut-chinh .icon { font-size: 52px; color: #fff; }
+.mini-player-sheet .mps-nut-chinh .nut-tai { --f7-preloader-size: 34px; --f7-preloader-color: #fff; color: #fff; }
+.mini-player-sheet .mps-hang-duoi { gap: 14px; margin-top: 6px; }
+.mps-tron-vien {
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  justify-content: center;
+  border: 1px solid rgba(255, 255, 255, .28);
+  background: rgba(255, 255, 255, .12);
+}
+.mps-nguon-khung { display: flex; flex-direction: column; min-width: 0; line-height: 1.3; }
+.mps-nguon-nhan { font-size: 14px; color: rgba(255, 255, 255, .62); }
+.mini-player-sheet .mps-nguon { font-size: 16px; font-weight: 500; color: #fff; }
+.mps-cum { height: 52px; padding: 0 8px; gap: 2px; }
+.mps-cum .link { width: 44px; justify-content: center; }
+.mps-cum .link .icon { font-size: 22px; }
+/* Menu ⋯ / danh sách mở TỪ trình phát mở rộng phải nằm TRÊN sheet (F7 popup
+   z-index 11000 < sheet 12500-13500 - đã gặp với danh sách đang phát). */
+.popup.music-menu-bai-dt { z-index: 14000; }
+
+/* Mini player (iOS, ôm tabbar) CAO hơn: ảnh bìa nằm trọn, cách thanh chạy và
+   hàng tab một khoảng rõ ràng (trước 56px, ảnh 44px gần chạm thanh chạy). */
+html.ios { --mini-player-cao: 70px; }
+html.ios #mini-player { padding-top: 2px; padding-bottom: 6px; }
+html.ios #mini-player .mini-player-anh { width: 48px; height: 48px; border-radius: 24px; }
+html.ios #mini-player .mini-player-tien-trinh { bottom: 4px; }
+
+/* Trình phát mở rộng TOÀN MÀN HÌNH (như Tidal): không bo góc/viền/bóng, cao
+   hết màn; trượt lên/xuống theo đường cong kiểu iOS (nhanh đầu, chậm dần mượt
+   cuối) dài hơn mặc định 300ms của F7 - qua biến chính thức của F7 sheet nên
+   áp cả lúc mở, đóng và lúc thả tay sau khi vuốt. */
+.mini-player-sheet {
+  --f7-sheet-border-radius: 0px;
+  --f7-sheet-transition-duration: 500ms;
+  --f7-sheet-transition-timing-function: cubic-bezier(.32, .72, 0, 1);
+  height: 100%;
+  height: 100dvh;
+  max-height: none;
+  border-radius: 0;
+  border: none;
+  box-shadow: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+.mini-player-sheet .sheet-modal-inner { height: 100%; }
+.mini-player-sheet .mps-noi-dung {
+  box-sizing: border-box;
+  min-height: 100%;
+  justify-content: space-between;
+  padding-top: calc(10px + var(--f7-safe-area-top, 0px));
+  padding-bottom: calc(14px + var(--f7-safe-area-bottom, 0px));
+}
+/* Ảnh bìa co theo chiều cao màn để cả trình phát vừa 1 màn (không cuộn). */
+.mini-player-sheet .mps-anh { width: min(100%, 44vh, calc(100dvh - 430px)); }
+/* F7 iOS đặt lại --f7-sheet-transition-timing-function ở ".ios .sheet-modal"
+   (ưu tiên cao hơn) - khai lại với selector mạnh hơn. */
+html .sheet-modal.mini-player-sheet {
+  /* 600ms, đường cong đều (tăng tốc nhẹ, hãm dần dài) - bản trước
+     cubic-bezier(.32,.72,0,1) dồn gần hết quãng đường vào ~0.1s đầu nên trông
+     như "bật" lên quá nhanh (phản ánh thật). */
+  --f7-sheet-transition-duration: 600ms;
+  --f7-sheet-transition-timing-function: cubic-bezier(.25, .8, .25, 1);
+  /* iOS của F7 không dùng biến trên cho timing (đo: vẫn "ease") - đặt thẳng. */
+  transition-timing-function: cubic-bezier(.25, .8, .25, 1);
+}
+
+/* Nút trên trình phát mở rộng = KÍNH MỜ y như nút navbar F7 iOS 9 (đo thật
+   ".navbar .right": nền --f7-glass-bg-color, bóng --f7-glass-shadow, blur,
+   bo tròn hẳn, cao 44px) - dùng chính biến của F7, đổi theme vẫn khớp. */
+.mps-kinh {
+  background: var(--f7-glass-bg-color, rgba(50, 50, 50, .5)) !important;
+  box-shadow: var(--f7-glass-shadow, none);
+  backdrop-filter: saturate(180%) blur(16px);
+  -webkit-backdrop-filter: saturate(180%) blur(16px);
+  border: none !important;
+  border-radius: 999px;
+  color: #fff !important;
+}
+.mps-kinh-tron { width: 44px; height: 44px; justify-content: center; }
+.mps-kinh-tron .icon { font-size: 22px; }
+.mps-kinh-vien { height: 44px; }
+.mini-player-sheet .mps-cum.mps-kinh-vien { height: 52px; }
+/* Chừa TAI THỎ / thanh home: F7 đặt --f7-safe-area-top = 0 cho sheet trượt từ
+   dưới lên (đo thật) -> đọc thẳng env() của máy. */
+.mini-player-sheet .mps-noi-dung {
+  padding-top: calc(10px + env(safe-area-inset-top, 0px));
+  padding-bottom: calc(14px + env(safe-area-inset-bottom, 0px));
+}
+/* Bỏ VIỀN KÍNH của sheet (F7 iOS vẽ bằng box-shadow inset trắng, quy tắc của
+   F7 mạnh hơn nên phải !important) + vạch kẻ 1px ::before. */
+html .sheet-modal.mini-player-sheet { box-shadow: none !important; }
+html .sheet-modal.mini-player-sheet::before { display: none; }
+/* Viên kính Chia sẻ · ⋯ (và viên âm lượng): canh giữa dọc các icon bên trong. */
+.mps-kinh-vien { display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 0 16px; }
+.mini-player-sheet .mps-cum.mps-kinh-vien { padding: 0 8px; gap: 2px; }
+.mps-cum .link { height: 44px; align-items: center; }
+
+/* Thanh phát desktop khi cửa sổ HẸP: cột phải trước đây chia tỉ lệ cố định
+   (0.7fr) -> 2 icon + huy hiệu chất lượng tràn đè lên cụm nút giữa (ảnh phản
+   ánh thật). Cột phải giờ luôn đủ rộng cho nội dung (auto), cột giữa co giãn
+   có tối thiểu; hẹp dần thì huy hiệu gọn lại rồi ẩn, nút sít lại. */
+html.device-desktop #music-player {
+  grid-template-columns: minmax(0, 1fr) minmax(300px, 1.6fr) auto;
+}
+html.device-desktop #music-player .music-player-phai { min-width: 0; }
+@media (max-width: 1400px) {
+  html.device-desktop #music-player { column-gap: 16px; padding: 0 16px; }
+  html.device-desktop #music-player .music-player-nut { gap: 18px; }
+  .music-chat-luong { padding: 6px 10px; font-size: 11px; }
+}
+@media (max-width: 1180px) {
+  .music-chat-luong { display: none !important; }
+  html.device-desktop #music-player .music-player-nut { gap: 12px; }
+  html.device-desktop #music-player .music-player-anh { width: 52px; height: 52px; }
+  html.device-desktop #music-player { grid-template-columns: minmax(0, 1fr) minmax(260px, 1.4fr) auto; }
+}
+
+/* ---------- Kết quả tìm kiểu YouTube Music: nhãn đóng khung (HÁT LẠI /
+   KARAOKE / REMIX / LIVE), ô "Kết quả hàng đầu" (Phát / Lưu), chip lọc. ---------- */
+.music-nhan {
+  display: inline-block;
+  margin-right: 6px;
+  padding: 0 5px;
+  border-radius: 3px;
+  font-size: 10.5px;
+  font-weight: 700;
+  line-height: 16px;
+  letter-spacing: .02em;
+  vertical-align: 1px;
+  color: var(--f7-text-color, #000);
+  background: color-mix(in srgb, var(--f7-text-color, #000) 22%, transparent);
+}
+.mkq-loc { display: flex; gap: 8px; overflow-x: auto; scrollbar-width: none; padding: 2px 0 12px; }
+.mkq-loc::-webkit-scrollbar { display: none; }
+.mkq-loc .music-chip { flex-shrink: 0; }
+.mkq-hang-dau {
+  margin: 0 0 14px;
+  padding: 14px;
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--f7-text-color, #000) 7%, transparent);
+}
+.mkq-nhan-muc { font-size: 12px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--f7-list-item-footer-text-color, #888); margin-bottom: 10px; }
+.mkq-tren { display: flex; align-items: center; gap: 14px; }
+.mkq-anh {
+  width: 72px;
+  height: 72px;
+  flex-shrink: 0;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--f7-text-color, #000) 8%, transparent) center / auto 133.4% no-repeat;
+}
+.mkq-chu { flex: 1; min-width: 0; }
+.mkq-ten { font-size: 17px; font-weight: 700; line-height: 1.3; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.mkq-phu { margin-top: 3px; white-space: normal !important; }
+.mkq-them { color: var(--f7-text-color, #000) !important; opacity: .75; flex-shrink: 0; }
+.mkq-nut { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 14px; }
+.mkq-nut .button { height: 44px; gap: 8px; font-size: 16px; font-weight: 600; text-transform: none; }
+.mkq-phat { background: var(--f7-text-color, #000) !important; color: var(--f7-page-bg-color, #fff) !important; }
+.mkq-luu { color: var(--f7-text-color, #000) !important; border: 1px solid color-mix(in srgb, var(--f7-text-color, #000) 30%, transparent) !important; background: transparent !important; }
+.mkq-luu.da-luu i { color: #ff375f; }
+
+/* Skeleton kết quả tìm đủ khuôn (veSkeletonTim): chip, ô hàng đầu,
+   chỗ tim + ⋯ ở mỗi dòng. */
+.mkx-vien { display: block; height: 44px; border-radius: 999px; }
+.mkx-chip { display: block; flex-shrink: 0; height: 36px; border-radius: 999px; }
+.mkx-nut-to { width: auto; }
+.mkx-icon { display: block; flex-shrink: 0; width: 24px; height: 24px; border-radius: 50%; margin-left: 10px; }
+.mkq-hang-dau.skeleton-text .mkq-anh { display: block; }
+/* Chip "Kết quả tìm" canh sát phải, tách khỏi Khám phá · Yêu thích. */
+.music-ds-chip .music-chip-tim { margin-left: auto; }
+
+/* ---------- Tab "Đang phát" (veDangPhat - kiểu trang phát YouTube Music):
+   máy tính 2 cột (ảnh lớn | Tiếp theo / Liên quan), điện thoại xếp dọc. ---------- */
+.mdp-khung { display: grid; grid-template-columns: minmax(0, 1fr); gap: 20px; padding-bottom: 12px; }
+.mdp-trai, .mdp-phai { min-width: 0; }
+html.device-desktop .mdp-khung { grid-template-columns: minmax(0, 1.35fr) minmax(320px, 1fr); gap: 36px; align-items: start; }
+html.device-desktop .mdp-trai { position: sticky; top: 0; }
+.mdp-anh {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  border-radius: 12px;
+  overflow: hidden;
+  background: color-mix(in srgb, var(--f7-text-color, #000) 8%, transparent);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, .35);
+  cursor: pointer;
+}
+.mdp-anh img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.mdp-ten { margin-top: 14px; font-size: 20px; font-weight: 700; line-height: 1.3; }
+.mdp-kenh { margin-top: 4px; white-space: normal !important; }
+.mdp-the {
+  display: flex;
+  border-bottom: 1px solid color-mix(in srgb, var(--f7-text-color, #000) 14%, transparent);
+  margin-bottom: 12px;
+}
+.mdp-the a {
+  flex: 1;
+  text-align: center;
+  padding: 12px 0;
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  color: var(--f7-list-item-footer-text-color, #888) !important;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+}
+.mdp-the a.active { color: var(--f7-text-color, #000) !important; border-bottom-color: var(--f7-text-color, #000); }
+.mdp-nguon { display: flex; align-items: center; gap: 12px; padding: 4px 0 10px; }
+.mdp-nguon-chu { flex: 1; min-width: 0; }
+.mdp-nhan { font-size: 13px; color: var(--f7-list-item-footer-text-color, #888); }
+.mdp-nguon-ten { font-size: 16px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mdp-luu {
+  flex-shrink: 0;
+  width: auto;
+  height: 38px;
+  padding: 0 16px;
+  gap: 6px;
+  font-weight: 600;
+  text-transform: none;
+  background: var(--f7-text-color, #000) !important;
+  color: var(--f7-page-bg-color, #fff) !important;
+}
+.mdp-luu .icon { font-size: 18px; }
+.mdp-tu-phat {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  justify-content: space-between;
+  padding: 10px 14px;
+  margin-bottom: 8px;
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--f7-text-color, #000) 6%, transparent);
+  cursor: pointer;
+}
+.mdp-tu-phat-ten { font-size: 16px; font-weight: 600; }
+.mdp-cho { list-style: none; padding: 18px 4px; color: var(--f7-list-item-footer-text-color, #888); font-size: 14px; }
+
+/* Tab Đang phát: thanh "Tiếp theo · Liên quan" GHIM khi cuộn (vùng cuộn là
+   #music-results) - như YouTube Music. */
+.mdp-the {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  background: var(--f7-page-bg-color, #000);
+}
+/* Hiệu ứng vào trang kiểu YouTube Music: cả trang trượt từ dưới lên + mờ dần
+   hiện, ảnh lớn phóng nhẹ từ 0.92, cột phải trễ 80ms cho có nhịp. */
+.mdp-vao { animation: mdp-truot-len .5s cubic-bezier(.2, .8, .2, 1) both; }
+.mdp-vao .mdp-anh { animation: mdp-anh-phong .6s cubic-bezier(.2, .8, .2, 1) both; }
+.mdp-vao .mdp-phai { animation: mdp-truot-len .5s cubic-bezier(.2, .8, .2, 1) .08s both; }
+@keyframes mdp-truot-len { from { opacity: 0; transform: translateY(48px); } to { opacity: 1; transform: none; } }
+@keyframes mdp-anh-phong { from { opacity: 0; transform: scale(.92); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) {
+  .mdp-vao, .mdp-vao .mdp-anh, .mdp-vao .mdp-phai { animation: none; }
+}
+/* Đổi bài ở tab Đang phát: ảnh cũ mờ đi rồi ảnh mới hiện lại (không vẽ lại trang). */
+.mdp-anh img { transition: opacity .25s ease; }
+.mdp-anh img.mdp-doi-anh { opacity: .25; }
+/* Tab Đang phát: tiêu đề nằm trong cột trái, cột Tiếp theo ngang hàng nó. */
+.mdp-tieu-de { font-size: 30px; font-weight: 800; line-height: 1.15; }
+.mdp-noi { margin: 4px 0 14px; font-size: 13px; color: var(--f7-list-item-footer-text-color, #888); }
+
+/* ---------- Icon cast + bảng chọn nơi phát (moChonNoiPhat) ---------- */
+.icon-cast { width: 22px; height: 22px; display: block; }
+#music-output-btn { color: var(--f7-text-color, #fff) !important; }
+#music-output-btn.dang-cast, #mps-noi-phat.dang-cast { color: var(--f7-theme-color, #4285F4) !important; }
+.mmb-nhom { padding: 14px 16px 4px; font-size: 13px; font-weight: 600; color: var(--f7-list-item-footer-text-color, #888); display: flex; align-items: center; gap: 8px; }
+.music-menu-bai-dt .mmb-nhom { padding-left: 0; font-size: 15px; }
+/* Dòng chờ/báo trống của nhóm "Thiết bị trong nhà" (bảng chọn nơi phát). */
+.mmb-ha-cho { padding: 8px 16px; font-size: 14px; color: var(--f7-list-item-footer-text-color, #888); }
+.music-menu-bai-dt .mmb-ha-cho { padding-left: 0; }
+.mmb-xoay { --f7-preloader-size: 16px; }
+.mmb-chon { color: var(--f7-theme-color, #4285F4) !important; font-size: 18px !important; }
+.mmb-trong { padding: 10px 16px; font-size: 14px; color: var(--f7-list-item-footer-text-color, #888); }
+.music-menu-bai-dt .mmb-trong { padding-left: 0; }
+.popover.music-noi-phat { width: 320px; }
+/* Cân đối với icon loa bên cạnh (đo nét thật: loa cao 17.5px, cast 22px chỉ
+   cao 16.3px và nét mảnh trông nhỏ hơn) -> cast 24px trên thanh phát desktop. */
+#music-output-btn .icon-cast { width: 24px; height: 24px; }
+/* Tên nơi phát luôn 1 dòng (tên thiết bị HA có thể dài). */
+.mps-nguon-khung { flex: 1; min-width: 0; }
+.mini-player-sheet .mps-nguon, .mps-nguon-nhan { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* Điện thoại: đầu menu ⋯ / bảng chọn thiết bị - ảnh bên TRÁI, tên + kênh bên
+   PHẢI (trước đây ảnh lớn ở trên, chữ ở dưới). */
+.music-menu-bai-dt .mmb-dau { flex-direction: row; align-items: center; gap: 14px; padding: 4px 0 12px; }
+.music-menu-bai-dt .mmb-anh { width: 72px; height: 72px; border-radius: 8px; }
+.music-menu-bai-dt .mmb-chu { width: auto; flex: 1; min-width: 0; }
+.music-menu-bai-dt .mmb-ten { font-size: 17px; white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.music-menu-bai-dt .mmb-phu { font-size: 14px; margin-top: 3px; }
+
+/* Trang Tài khoản: ảnh đại diện tròn = chữ cái đầu tên hiển thị */
+.tk-anh {
+  width: 36px; height: 36px; border-radius: 50%;
+  display: inline-flex; align-items: center; justify-content: center;
+  background: color-mix(in srgb, var(--f7-theme-color, #4285F4) 18%, transparent);
+  color: var(--f7-theme-color, #4285F4);
+  font-weight: 600; font-size: 16px;
+}
+
+/* Nút Phát chính thanh phát: giữ đúng cỡ của icon (36/38px) cả lúc đang tải -
+   icon ẩn, vòng xoay 24px thay vào thì nút từng co còn 24px rồi bật lại 38px. */
+#music-player .music-player-nut-chinh { min-width: 36px; min-height: 36px; justify-content: center; align-items: center; }
+html.device-desktop #music-player .music-player-nut .music-player-nut-chinh { min-width: 38px; min-height: 38px; }
+/* Trang Tài khoản: dòng phụ "Xuất file .zip · Nhập từ file" dưới nút Đồng bộ */
+.tk-db-phu { display: flex; justify-content: center; gap: 8px; padding: 6px 16px 14px; font-size: 13px; color: var(--f7-list-item-footer-text-color, #888); }
+.tk-db-phu a { color: var(--f7-theme-color, #4285F4); }
+
+/* Tabbar dưới (iOS) mất cảm giác kính: F7 phủ dải TRẮNG mờ dần (.toolbar::after,
+   màu nền thanh) phía sau .toolbar-pane + nền kính trắng 75% -> kính làm mờ cả
+   dải trắng đó, nhìn gần như đặc (đo thật bằng nền sọc màu sau tabbar). Bỏ
+   dải trắng, nền kính trong hơn - khối kính chung với mini player (::before
+   của pane) dùng cùng biến nên cũng trong theo. */
+html.ios #mobile-tabbar::after { display: none; }
+html.ios #mobile-tabbar { --f7-glass-bg-color: rgba(255, 255, 255, 0.5); }
+html.ios.dark #mobile-tabbar { --f7-glass-bg-color: rgba(40, 40, 40, 0.42); }
+
+/* Trang Nhạc (điện thoại): danh sách cuộn #music-results kéo xuống TẬN ĐÁY,
+   nằm dưới thanh tab như các trang khác - trước đây page-content chừa sẵn chỗ
+   thanh tab (padding-bottom) nên danh sách dừng phía trên, sau tabbar chỉ có
+   nền trơn -> kính không có gì để làm mờ (đã đo: elementsFromPoint sau tabbar
+   chỉ là .page). Chỗ chừa chuyển vào trong danh sách (cuộn được tới bài cuối). */
+@media (min-height: 521px) {
+  html:not(.device-desktop) .page-content.music-vua-man-hinh { padding-bottom: 0; }
+  html:not(.device-desktop) .page-content.music-vua-man-hinh > #music-list-card { margin-bottom: 0; }
+  html:not(.device-desktop) #music-list-card > #music-results {
+    padding-bottom: calc(var(--f7-page-toolbar-bottom-offset, 0px) + var(--f7-safe-area-bottom) + var(--f7-page-content-extra-padding-bottom, 0px) + 8px);
+  }
+}
+
+/* Icon bộ Material Design Icons (Home Assistant) trên thẻ thiết bị + bảng chọn icon */
+/* Khung icon CỐ ĐỊNH, căn giữa - cỡ chữ + dời vị trí từng icon do chuanHoaMdi()
+   (devices.html) đặt theo nét thật để mọi icon to đều nhau. */
+#view-devices .ha-dash-mdi { display: inline-block; width: 28px; height: 28px; font-size: 28px; line-height: 28px; text-align: center; }
+.ha-icon-tim { display: flex; align-items: center; gap: 8px; padding: 0 12px; height: 40px; border-radius: 12px;
+  background: color-mix(in srgb, var(--f7-text-color, #000) 8%, transparent); }
+.ha-icon-tim .icon { font-size: 18px; opacity: .5; }
+.ha-icon-tim input { flex: 1; min-width: 0; border: 0; outline: 0; background: transparent; font-size: 16px; color: var(--f7-text-color, #000); }
+.ha-icon-luoi { display: grid; grid-template-columns: repeat(auto-fill, minmax(56px, 1fr)); gap: 8px; }
+.ha-icon-o { display: flex; align-items: center; justify-content: center; aspect-ratio: 1; border-radius: 14px;
+  color: var(--f7-text-color, #000) !important; background: color-mix(in srgb, var(--f7-text-color, #000) 6%, transparent); }
+.ha-icon-o .mdi { display: inline-block; width: 32px; height: 32px; font-size: 28px; line-height: 32px; text-align: center; }
+.ha-icon-o.chon { background: color-mix(in srgb, var(--f7-theme-color, #4285F4) 22%, transparent); color: var(--f7-theme-color, #4285F4) !important; }
+
+/* Bong bóng tab đang chọn - chế độ tối đúng iOS 26 (theo ảnh app Danh bạ
+   người dùng gửi): viên TỐI HƠN chìm trong thanh kính xám, viền rất mảnh -
+   không phải viên sáng. Thanh hơi đục hơn để viên tối nổi rõ. */
+html.ios.dark #mobile-tabbar { --f7-glass-bg-color: rgba(38, 38, 38, 0.62); }
+html.ios.dark #mobile-tabbar .tab-link-highlight::before {
+  background: rgba(0, 0, 0, .45);
+  box-shadow: inset 0 0 0 .5px rgba(255, 255, 255, .06);
+}
+
+/* Bấm giữ / kéo bong bóng tab: F7 phóng đều 1.4 lần - quá to. Phóng KHÔNG
+   ĐỀU: ngang 1.12 (vừa tay), dọc 1.32 -> viên cao ~74px > thanh 64px, NỔI
+   lồi ra trên/dưới thanh như iOS 26 (phóng đều 1.15 thì cao đúng bằng thanh,
+   mép chạm sát nhìn như bị thanh cắt). */
+html.ios #mobile-tabbar .tab-link-highlight-pressed::before,
+html.ios #mobile-tabbar .tab-link-highlight-pressed::after { scale: 1.12 1.32; }

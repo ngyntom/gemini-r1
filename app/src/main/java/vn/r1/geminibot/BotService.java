@@ -56,6 +56,7 @@ public class BotService extends Service {
         Led.setEnabled(Config.load(this).led);
         Led.start(this);
         Button.start(this);
+        Music.get(this); // dựng trình phát nhạc sẵn (hàng chờ cũ đọc lại từ file)
         new Thread(() -> Updater.reportLastInstall(this), "update-log").start();
     }
 
@@ -87,6 +88,13 @@ public class BotService extends Service {
                 BotLog.state = "thinking";
                 BotLog.lastHeard = question;
                 BotLog.i("Hỏi (Web): " + question);
+                String mus = MusicCommands.handle(this, question);
+                if (mus != null) {
+                    BotLog.lastReply = mus;
+                    speak(cfg, mus);
+                    Music.get(this).holdForBot(false);
+                    return;
+                }
                 String quick = cfg.localTime ? LocalAnswer.answer(question) : null;
                 if (quick != null) {
                     BotLog.lastReply = quick;
@@ -235,10 +243,16 @@ public class BotService extends Service {
                         followUp = false;
                         wake.configure(cfg);
                         BotLog.state = "idle";
-                        if (!barged) PcmPlayer.keepAwake(false); // rảnh: cho ampli nghỉ
+                        if (!barged) {
+                            PcmPlayer.keepAwake(false); // rảnh: cho ampli nghỉ
+                            Music.get(this).holdForBot(false); // trả lời xong: nhạc phát tiếp
+                        }
                         String hit = barged ? "ngắt lời" : wake.waitFor(recorder);
                         barged = false;
-                        if (hit != null) PcmPlayer.keepAwake(true); // giữ ampli thức tới lúc trả lời xong
+                        if (hit != null) {
+                            Music.get(this).holdForBot(true); // tạm dừng nhạc để nghe rõ câu hỏi
+                            PcmPlayer.keepAwake(true); // giữ ampli thức tới lúc trả lời xong
+                        }
                         if (hit == null) {
                             Thread.sleep(50);
                             continue;
@@ -312,6 +326,15 @@ public class BotService extends Service {
                             BotLog.i("Google STT (" + (System.currentTimeMillis() - t0) + " ms): " + text);
                             if (text.isEmpty()) {
                                 BotLog.i("Không nghe rõ lời");
+                                continue;
+                            }
+                            String mus = MusicCommands.handle(this, text);
+                            if (mus != null) {
+                                // Lệnh nhạc: trả lời ngắn rồi về chờ từ đánh thức (nhạc phát tiếp ở đó)
+                                BotLog.lastHeard = text;
+                                BotLog.lastReply = mus;
+                                barged = speakBargeIn(cfg, mus, wake);
+                                followUp = false;
                                 continue;
                             }
                             String quick = cfg.localTime ? LocalAnswer.answer(text) : null;

@@ -1,0 +1,2830 @@
+<template>
+  <div class="page" data-name="music">
+    <div class="navbar">
+      <div class="navbar-bg"></div>
+      <div class="navbar-inner">
+        <div class="title">Nhạc</div>
+        <div class="right">
+          <a href="#" class="link icon-only searchbar-enable" data-searchbar="#music-searchbar" title="Tìm bài hát">
+            <i class="icon f7-icons">search</i>
+          </a>
+        </div>
+        <!-- Kiểu "searchbar-expandable" trong docs F7 (framework7.io/docs/
+             searchbar) - cùng mẫu với popup Thêm/bớt thiết bị (devices.html):
+             bấm kính lúp mới mở thanh tìm phủ kín navbar. Gõ -> gợi ý từ khoá
+             (#music-suggest đầu trang), Enter/chạm gợi ý -> tìm, kết quả hiện ở
+             card "Danh sách phát" bên dưới phần điều khiển. -->
+        <form class="searchbar searchbar-expandable" id="music-searchbar">
+          <div class="searchbar-inner">
+            <div class="searchbar-input-wrap">
+              <input type="search" id="music-query" placeholder="Tên bài hát hoặc ca sĩ..." autocomplete="off" autocapitalize="off" enterkeyhint="search" />
+              <i class="searchbar-icon"></i>
+              <span class="input-clear-button"></span>
+            </div>
+            <span class="searchbar-disable-button">
+              <i class="icon icon-close"></i>
+            </span>
+          </div>
+        </form>
+      </div>
+    </div>
+    <!-- Gợi ý từ khoá của YouTube - khung THẢ XUỐNG nổi, con trực tiếp của
+         .page (KHÔNG đặt trong .navbar: luật ".navbar a{color:...}" của F7 tô
+         lại màu chữ + nền kính mờ làm chữ gần như không thấy, và mép dưới
+         navbar iOS cách ô nhập ~16px). Vị trí tính bằng JS theo đúng mép dưới
+         ô nhập (dinhViGoiY). CHỈ hiện lúc đang mở thanh tìm và đã gõ. -->
+    <div class="list list-strong list-dividers-ios" id="music-suggest" style="display:none;">
+      <ul></ul>
+    </div>
+
+    <!-- Âm lượng PHẦN CỨNG của loa Pi (dùng chung API /api/music/volume với
+         trang Mic & loa > "Loa") - popover F7 NỔI mở khi bấm icon loa ở hàng
+         nút điều khiển (thay cho thanh ngang cũ ở đầu card): thanh trượt DỌC
+         (range vertical), +/- 10%, nút tắt tiếng. Tạo bằng $f7.popover.create()
+         trong pageInit (cùng cách trang Nhật ký). -->
+    <div class="popover music-volume-popover" id="music-volume-popover">
+      <div class="popover-angle"></div>
+      <div class="popover-inner">
+        <div class="music-vol-wrap">
+          <div class="music-vol-so" id="music-volume-label">--%</div>
+          <a href="#" id="music-volume-up-btn" class="link icon-only" title="Tăng 10%">
+            <i class="icon f7-icons">plus_circle_fill</i>
+          </a>
+          <div class="range-slider range-slider-vertical" id="music-volume-range"></div>
+          <a href="#" id="music-volume-down-btn" class="link icon-only" title="Giảm 10%">
+            <i class="icon f7-icons">minus_circle_fill</i>
+          </a>
+          <a href="#" id="music-volume-mute-btn" class="link icon-only" title="Tắt/bật tiếng">
+            <i class="icon f7-icons" id="music-volume-mute-icon">speaker_slash_fill</i>
+          </a>
+        </div>
+      </div>
+    </div>
+
+    <!-- "music-vua-man-hinh": trang vừa khít màn hình, chỉ danh sách bài cuộn
+         bên trong card (xem app.css). -->
+    <div class="page-content music-vua-man-hinh">
+      <!-- Danh sách kiểu Tidal (không khung card): chip "Kết quả tìm" (kết quả
+           tìm gần nhất, lưu RIÊNG từng máy - luuKetQuaMay) | "Yêu thích"
+           (/api/music/favorites), tiêu đề lớn + số bài/tổng thời lượng; từng dòng: ảnh vuông, tên, kênh ·
+           thời lượng, tim. Chạm 1 bài để phát - cả danh sách đang xem thành
+           hàng chờ Trước/Tiếp. CHỈ danh sách bài cuộn (app.css). -->
+      <div class="music-ds" id="music-list-card">
+        <div class="music-ds-dau">
+          <div class="music-ds-chip" id="music-tab">
+            <!-- "Đang phát" (kiểu trang phát của YouTube Music) - chỉ hiện khi có nhạc. -->
+            <button class="music-chip music-chip-dp" data-value="dang_phat" style="display:none;">Đang phát</button>
+            <button class="music-chip active" data-value="kham_pha">Khám phá</button>
+            <button class="music-chip" data-value="yeu_thich">Yêu thích <span id="music-fav-count">0</span></button>
+            <!-- Chỉ hiện khi đang có kết quả tìm (tìm bài / mở trang kênh / mở 1
+                 hàng Khám phá), canh sát phải; chạm bài để nghe thì ẩn lại. -->
+            <button class="music-chip music-chip-tim" data-value="tim" style="display:none;">Kết quả tìm</button>
+          </div>
+          <!-- Chỉ hiện khi đang MỞ 1 playlist (từ hàng thẻ trong tab Yêu thích). -->
+          <a href="#" class="link music-ds-quay-lai" id="music-pl-quay-lai" style="display:none;"><i class="icon f7-icons">chevron_left</i>Yêu thích</a>
+          <!-- Nút tròn bên phải tiêu đề: Khám phá = làm mới tất cả các hàng ngay
+               (bỏ qua đệm trên Pi); đang mở 1 playlist = ⋯ đổi tên / xoá. -->
+          <a href="#" class="link icon-only music-ds-nut-phai music-kp-lam-moi" id="music-kp-lam-moi" title="Làm mới" style="display:none;"><i class="icon f7-icons">arrow_clockwise</i></a>
+          <a href="#" class="link icon-only music-ds-nut-phai" id="music-pl-menu" title="Tuỳ chọn danh sách" style="display:none;"><i class="icon f7-icons">ellipsis</i></a>
+          <div class="music-ds-tieu-de" id="music-list-title">Kết quả tìm</div>
+          <div class="music-ds-phu" id="music-list-phu"></div>
+        </div>
+        <p id="music-search-status" class="music-ds-trang-thai" style="display:none;"></p>
+        <div id="music-results">
+          <ul class="music-ds-bai"></ul>
+        </div>
+      </div>
+
+      <!-- Khung phát nhạc - ẨN khi không có nhạc (chỉ hiện lúc đang phát/tạm
+           dừng, xem capNhatKhungPhat). 1 bố cục CSS Grid (app.css "Khung phát
+           nhạc"): điện thoại = 3 hàng (bài / tiến trình / nút) nằm dưới danh
+           sách; desktop = THANH CỐ ĐỊNH đáy cửa sổ kiểu Tidal (trái: ảnh + tên
+           + tim, giữa: nút + tiến trình, phải: âm lượng + nơi phát). -->
+      <div class="card card-outline music-player" id="music-player" style="display:none;">
+        <div class="music-player-trai">
+          <div class="music-player-anh"><i class="icon f7-icons">music_note</i><img id="music-player-anh" alt="" style="display:none;" /></div>
+          <div class="music-player-chu">
+            <div class="music-player-ten" id="music-now-playing"></div>
+            <div class="music-player-phu" id="music-player-phu"></div>
+          </div>
+          <a href="#" class="link icon-only" id="music-player-tim" title="Yêu thích">
+            <i class="icon f7-icons" id="music-player-tim-icon">heart</i>
+          </a>
+          <!-- ⋯ kiểu Tidal: menu bài đang phát (moMenuBai) + "Dừng phát". -->
+          <a href="#" class="link icon-only" id="music-player-them" title="Tuỳ chọn">
+            <i class="icon f7-icons">ellipsis</i>
+          </a>
+        </div>
+        <!-- Cụm nút giữa kiểu Tidal: Trộn · Trước · Phát · Tiếp · Lặp (không còn
+             nút Dừng đỏ - "Dừng phát" nằm trong menu ⋯ cạnh tim). -->
+        <div class="music-player-nut">
+          <a href="#" class="link icon-only music-tron" id="music-shuffle-btn" title="Trộn bài">
+            <i class="icon f7-icons">shuffle</i>
+          </a>
+          <a href="#" class="link icon-only" id="music-back-btn" title="Bài trước">
+            <i class="icon f7-icons">backward_end_fill</i>
+          </a>
+          <a href="#" class="link icon-only music-player-nut-chinh" id="music-playpause-btn" title="Phát/Tạm dừng">
+            <i class="icon f7-icons icon-play-bu" id="music-playpause-icon">play_fill</i>
+            <span class="preloader nut-tai"><span class="preloader-inner"><span class="preloader-inner-line"></span><span class="preloader-inner-line"></span><span class="preloader-inner-line"></span><span class="preloader-inner-line"></span><span class="preloader-inner-line"></span><span class="preloader-inner-line"></span><span class="preloader-inner-line"></span><span class="preloader-inner-line"></span></span></span>
+          </a>
+          <a href="#" class="link icon-only" id="music-next-btn" title="Bài tiếp theo">
+            <i class="icon f7-icons">forward_end_fill</i>
+          </a>
+          <!-- Lặp lại: tắt -> cả danh sách -> 1 bài (xem doiCheDoLap()). -->
+          <a href="#" class="link icon-only music-lap" id="music-repeat-btn" title="Lặp lại: tắt">
+            <i class="icon f7-icons" id="music-repeat-icon">repeat</i>
+          </a>
+        </div>
+        <!-- Range của F7 (kéo tua được). .range-slider có sẵn width:100% - bọc
+             trong div dùng PADDING chứ không margin trên chính nó (margin cộng
+             thêm ra ngoài 100% làm tràn card - đã gặp thật). -->
+        <div class="music-player-tien-trinh">
+          <span id="music-elapsed">0:00</span>
+          <div class="music-player-range"><div class="range-slider" id="music-progressbar"></div></div>
+          <span id="music-duration">--:--</span>
+        </div>
+        <div class="music-player-phai">
+          <a href="#" class="link icon-only" id="music-mute-btn" title="Âm lượng">
+            <i class="icon f7-icons" id="music-mute-icon">speaker_3_fill</i>
+          </a>
+          <!-- Chuyển nơi phát: Loa Pi <-> Máy này (trình duyệt/iPhone tự phát qua
+               /api/music/stream - xem webui.py). Mỗi máy nhớ riêng (localStorage). -->
+          <!-- Icon CAST (kiểu YouTube Music) - bảng chọn nơi phát: Thiết bị này / Loa
+               Pi / thiết bị khác trong Home Assistant (moChonNoiPhat). -->
+          <a href="#" class="link icon-only" id="music-output-btn" title="Chọn nơi phát"><svg class="icon-cast" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M21 3H3c-1.1 0-2 .9-2 2v3h2V5h18v14h-7v2h7c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zM1 18v3h3c0-1.66-1.34-3-3-3zm0-4v2c2.76 0 5 2.24 5 5h2c0-3.87-3.13-7-7-7zm0-4v2c4.97 0 9 4.03 9 9h2c0-6.08-4.93-11-11-11z"/></svg></a>
+          <!-- Chất lượng luồng đang phát (codec · kbps · kHz) - kiểu ô chất
+               lượng bên phải thanh phát Tidal. Xem capNhatChatLuong(). -->
+          <span class="music-chat-luong" id="music-chat-luong" style="display:none;"></span>
+        </div>
+      </div>
+
+    </div>
+
+  </div>
+</template>
+<script>
+export default (props, { $f7, $on }) => {
+  let musicTickTimer = null;
+  let musicPlayPollTimer = null;
+
+  let musicProgressRange = null;
+  let musicProgressRangeMax = null;
+  let musicSeeking = false;
+
+  // Trạng thái đọc được từ server lúc đồng bộ gần nhất - giây "elapsed" chạy
+  // mượt giữa 2 lần đồng bộ bằng cách tự cộng thêm thời gian trôi qua ở máy
+  // khách (xem tickMusicProgress), thay vì chỉ nhảy số mỗi 3 giây (giật/khựng).
+  let musicSyncElapsed = 0;
+  let musicDangTai = false;      // Máy này: đã bấm phát, chưa có tiếng (xem trangThaiMay)
+  let musicSyncTs = 0;
+  let musicState = 'stopped';
+  let musicDuration = null;
+  let musicBuffered = null;   // giây ĐÃ TẢI (vạch nhạt trên thanh tua, kiểu YouTube) - null = không biết
+
+  // m:ss, dùng cho cả elapsed lẫn duration.
+  function fmtTime(s) {
+    if (s == null || isNaN(s)) return '0:00';
+    s = Math.max(0, Math.round(s));
+    const m = Math.floor(s / 60);
+    const sec = s % 60;
+    return m + ':' + String(sec).padStart(2, '0');
+  }
+
+  // Thanh tiến trình dùng component Range của F7 (kéo tua được, khác Progressbar
+  // chỉ để xem) - tạo lại mỗi khi biết tổng thời lượng bài mới (max đổi), còn
+  // lại chỉ setValue(). Bỏ qua khi đang bị người dùng kéo tay (musicSeeking) để
+  // không giằng co giá trị với ngón tay đang kéo.
+  function ensureMusicProgressRange(elapsed, duration) {
+    const max = duration && duration > 0 ? Math.round(duration) : 1;
+    const val = Math.min(max, Math.max(0, Math.round(elapsed || 0)));
+    if (!musicProgressRange || musicProgressRangeMax !== max) {
+      if (musicProgressRange) musicProgressRange.destroy();
+      // destroy() của F7 CHỈ gỡ sự kiện, không tự xóa DOM con (range-bar/
+      // range-knob-wrap) đã chèn vào lúc create() - đã gặp lỗi thật: mỗi lần
+      // chuyển bài (thời lượng đổi -> max đổi) lại sinh thêm 1 nút kéo chồng
+      // lên nút cũ. Phải dọn sạch DOM tay trước khi tạo mới.
+      const el = document.getElementById('music-progressbar');
+      if (el) el.innerHTML = '';
+      musicProgressRangeMax = max;
+      musicProgressRange = $f7.range.create({
+        el: '#music-progressbar',
+        value: val,
+        min: 0,
+        max: max,
+        step: 1,
+        on: {
+          change(range, v) {
+            document.getElementById('music-elapsed').textContent = fmtTime(v);
+            // change() bắn cả lúc TỰ đồng bộ tiến trình phát (setValue() mỗi
+            // giây, xem updateProgressUI()) - chỉ rung lúc THẬT SỰ đang kéo
+            // tay (musicSeeking), không rung liên tục suốt lúc phát nhạc.
+            if (musicSeeking) rungNhe();
+          },
+        },
+      });
+      theoDoiCoGianThanhTua();
+      return;
+    }
+    if (!musicSeeking) {
+      musicProgressRange.setValue(val);
+    }
+  }
+
+  // F7 Range tính vị trí nút kéo theo độ rộng thanh đo LÚC TẠO (calcSize) -
+  // đổi thiết bị/tên bài làm chữ bên cạnh dài-ngắn, thanh co giãn mà F7 không
+  // đo lại -> chấm tròn lệch khỏi phần đã chạy (đã gặp: 0:26/4:56 phần chạy
+  // ~9%, chấm ở ~13%). Thanh đổi độ rộng là đo lại + đặt lại nút.
+  let quanSatThanhTua = null;
+  function theoDoiCoGianThanhTua() {
+    const el = document.getElementById('music-progressbar');
+    if (quanSatThanhTua || !el || !window.ResizeObserver) return;
+    quanSatThanhTua = new ResizeObserver(() => {
+      if (musicProgressRange && el.offsetWidth) { musicProgressRange.calcSize(); musicProgressRange.layout(); }
+    });
+    quanSatThanhTua.observe(el);
+  }
+
+  // Giây hiển thị NGAY LÚC NÀY, suy ra từ lần đồng bộ server gần nhất + thời
+  // gian đã trôi qua ở máy khách kể từ lúc đó (chỉ cộng dồn khi đang thật sự
+  // phát - đang tạm dừng thì đứng yên).
+  function displayedElapsed() {
+    if (musicState !== 'playing' || musicDangTai) return musicSyncElapsed;
+    return musicSyncElapsed + (Date.now() - musicSyncTs) / 1000;
+  }
+
+  function updateProgressUI() {
+    if (musicSeeking) return;
+    const elapsed = displayedElapsed();
+    ensureMusicProgressRange(elapsed, musicDuration);
+    veDaTai();
+    document.getElementById('music-elapsed').textContent = fmtTime(elapsed);
+    document.getElementById('music-duration').textContent = musicDuration ? fmtTime(musicDuration) : '--:--';
+  }
+
+  // Vạch nhạt "đã tải" nằm dưới phần đã phát, trong .range-bar của F7 (tạo
+  // lại mỗi lần F7 dựng lại range - xem ensureMusicProgressRange).
+  function veDaTai() {
+    const bar = document.querySelector('#music-progressbar .range-bar');
+    if (!bar) return;
+    let tai = bar.querySelector('.range-bar-tai');
+    if (!tai) {
+      tai = document.createElement('span');
+      tai.className = 'range-bar-tai';
+      bar.insertBefore(tai, bar.firstChild);
+    }
+    const pt = musicBuffered != null && musicDuration > 0 ? Math.min(100, (musicBuffered / musicDuration) * 100) : 0;
+    tai.style.width = pt + '%';
+  }
+
+  // Chạy mỗi giây giữa 2 lần gọi API (loadMusicStatus) để số giây chạy mượt,
+  // không cần chờ đồng bộ server mới thấy số đổi.
+  function tickMusicProgress() {
+    if (musicState !== 'playing') return;
+    updateProgressUI();
+  }
+
+  function updatePlayPauseIcon(state) {
+    const ic = document.getElementById('music-playpause-icon');
+    ic.textContent = state === 'playing' ? 'pause_fill' : 'play_fill';
+    ic.classList.toggle('icon-play-bu', state !== 'playing');
+  }
+
+  // ---------- Thanh âm lượng ở header "Đang phát" - âm lượng PHẦN CỨNG của
+  // Pi (dùng chung API /api/music/volume với thanh ở trang Mic & loa >
+  // "Loa"). "/api/music/status" đã có sẵn field "volume" (xem music_status()
+  // trong webui.py) - KHÔNG cần tự gọi API riêng để tải giá trị ban đầu,
+  // apDungTrangThaiNhac() bên dưới tự gọi ensureMusicHeaderVolumeRange() mỗi
+  // lần có trạng thái mới (kể cả qua SSE) - tự động bắt được cả lúc âm lượng
+  // bị đổi từ nơi khác (trang Mic & loa, chỉnh thẳng phần cứng...). Debounce
+  // 250ms tránh gọi API dồn dập lúc đang kéo, và CHẶN đồng bộ SSE đè giá trị
+  // giữa lúc đang tự kéo tay (dangKeoMusicVolume, cùng kiểu với musicSeeking
+  // của thanh tua nhạc phía dưới). ----------
+  let musicVolumeRange = null;
+  let musicVolumePopover = null;
+  let musicVolumeDebounce = null;
+  let dangKeoMusicVolume = false;
+  // Nhớ mức âm lượng NGAY TRƯỚC lúc bấm tắt tiếng - bấm lại nút mute lần nữa
+  // thì khôi phục đúng mức cũ, thay vì luôn nhảy về 1 số cố định.
+  let amLuongTruocMute = null;
+
+  // Icon loa ở hàng nút đổi theo MỨC âm lượng (0 / thấp / vừa / to), kèm số %
+  // và nút tắt/bật tiếng trong popover.
+  function capNhatIconMute(value) {
+    const v = Math.round(value || 0);
+    const icon = document.getElementById('music-mute-icon');
+    if (icon) {
+      icon.textContent = v <= 0 ? 'speaker_slash_fill' : v < 34 ? 'speaker_1_fill' : v < 67 ? 'speaker_2_fill' : 'speaker_3_fill';
+    }
+    const so = document.getElementById('music-volume-label');
+    if (so) so.textContent = v + '%';
+    const nutMute = document.getElementById('music-volume-mute-icon');
+    if (nutMute) nutMute.textContent = v > 0 ? 'speaker_slash_fill' : 'speaker_2_fill';
+  }
+
+  function ensureMusicHeaderVolumeRange(value) {
+    capNhatIconMute(value);
+    if (dangKeoMusicVolume) return;
+    if (musicVolumeRange) {
+      musicVolumeRange.setValue(value);
+      return;
+    }
+    musicVolumeRange = $f7.range.create({
+      el: '#music-volume-range',
+      value: value,
+      min: 0,
+      max: 100,
+      step: 1,
+      vertical: true,              // thanh DỌC trong popover - dưới nhỏ, trên to
+      label: false,                // số % hiện riêng phía trên (#music-volume-label)
+      // CHỈ nhận thao tác lúc chạm đúng nút tròn kéo - xem giải thích đầy đủ
+      // trong settings-common.js.
+      draggableBar: false,
+      formatLabel: (val) => Math.round(val) + '%',
+      on: {
+        change(range, val) {
+          capNhatIconMute(val);
+          rungNhe();
+          clearTimeout(musicVolumeDebounce);
+          musicVolumeDebounce = setTimeout(() => setMusicVolume(val), 250);
+        },
+      },
+    });
+  }
+
+  async function setMusicVolume(level) {
+    try {
+      await api('/api/music/volume', { method: 'POST', body: JSON.stringify({ level }) });
+    } catch (e) {
+      baoLoi(e, 'Lỗi chỉnh âm lượng: ');
+    }
+  }
+
+  // Nút tắt tiếng (mute) cạnh thanh âm lượng - đang có tiếng thì nhớ lại mức
+  // hiện tại rồi đặt về 0, đang tắt (0) thì khôi phục đúng mức đã nhớ (hoặc
+  // 50% nếu chưa từng nhớ, vd vừa mở app đã tắt tiếng luôn từ trước).
+  function toggleMuteNhac() {
+    const hienTai = musicVolumeRange ? musicVolumeRange.value : 0;
+    rungNhe();
+    const gtMoi = hienTai > 0 ? 0 : (amLuongTruocMute || 50);
+    if (hienTai > 0) amLuongTruocMute = hienTai;
+    if (musicVolumeRange) musicVolumeRange.setValue(gtMoi);
+    capNhatIconMute(gtMoi);
+    setMusicVolume(gtMoi);
+  }
+
+  // 2 icon loa cạnh thanh trượt (nhỏ = giảm, to = tăng) - bấm 1 cái chỉnh
+  // nhanh 10%, không cần kéo tay. Làm tròn về đúng bội số 10 trước khi cộng/
+  // trừ, để bấm nhiều lần liên tiếp luôn ra số tròn (10/20/30...) dù giá trị
+  // đang dở dang (vd 34%).
+  function chinhNhanhAmLuong(buoc) {
+    const hienTai = musicVolumeRange ? musicVolumeRange.value : 0;
+    const gtMoi = Math.max(0, Math.min(100, Math.round(hienTai / 10) * 10 + buoc));
+    rungNhe();
+    if (musicVolumeRange) musicVolumeRange.setValue(gtMoi);
+    capNhatIconMute(gtMoi);
+    clearTimeout(musicVolumeDebounce);
+    setMusicVolume(gtMoi);
+  }
+
+  // ---------- "Phát trên: Máy này" - trình duyệt/iPhone tự phát qua phần tử
+  // Audio (luồng m4a do Pi chuyển tiếp, /api/music/stream/<id>), hàng chờ
+  // RIÊNG của máy này. Lúc đang có bài trên máy thì mọi nút điều khiển (phát/
+  // dừng/tua/trước/tiếp) + mini player điều khiển bài trên máy; trạng thái
+  // loa Pi từ SSE chỉ còn dùng để cập nhật âm lượng. ----------
+  // KHÔNG nhớ lựa chọn: mỗi lần mở app/tải lại luôn ưu tiên phát trên MÁY
+  // NÀY (điện thoại/web) - muốn ra Loa Pi thì tự chạm icon chọn loa.
+  let cheDoPhat = 'may';
+  const loaMay = new Audio();
+  loaMay.preload = 'auto';
+  // AirPlay/Bluetooth của iOS (Safari, web app, app): phần tử phải cho phép
+  // AirPlay + nằm trong trang thì bảng chọn của iOS mới mở được cho nó.
+  loaMay.setAttribute('x-webkit-airplay', 'allow');
+  loaMay.style.display = 'none';
+  document.body.appendChild(loaMay);
+  const CO_AIRPLAY = !!window.WebKitPlaybackTargetAvailabilityEvent && typeof loaMay.webkitShowPlaybackTargetPicker === 'function';
+  const CO_CAST_TRINH_DUYET = !CO_AIRPLAY && 'remote' in loaMay;     // Chrome: Remote Playback (Chromecast)
+  // Tên nơi phát trên MÁY NÀY: đang phát qua AirPlay/cast của trình duyệt thì ghi rõ.
+  function tenMayNay() {
+    if (loaMay.webkitCurrentPlaybackTargetIsWireless) return 'AirPlay';
+    if (loaMay.remote && loaMay.remote.state === 'connected') return 'Cast';
+    return 'Máy này';
+  }
+  loaMay.addEventListener('webkitcurrentplaybacktargetiswirelesschanged', () => capNhatTuMay());
+  // iOS/Chrome không cho đọc TÊN thiết bị, chỉ báo "có thiết bị ở gần không"
+  // -> ghi dưới mục trong bảng chọn nơi phát. null = chưa biết.
+  let coThietBiGan = null, veLaiBangNoiPhat = null;
+  const datCoThietBiGan = (co) => { coThietBiGan = co; if (veLaiBangNoiPhat) veLaiBangNoiPhat(); };
+  if (CO_AIRPLAY) loaMay.addEventListener('webkitplaybacktargetavailabilitychanged', (e) => datCoThietBiGan(e.availability === 'available'));
+  else if (CO_CAST_TRINH_DUYET) loaMay.remote.watchAvailability(datCoThietBiGan).catch(() => {});
+  if (loaMay.remote) { loaMay.remote.onconnect = () => capNhatTuMay(); loaMay.remote.ondisconnect = () => capNhatTuMay(); }
+  let hangChoMay = [];
+  let hangChoGoiY = true;      // hết hàng chờ thì tự nối bài liên quan (xem 'ended')
+  let tenHangChoMay = '';      // "Đang phát từ ..." (tab Đang phát)
+  let viTriMay = -1;
+  let lanCapNhatMay = 0;
+
+  // Chế độ lặp: Máy này = theo TÀI KHOẢN (luuCaiDatTk, lưu trên Pi; 2 máy vẫn nghe
+  // riêng không lặp theo nhau); Loa Pi = CHUNG, lưu trên Pi (/api/music/repeat,
+  // .music_repeat.json), SSE đẩy về khi máy khác đổi. Nút lặp hiện/đổi đúng
+  // chế độ của nơi phát đang chọn (lapHienTai).
+  // "tat": hết danh sách thì tự gợi ý | "tat_ca": quay về bài đầu | "mot": lặp 1 bài.
+  const TEN_CHE_DO_LAP = { tat: 'Lặp lại: tắt', tat_ca: 'Lặp lại toàn danh sách', mot: 'Lặp lại 1 bài' };
+  let lapMay = 'tat';
+  try { lapMay = TEN_CHE_DO_LAP[localStorage.getItem('music_lap_may')] ? localStorage.getItem('music_lap_may') : 'tat'; } catch (e) { /* chế độ riêng tư */ }
+  // Đăng nhập máy khác/tài khoản khác: lấy chế độ lặp "Máy này" của tài khoản từ Pi.
+  $f7.on('caiDatTk', (doi) => {
+    if (TEN_CHE_DO_LAP[doi.music_lap_may] && doi.music_lap_may !== lapMay) { lapMay = doi.music_lap_may; if (cheDoPhat === 'may') apDungCheDoLap(); }
+  });
+  let lapPi = 'tat';
+  // Vừa bấm đổi lặp của Loa Pi: SSE (vòng 2s) có thể còn đẩy về giá trị CŨ của
+  // lần bấm trước -> ghi đè lựa chọn mới (đã gặp khi bấm nhanh). Bỏ qua lúc đó.
+  let lapDoiLuc = 0;
+
+  // Trộn bài (nút thanh phát kiểu Tidal): xáo các bài SẮP phát, bài đang nghe
+  // giữ nguyên; tắt = về thứ tự cũ. Máy này: tại chỗ (hangChoGocMay giữ thứ
+  // tự gốc, phát danh sách mới thì hết trộn). Loa Pi: /api/music/shuffle,
+  // trạng thái "tron" về theo SSE.
+  let tronMay = false;
+  let hangChoGocMay = null;
+  let tronPi = false;
+  let tronDoiLuc = 0;
+
+  function tronHienTai() { return cheDoPhat === 'may' ? tronMay : tronPi; }
+
+  function apDungTron() {
+    const nut = document.getElementById('music-shuffle-btn');
+    if (!nut) return;
+    nut.classList.toggle('dang-bat', tronHienTai());
+    nut.title = tronHienTai() ? 'Trộn bài: bật' : 'Trộn bài: tắt';
+    window.dispatchEvent(new CustomEvent('nhac-tron', { detail: tronHienTai() }));
+  }
+
+  function nhanTronTuPi(t) {
+    if (Date.now() - tronDoiLuc <= 5000 || !!t === tronPi) return;
+    tronPi = !!t;
+    apDungTron();
+  }
+
+  function datLaiTronMay() {
+    tronMay = false;
+    hangChoGocMay = null;
+    apDungTron();
+  }
+
+  async function doiTron() {
+    rungNhe();
+    const bat = !tronHienTai();
+    if (cheDoPhat === 'may') {
+      if (!dangPhatTrenMay()) { $f7.toast.show({ text: 'Chưa có bài nào đang phát', closeTimeout: 1500 }); return; }
+      const hienTai = hangChoMay[viTriMay];
+      if (bat) {
+        hangChoGocMay = hangChoMay.slice();
+        const sau = hangChoMay.slice(viTriMay + 1);
+        for (let k = sau.length - 1; k > 0; k--) {
+          const r = Math.floor(Math.random() * (k + 1));
+          [sau[k], sau[r]] = [sau[r], sau[k]];
+        }
+        hangChoMay = hangChoMay.slice(0, viTriMay + 1).concat(sau);
+      } else if (hangChoGocMay) {
+        // Bài gợi ý nối thêm lúc đang trộn (không có trong gốc) giữ ở cuối.
+        const coGoc = new Set(hangChoGocMay.map((b) => b.id));
+        hangChoMay = hangChoGocMay.concat(hangChoMay.filter((b) => !coGoc.has(b.id)));
+        const k = hangChoMay.findIndex((b) => hienTai && b.id === hienTai.id);
+        if (k >= 0) viTriMay = k;
+        hangChoGocMay = null;
+      }
+      tronMay = bat;
+      taiTruoc([hangChoMay[viTriMay + 1], hangChoMay[viTriMay + 2]]);
+    } else {
+      const truoc = tronPi;
+      tronDoiLuc = Date.now();
+      tronPi = bat;
+      try {
+        const kq = await api('/api/music/shuffle', { method: 'POST', body: JSON.stringify({ bat }) });
+        if (!kq.ok) { tronPi = truoc; apDungTron(); $f7.toast.show({ text: 'Chưa có bài nào đang phát', closeTimeout: 1500 }); return; }
+      } catch (e) {
+        tronPi = truoc;
+        apDungTron();
+        baoLoi(e);
+        return;
+      }
+    }
+    apDungTron();
+    $f7.toast.show({ text: bat ? 'Trộn bài: bật' : 'Trộn bài: tắt', closeTimeout: 1500, position: 'center' });
+    veHangCho();
+  }
+
+  function lapHienTai() { return cheDoPhat === 'may' ? lapMay : lapPi; }
+
+  function nhanCheDoLapTuPi(m) {
+    if (!TEN_CHE_DO_LAP[m] || m === lapPi || Date.now() - lapDoiLuc <= 5000) return;
+    lapPi = m;
+    apDungCheDoLap();
+  }
+
+  function apDungCheDoLap() {
+    const m = lapHienTai();
+    const nut = document.getElementById('music-repeat-btn');
+    if (nut) {
+      nut.classList.toggle('dang-bat', m !== 'tat');
+      nut.title = TEN_CHE_DO_LAP[m];
+      document.getElementById('music-repeat-icon').textContent = m === 'mot' ? 'repeat_1' : 'repeat';
+    }
+    window.dispatchEvent(new CustomEvent('nhac-lap', { detail: m }));
+  }
+
+  async function doiCheDoLap() {
+    const moi = { tat: 'tat_ca', tat_ca: 'mot', mot: 'tat' }[lapHienTai()];
+    rungNhe();
+    $f7.toast.show({ text: TEN_CHE_DO_LAP[moi], closeTimeout: 1500, position: 'center' });
+    if (cheDoPhat === 'may') {
+      lapMay = moi;
+      luuCaiDatTk('music_lap_may', moi);     // lưu theo tài khoản trên Pi
+      apDungCheDoLap();
+      return;
+    }
+    const truoc = lapPi;
+    lapDoiLuc = Date.now();
+    lapPi = moi;
+    apDungCheDoLap();
+    try {
+      await api('/api/music/repeat', { method: 'POST', body: JSON.stringify({ lap: moi }) });
+    } catch (e) {
+      lapPi = truoc;
+      apDungCheDoLap();
+      baoLoi(e);
+    }
+  }
+
+
+  // Trạng thái Loa Pi gần nhất (SSE/API) - để chuyển tiếp sang "Máy này".
+  let trangThaiPiCuoi = null;
+  // Mã MÁY này (mỗi điện thoại / app / web app 1 mã, lưu trên máy). Gửi kèm khi
+  // phát ra Loa Pi/thiết bị khác; trạng thái Pi do MÁY KHÁC phát thì coi như
+  // không có gì - 2 điện thoại dùng độc lập, không hiện/điều khiển bài của
+  // nhau. Nhạc bật bằng giọng nói (không chủ) vẫn hiện ở mọi máy.
+  const MAY_ID = (() => {
+    let id = '';
+    try { id = localStorage.getItem('voicebot_may_id') || ''; } catch (e) { /* riêng tư */ }
+    if (!id) {
+      id = 'm' + Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4);
+      try { localStorage.setItem('voicebot_may_id', id); } catch (e) { /* riêng tư */ }
+    }
+    return id;
+  })();
+  function locTrangThaiPi(d) {
+    if (d && d.chu && d.chu !== MAY_ID) {
+      return { state: 'stopped', title: null, elapsed: null, duration: null, lap: d.lap, volume: d.volume, cuaMayKhac: true };
+    }
+    return d;
+  }
+  let noiPhatTen = 'Loa Pi';     // nơi Pi đang phát ra: "Loa Pi" hoặc tên thiết bị cast (Mi Box...)
+  let noiPhatEntity = '';
+  let dangChuyenSangPi = null;
+  let giuChoMini = false;   // {id,title,duration,elapsed,han} lúc đang chuyển Máy này -> Pi
+  let piDongBoLuc = 0;
+  // Pi tự giành nơi phát (xem nhoTrangThaiPi) - Pi dừng hẳn thì trả về Máy này.
+  let piTuGianh = false;
+
+  function nhoTrangThaiPi(data) {
+    const truoc = trangThaiPiCuoi;
+    noiPhatTen = data.noi_phat || 'Loa Pi';
+    nhanTronTuPi(data.tron);
+    trangThaiPiCuoi = data;
+    piDongBoLuc = Date.now();
+    // Pi vừa BẮT ĐẦU phát bài mới mà KHÔNG do máy này chuyển sang (vd ra lệnh
+    // bằng giọng nói "phát nhạc yêu thích"): trước đây máy này còn giữ bài
+    // "Máy này" (đang phát/tạm dừng) nên bỏ qua hẳn trạng thái Pi - khung phát
+    // không đổi, nút bấm vẫn điều khiển bài trên máy, không điều khiển được
+    // Pi. Giờ Pi giành quyền: thả bài trên máy, chuyển nơi phát sang Loa Pi.
+    const piVuaPhat = data.state === 'playing' && !!data.title &&
+      !(truoc && truoc.state === 'playing' && truoc.title === data.title);
+    // Máy này ĐANG phát (có tiếng) thì giữ nguyên - người khác/điện thoại khác
+    // gửi nhạc ra Loa Pi không được cắt ngang người đang nghe riêng.
+    const mayDangNghe = dangPhatTrenMay() && !loaMay.paused;
+    if (piVuaPhat && cheDoPhat === 'may' && !dangChuyenSangPi && !mayDangNghe) {
+      if (dangPhatTrenMay()) dungTrenMay();
+      chonCheDoPhat('pi');
+      piTuGianh = true;
+    } else if (piTuGianh && data.state === 'stopped') {
+      piTuGianh = false;
+      if (cheDoPhat === 'pi' && !dangPhatTrenMay()) chonCheDoPhat('may');
+    }
+  }
+
+  function dangPhatTrenMay() {
+    return viTriMay >= 0 && !!loaMay.getAttribute('src');
+  }
+
+  // Trình duyệt tự tải trước: lấy đoạn đã tải chứa vị trí đang phát.
+  function giayDaTaiMay() {
+    const b = loaMay.buffered, t = loaMay.currentTime || 0;
+    try {
+      for (let i = 0; i < b.length; i++) {
+        if (b.start(i) <= t + 0.5 && t <= b.end(i) + 0.5) return (dangMp3 ? mp3BuDau : 0) + b.end(i);
+      }
+    } catch (e) { /* chưa có dữ liệu */ }
+    return null;
+  }
+
+  function trangThaiMay() {
+    const bai = hangChoMay[viTriMay] || {};
+    const coBai = dangPhatTrenMay();
+    return {
+      state: !coBai ? 'stopped' : (loaMay.paused ? 'paused' : 'playing'),
+      // Đã bấm phát nhưng CHƯA có tiếng (Pi đang lấy link YouTube ~2-3s + tải
+      // đoạn đầu): báo "Đang tải…" và đứng yên thời gian - trước đây vẫn báo
+      // "đang phát" nên đồng hồ chạy trong im lặng vài giây rồi mới có tiếng.
+      dangTai: coBai && !loaMay.paused && loaMay.readyState < 3,
+      title: bai.title || '',
+      elapsed: giayMay(),
+      // Ưu tiên thời lượng YouTube: iPhone tự ĐOÁN độ dài file m4a phân mảnh
+      // và có thể sai (đo thật: bài 5:59 báo 11:57 - metadata file vẫn đúng 358.6s).
+      duration: bai.duration || (!dangMp3 && isFinite(loaMay.duration) && loaMay.duration > 0 ? loaMay.duration : null),
+      buffered: giayDaTaiMay(),
+      id: bai.id || null,
+      trenMay: true,
+      tenMay: tenMayNay(),
+    };
+  }
+
+  // Vẽ lại khung phát + báo mini player (mini-player.js nghe "nhac-tren-may").
+  function capNhatTuMay() {
+    const st = trangThaiMay();
+    apDungTrangThaiNhac(st);
+    if (!dangChuyenSangPi) window.dispatchEvent(new CustomEvent('nhac-tren-may', { detail: st }));
+  }
+
+  function capNhatMediaSession(bai) {
+    if (!('mediaSession' in navigator) || !bai) return;
+    try {
+      navigator.mediaSession.metadata = new MediaMetadata({
+        title: bai.title || '',
+        artist: bai.channel || 'Voicebot',
+        artwork: [{ src: 'https://i.ytimg.com/vi/' + encodeURIComponent(bai.id) + '/mqdefault.jpg', sizes: '320x180', type: 'image/jpeg' }],
+      });
+    } catch (e) { /* trình duyệt cũ */ }
+  }
+
+  // Bài RẤT DÀI (> 3 tiếng, vd nhạc piano 25 tiếng - file AAC 1.5GB): MP4 phân
+  // mảnh của YouTube có bảng mục lục khổng lồ ở đầu, iPhone đọc thử mãi không
+  // phát được (log thật: xin lại luồng mỗi 2s) -> Pi BÓC tiếng AAC ra khỏi vỏ
+  // MP4 (/api/music/stream_aac - không mã hoá lại, giữ chất lượng). Bài thường
+  // mà 12s vẫn chưa phát được cũng tự chuyển sang luồng này. Tua = xin luồng
+  // mới từ giây đó (?ss=), vị trí = mp3BuDau + currentTime.
+  const BAI_RAT_DAI = 3 * 3600;
+  let dangMp3 = false;
+  let mp3BuDau = 0;
+  let henMp3 = null;
+  function giayMay() { return (dangMp3 ? mp3BuDau : 0) + (loaMay.currentTime || 0); }
+  function choiMay() {
+    loaMay.play().catch((e) => {
+      if (e && e.name !== 'AbortError') baoLoi(e, 'Không phát được trên máy này: ');
+    });
+  }
+  function moLuongMp3(bai, tuGiay) {
+    dangMp3 = true;
+    mp3BuDau = Math.max(0, Math.floor(tuGiay || 0));
+    loaMay.src = '/api/music/stream_aac/' + encodeURIComponent(bai.id) + (mp3BuDau ? '?ss=' + mp3BuDau : '');
+    choiMay();
+  }
+  function tuaTrenMay(giay) {
+    if (dangMp3) { moLuongMp3(hangChoMay[viTriMay], giay); capNhatTuMay(); }
+    else loaMay.currentTime = giay;
+  }
+
+  function phatBaiTrenMay(i, batDauTu) {
+    if (i < 0 || i >= hangChoMay.length) {
+      $f7.toast.show({ text: 'Đã hết danh sách.', closeTimeout: 1500 });
+      return false;
+    }
+    viTriMay = i;
+    const bai = hangChoMay[i];
+    clearTimeout(henMp3);
+    taiTruoc([hangChoMay[i + 1], hangChoMay[i + 2]]);
+    ghiLichSuMay(bai);
+    if ((bai.duration || 0) > BAI_RAT_DAI) {
+      moLuongMp3(bai, batDauTu);
+    } else {
+      dangMp3 = false;
+      mp3BuDau = 0;
+      loaMay.src = '/api/music/stream/' + encodeURIComponent(bai.id);
+      if (batDauTu > 0) {
+        // Chuyển tiếp từ Loa Pi giữa bài - tua tới đúng giây khi đã biết thời lượng.
+        const tua = () => { loaMay.removeEventListener('loadedmetadata', tua); loaMay.currentTime = batDauTu; };
+        loaMay.addEventListener('loadedmetadata', tua);
+      }
+      choiMay();
+      henMp3 = setTimeout(() => {
+        if (viTriMay === i && hangChoMay[i] === bai && !dangMp3 && !loaMay.paused && loaMay.readyState < 3) {
+          console.warn('[nhạc] AAC 12s chưa phát được -> chuyển luồng MP3');
+          moLuongMp3(bai, batDauTu || 0);
+          capNhatTuMay();
+        }
+      }, 12000);
+    }
+    capNhatMediaSession(bai);
+    capNhatTuMay();
+    return true;
+  }
+
+  // ---------- Bảng chọn NƠI PHÁT kiểu YouTube Music (icon cast) ----------
+  // Đầu: bài đang phát. Thiết bị này | Loa Pi | AirPlay và Bluetooth (bảng chọn
+  // của iOS) / Cast từ trình duyệt (Chrome). Không lấy thiết bị từ Home Assistant.
+  // Máy tính: popover cạnh nút; điện thoại: màn tối toàn trang.
+  function moChonNoiPhat(nutGoc) {
+    const rong = !!nutGoc && window.innerWidth >= 630;
+    const modal = rong
+      ? $f7.popover.create({ targetEl: nutGoc, content: '<div class="popover music-menu-bai music-noi-phat"><div class="popover-inner"><div class="mmb-vung"></div></div></div>', on: { closed: (m) => m.destroy() } })
+      : $f7.popup.create({ swipeToClose: 'to-bottom', content: '<div class="popup music-menu-bai music-menu-bai-dt music-noi-phat"><div class="mmb-vung"></div><a href="#" class="mmb-huy" title="Đóng" aria-label="Đóng"><i class="icon f7-icons">xmark</i></a></div>', on: { closed: (m) => m.destroy() } });
+    const vung = modal.el.querySelector('.mmb-vung');
+    const daChon = (hd) => (hd === 'may' ? cheDoPhat === 'may'
+      : cheDoPhat !== 'may' && (hd === 'pi' ? !noiPhatEntity : hd === 'ha:' + noiPhatEntity));
+    // Thiết bị trong Home Assistant (Phicomm, Nest Hub, Mi Box...): Pi đẩy nhạc
+    // thẳng tới loa - thấy giống nhau trên Chrome/app Mac/app iOS (AirPlay của
+    // máy chỉ có ở iOS, Cast trình duyệt chỉ có ở Chrome). null = đang tải.
+    let dsHa = null, loiHa = '';
+    const TEN_TT_HA = { off: 'Đang tắt', playing: 'Đang phát', paused: 'Tạm dừng', standby: 'Chờ' };
+    const iconHa = (t) => (t.loai === 'tv' || /tv|box|display/i.test(t.ten) ? 'tv' : 'hifispeaker');
+    const muc = (hd, icon, ten, phu) => htmlMucMenu(hd, icon, ten,
+      (phu ? '<em>' + esc(phu) + '</em>' : '') + (daChon(hd) ? '<i class="icon f7-icons mmb-con mmb-chon">checkmark_alt</i>' : ''));
+    const ve = () => {
+      const bai = baiKhungPhat;
+      const ganDay = coThietBiGan === null ? '' : coThietBiGan ? 'Có thiết bị ở gần' : 'Không thấy thiết bị';
+      vung.innerHTML =
+        (bai ? '<div class="mmb-nhom">Đang phát</div><div class="mmb-dau"><span class="mmb-anh" style="background-image:url(\'https://i.ytimg.com/vi/' + encodeURIComponent(bai.id) + '/hqdefault.jpg\')"></span>' +
+          '<div class="mmb-chu"><div class="mmb-ten">' + esc(bai.title) + '</div><div class="mmb-phu">' + esc(bai.channel || '') + '</div></div></div>' : '') +
+        '<div class="mmb-ds">' + muc('may', 'device_phone_portrait', 'Thiết bị này') + muc('pi', 'hifispeaker_fill', 'Loa Pi') +
+          // Có sẵn trong máy, không cần Pi/HA (dùng được cả khi đi nhà khác):
+          (CO_AIRPLAY ? muc('airplay', 'antenna_radiowaves_left_right', 'AirPlay và Bluetooth', ganDay) : '') +
+          (CO_CAST_TRINH_DUYET ? muc('cast_trinh_duyet', 'tv', 'Cast từ trình duyệt', ganDay) : '') + '</div>' +
+        '<div class="mmb-nhom">Thiết bị trong nhà</div><div class="mmb-ds">' +
+          (dsHa === null ? '<div class="mmb-phu mmb-ha-cho">Đang tìm thiết bị…</div>'
+            : !dsHa.length ? '<div class="mmb-phu mmb-ha-cho">' + esc(loiHa || 'Không có thiết bị nào') + '</div>'
+            : dsHa.map((t) => muc('ha:' + t.entity, iconHa(t), t.ten, TEN_TT_HA[t.state] || '')).join('')) + '</div>';
+      if (rong && modal.opened) modal.resize();
+    };
+    ve();
+    api('/api/music/thiet_bi').then((r) => {
+      dsHa = r.ha || [];
+      loiHa = r.loi ? 'Không lấy được thiết bị từ Home Assistant' : '';
+      const np = r.noi_phat || {};
+      noiPhatEntity = np.loai === 'ha' ? (np.entity || '') : '';
+      ve();
+    }).catch(() => { dsHa = []; loiHa = 'Không lấy được thiết bị từ Home Assistant'; ve(); });
+    veLaiBangNoiPhat = ve;
+    modal.on('close', () => { if (veLaiBangNoiPhat === ve) veLaiBangNoiPhat = null; });
+    modal.el.addEventListener('click', (e) => {
+      if (e.target.closest('.mmb-huy')) { e.preventDefault(); modal.close(); return; }
+      const a = e.target.closest('[data-hd]');
+      if (!a) return;
+      e.preventDefault();
+      const hd = a.dataset.hd;
+      const ten = (a.querySelector('span') || {}).textContent || '';
+      if (hd === 'airplay' || hd === 'cast_trinh_duyet') {
+        // Bảng chọn của iOS/Chrome phải mở NGAY trong lúc chạm. Đang phát ở Pi/
+        // thiết bị khác thì chuyển về máy này trước (vẫn trong lúc chạm).
+        rungNhe();
+        if (cheDoPhat !== 'may') chonCheDoPhat('may', true);
+        modal.close();
+        moBangChonCuaMay(hd);
+        return;
+      }
+      modal.close();
+      chonNoiPhat(hd, ten);        // chạy NGAY trong lúc chạm (iOS cần cho play() khi chọn Thiết bị này)
+    });
+    modal.open();
+  }
+
+  // AirPlay/Bluetooth (bảng chọn của iOS) hoặc Chromecast của Chrome - nhạc
+  // vẫn phát từ MÁY NÀY (kéo từ Pi như thường), chỉ đổi đường ra loa.
+  function moBangChonCuaMay(hd) {
+    try {
+      if (hd === 'airplay') { loaMay.webkitShowPlaybackTargetPicker(); return; }
+      if (!loaMay.getAttribute('src')) { $f7.toast.show({ text: 'Hãy phát 1 bài trên máy này trước', closeTimeout: 2000 }); return; }
+      loaMay.remote.prompt().catch((e) => {
+        if (e && e.name !== 'AbortError') $f7.toast.show({ text: 'Không tìm thấy thiết bị cast nào', closeTimeout: 2000 });
+      });
+    } catch (e) { baoLoi(e); }
+  }
+
+  async function chonNoiPhat(hd, ten) {
+    rungNhe();
+    if (hd === 'may') { if (cheDoPhat !== 'may') chonCheDoPhat('may', true); return; }
+    const body = hd === 'pi' ? { loai: 'pi' } : { loai: 'ha', entity: hd.slice(3), ten };
+    const tenMoi = hd === 'pi' ? 'Loa Pi' : ten;
+    // Đang phát ở Pi/thiết bị khác -> giữ khung phát ("Đang chuyển sang ...")
+    // trong lúc Pi dừng nơi cũ + bắt đầu nơi mới, không chớp tắt.
+    if (cheDoPhat !== 'may' && baiKhungPhat && musicState !== 'stopped') {
+      dangChuyenSangPi = { id: baiKhungPhat.id, title: baiKhungPhat.title, duration: baiKhungPhat.duration,
+        elapsed: displayedElapsed(), han: Date.now() + 25000, noi: tenMoi };
+      danhDauBaiDangPhat();          // vòng xoay ở nút play ngay lúc bấm chọn
+    }
+    try {
+      const r = await api('/api/music/noi_phat', { method: 'POST', body: JSON.stringify(body) });
+      noiPhatEntity = (r.noi_phat || {}).entity || '';
+      noiPhatTen = hd === 'pi' ? 'Loa Pi' : ten;
+    } catch (e) { baoLoi(e); return; }
+    if (cheDoPhat === 'may') chonCheDoPhat('pi', true);      // Máy này -> nơi mới: chuyển tiếp đúng bài, đúng giây
+    else { chonCheDoPhat('pi', false); $f7.toast.show({ text: 'Phát trên: ' + noiPhatTen, closeTimeout: 1500 }); loadMusicStatus(); }
+  }
+
+  // Nhờ Pi lấy SẴN link YouTube (/api/music/prefetch) cho bài sắp phát - khỏi
+  // chờ yt-dlp (~2s) lúc bấm. Cả Máy này lẫn Loa Pi (Pi dùng lại link đó).
+  const daTaiTruoc = {};
+  function taiTruoc(dsBai) {
+    // Mỗi bài tối đa 1 lần / 20 phút (rê chuột qua lại không gửi dồn dập).
+    const ids = dsBai.filter((b) => b && b.id && !(daTaiTruoc[b.id] > Date.now() - 20 * 60 * 1000)).map((b) => b.id);
+    if (!ids.length) return;
+    ids.forEach((id) => { daTaiTruoc[id] = Date.now(); });
+    fetch('/api/music/prefetch', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ids }) }).catch(() => {});
+  }
+
+  // Máy tính: rê chuột lên thẻ/dòng ~150ms là lấy trước link (thường người dùng
+  // rê tới rồi mới bấm, ~0.5-1s) - lúc bấm Pi đã có sẵn, phát gần như ngay.
+  function ganTaiTruocKhiRe(el, bai) {
+    let hen = null;
+    el.addEventListener('mouseenter', () => { hen = setTimeout(() => taiTruoc([bai]), 150); });
+    el.addEventListener('mouseleave', () => clearTimeout(hen));
+  }
+
+  function dungTrenMay() {
+    clearTimeout(henMp3);
+    dangMp3 = false;
+    mp3BuDau = 0;
+    loaMay.pause();
+    loaMay.removeAttribute('src');
+    loaMay.load();
+    viTriMay = -1;
+    if ('mediaSession' in navigator) navigator.mediaSession.metadata = null;
+    capNhatTuMay();
+  }
+
+  function chuyenBaiTrenMay(tien) {
+    if (tien) {
+      if (viTriMay + 1 >= hangChoMay.length && lapMay === 'tat_ca') return phatBaiTrenMay(0);
+      return phatBaiTrenMay(viTriMay + 1);
+    }
+    // "Bài trước": đã nghe > 3s thì về đầu bài (giống trình phát nhạc thường).
+    if (giayMay() > 3 || viTriMay === 0) { tuaTrenMay(0); return true; }
+    return phatBaiTrenMay(viTriMay - 1);
+  }
+
+  // Luồng bị đứt giữa chừng làm thẻ audio hỏng hẳn (bấm phát báo "The element
+  // has no supported sources") -> mở lại đúng bài từ giây đang nghe. Tối đa 2
+  // lần/bài để link hỏng thật không lặp mãi.
+  let khoiPhucMay = { bai: null, lan: 0 };
+  function thuKhoiPhucMay() {
+    const bai = hangChoMay[viTriMay];
+    if (!bai) return false;
+    if (khoiPhucMay.bai !== bai) khoiPhucMay = { bai, lan: 0 };
+    if (++khoiPhucMay.lan > 2) return false;
+    const giay = giayMay();
+    console.warn('[nhạc] Luồng hỏng -> mở lại bài từ giây', Math.round(giay));
+    phatBaiTrenMay(viTriMay, giay);
+    return true;
+  }
+
+  function batTatTrenMay() {
+    if (loaMay.paused) {
+      loaMay.play().catch((e) => {
+        if (e && e.name === 'NotSupportedError' && thuKhoiPhucMay()) return;
+        baoLoi(e, 'Không phát được: ');
+      });
+    } else loaMay.pause();
+  }
+
+  ['play', 'pause', 'loadedmetadata', 'waiting', 'playing', 'canplay', 'progress'].forEach((ten) => loaMay.addEventListener(ten, capNhatTuMay));
+  loaMay.addEventListener('timeupdate', () => {
+    // iPhone đoán sai độ dài (gấp đôi) -> hết tiếng ở đúng thời lượng thật
+    // nhưng 'ended' không tới, đồng hồ chạy tiếp trong im lặng. Đã quá thời
+    // lượng YouTube (làm tròn giây -> +1s cho chắc) thì tự coi là hết bài.
+    const bai = hangChoMay[viTriMay];
+    if (bai && bai.duration && !loaMay.paused && giayMay() >= bai.duration + 1 && daHetBaiMay !== bai) {
+      daHetBaiMay = bai;
+      hetBaiTrenMay();
+      return;
+    }
+    if (Date.now() - lanCapNhatMay < 1000) return;   // ~1 lần/giây là đủ
+    lanCapNhatMay = Date.now();
+    capNhatTuMay();
+  });
+  // Hết bài: sang bài kế; hết hàng chờ (kể cả Yêu thích/danh sách tự tạo)
+  // thì nối bài LIÊN QUAN rồi phát tiếp - kiểu
+  // "radio" của Tidal (/api/music/related, YouTube Mix của bài cuối).
+  let daHetBaiMay = null;    // bài đã xử lý "hết bài" (timeupdate hoặc 'ended') - không sang bài 2 lần
+  loaMay.addEventListener('ended', () => {
+    const bai = hangChoMay[viTriMay];
+    if (bai && daHetBaiMay === bai) return;
+    daHetBaiMay = bai || null;
+    hetBaiTrenMay();
+  });
+  loaMay.addEventListener('playing', () => { if (giayMay() < 2) daHetBaiMay = null; });
+  async function hetBaiTrenMay() {
+    if (lapMay === 'mot') { daHetBaiMay = null; tuaTrenMay(0); loaMay.play().catch(() => {}); return; }
+    if (viTriMay + 1 < hangChoMay.length) { phatBaiTrenMay(viTriMay + 1); return; }
+    if (lapMay === 'tat_ca' && hangChoMay.length) { phatBaiTrenMay(0); return; }
+    const cuoi = hangChoMay[hangChoMay.length - 1];
+    if (!hangChoGoiY || !cuoi) { dungTrenMay(); return; }
+    try {
+      const bo = hangChoMay.map((b) => b.id).join(',');
+      const data = await api('/api/music/related?id=' + encodeURIComponent(cuoi.id) + '&bo_qua=' + encodeURIComponent(bo));
+      const them = data.results || [];
+      if (!them.length) { dungTrenMay(); return; }
+      hangChoMay = hangChoMay.concat(them);
+      phatBaiTrenMay(viTriMay + 1);
+    } catch (e) {
+      dungTrenMay();
+    }
+  }
+  loaMay.addEventListener('error', () => {
+    if (!dangPhatTrenMay()) return;
+    if (loaMay.currentTime > 0 && thuKhoiPhucMay()) return;    // đứt giữa bài
+    datBaiDangMo(null);
+    baoLoi(new Error('Pi không lấy được luồng bài này'), 'Lỗi phát trên máy: ');
+  });
+  if ('mediaSession' in navigator) {
+    const ms = navigator.mediaSession;
+    const dat = (ten, fn) => { try { ms.setActionHandler(ten, fn); } catch (e) { /* không hỗ trợ */ } };
+    dat('play', () => loaMay.play());
+    dat('pause', () => loaMay.pause());
+    dat('nexttrack', () => chuyenBaiTrenMay(true));
+    dat('previoustrack', () => chuyenBaiTrenMay(false));
+    dat('seekto', (d) => { if (d && d.seekTime != null) tuaTrenMay(d.seekTime); });
+  }
+  // Lệnh từ mini player / trình phát mở rộng (mini-player.js) - dùng ĐÚNG
+  // các hàm của trang này nên tự biết đang phát trên Loa Pi hay Máy này.
+  window.addEventListener('nhac-lenh', (e) => {
+    const d = e.detail || {};
+    if (d.lenh === 'playpause') togglePlayPause();
+    else if (d.lenh === 'next') skipMusic('/api/music/next');
+    else if (d.lenh === 'back') skipMusic('/api/music/back');
+    else if (d.lenh === 'stop') stopMusic();
+    else if (d.lenh === 'seek') seekMusic(d.giay);
+    else if (d.lenh === 'noi-phat') moChonNoiPhat(null);
+    else if (d.lenh === 'tim' && baiKhungPhat) doiYeuThich(baiKhungPhat);
+    else if (d.lenh === 'lap') doiCheDoLap();
+    else if (d.lenh === 'tron') doiTron();
+    else if (d.lenh === 'chia-se' && baiKhungPhat) chiaSeBai(baiKhungPhat);
+    else if (d.lenh === 'menu' && baiKhungPhat) moMenuBai(baiKhungPhat, d.nut, true);
+  });
+
+  function chonCheDoPhat(cheDo, luu) {
+    cheDoPhat = cheDo;
+    if (luu) piTuGianh = false;
+    const nut = document.getElementById('music-output-btn');
+    nut.title = 'Đang phát trên: ' + (cheDo === 'may' ? 'Máy này' : noiPhatTen) + ' - chạm để chọn thiết bị';
+    // Phát ở NƠI KHÁC (Loa Pi / thiết bị cast) = icon cast màu chủ đề, như YouTube Music.
+    nut.classList.toggle('dang-cast', cheDo !== 'may');
+    apDungCheDoLap();
+    apDungTron();
+    if (luu) {
+      $f7.toast.show({ text: 'Phát trên: ' + (cheDo === 'may' ? 'Máy này' : noiPhatTen), closeTimeout: 1500 });
+    }
+    if (luu) chuyenTiepKhiDoiNoiPhat(cheDo);
+  }
+
+  // Đang phát mà đổi nơi phát -> CHUYỂN TIẾP đúng bài, đúng giây (không phải
+  // dừng hẳn rồi chọn lại bài). iOS chỉ cho phát âm thanh khi play() chạy
+  // NGAY trong lúc chạm -> Loa Pi -> Máy này phải bắt đầu phát trên máy TRƯỚC
+  // (dùng id bài + vị trí đã biết từ trạng thái Pi gần nhất), lấy hàng chờ
+  // đầy đủ + dừng loa Pi sau, ở nền.
+  function chuyenTiepKhiDoiNoiPhat(cheDo) {
+    if (cheDo === 'may') {
+      const pi = trangThaiPiCuoi;
+      if (dangPhatTrenMay() || !pi || pi.state === 'stopped' || !pi.id) return;
+      const viTri = pi.state === 'playing' ? pi.elapsed + (Date.now() - piDongBoLuc) / 1000 : pi.elapsed;
+      hangChoMay = [{ id: pi.id, title: pi.title, duration: pi.duration }];
+      phatBaiTrenMay(0, viTri || 0);
+      if (pi.state === 'paused') loaMay.pause();
+      (async () => {
+        try {
+          const q = await api('/api/music/queue');
+          const ds = Array.isArray(q.entries) ? q.entries : [];
+          const i = Number(q.index);
+          if (ds[i] && ds[i].id === pi.id) {      // ghép cả hàng chờ của Pi để Trước/Tiếp đi tiếp
+            hangChoMay = ds;
+            viTriMay = i;
+            tenHangChoMay = q.query || '';
+          }
+          hangChoGoiY = q.goi_y !== false;
+          await api('/api/music/stop', { method: 'POST' });
+        } catch (e) {
+          baoLoi(e, 'Lỗi chuyển sang máy này: ');
+        }
+      })();
+      return;
+    }
+    // Máy này -> Loa Pi: gửi hàng chờ + vị trí hiện tại cho Pi phát tiếp,
+    // không đọc lại câu "Đang phát..." (thong_bao: false).
+    if (!dangPhatTrenMay()) return;
+    const ds = hangChoMay.slice();
+    const i = viTriMay;
+    const viTri = giayMay();
+    const dangTamDung = loaMay.paused;
+    // Giữ khung phát trong lúc Pi lấy bài (~3-5s) - không thì vừa dừng trên
+    // máy là khung ẩn đi rồi mới hiện lại khi Pi phát (đã gặp).
+    if (!dangTamDung && ds[i]) {
+      dangChuyenSangPi = { id: ds[i].id, title: ds[i].title, duration: ds[i].duration, elapsed: viTri, han: Date.now() + 25000, noi: noiPhatTen };
+    }
+    dungTrenMay();
+    if (dangTamDung) return;               // đang tạm dừng trên máy thì chỉ dừng hẳn
+    $f7.toast.show({ text: 'Đang chuyển sang ' + noiPhatTen + '...', closeTimeout: 2000 });
+    api('/api/music/play_item', {
+      method: 'POST',
+      body: JSON.stringify({ query: tenHangChoMay || 'Máy này', index: i, entries: ds, bat_dau_tu: viTri, thong_bao: false, goi_y: hangChoGoiY, may_id: MAY_ID }),
+    }).then(() => setTimeout(loadMusicStatus, 4000)).catch((e) => baoLoi(e, 'Lỗi chuyển sang Loa Pi: '));
+  }
+
+  // ---------- Khung phát (#music-player): ẨN khi không có nhạc; tên bài, ảnh
+  // bìa, dòng phụ (kênh / nơi phát + trạng thái), tim yêu thích bài đang phát.
+  let khungPhatDangHien = false;
+  let baiKhungPhat = null;       // {id,title,duration,channel} bài đang hiện
+
+  function timBaiTheoId(id) {
+    if (!id) return null;
+    return [hangChoMay, ketQuaTim, dsYeuThich].flat().find((b) => b && b.id === id) || null;
+  }
+
+  function capNhatTimKhungPhat() {
+    const nut = document.getElementById('music-player-tim');
+    const co = !!(baiKhungPhat && baiKhungPhat.id && laYeuThich(baiKhungPhat.id));
+    nut.style.visibility = baiKhungPhat && baiKhungPhat.id ? '' : 'hidden';
+    document.getElementById('music-player-tim-icon').textContent = co ? 'heart_fill' : 'heart';
+    window.dispatchEvent(new CustomEvent('nhac-tim', {
+      detail: { co, coBai: !!(baiKhungPhat && baiKhungPhat.id), kenh: (baiKhungPhat && baiKhungPhat.channel) || '' },
+    }));
+    nut.style.color = co ? 'var(--f7-color-red)' : 'var(--f7-text-color)';
+  }
+
+  function capNhatKhungPhat(data, nhan) {
+    const hien = data.state && data.state !== 'stopped';
+    const el = document.getElementById('music-player');
+    el.style.display = hien ? '' : 'none';
+    // Desktop: khung là thanh CỐ ĐỊNH đáy - chừa chỗ cuối trang (app.css).
+    document.querySelector('.page-content.music-vua-man-hinh').classList.toggle('co-khung-phat', hien);
+    if (!hien) { khungPhatDangHien = false; baiKhungPhat = null; return; }
+
+    // Âm lượng popover là loa PI - chỉ hiện khi nhạc ĐANG phát ở loa Pi (kể
+    // cả bật bằng giọng nói lúc đang chọn "Máy này"); phát trên máy thì chỉnh
+    // bằng phím cứng.
+    document.getElementById('music-mute-btn').style.display = data.trenMay ? 'none' : '';
+    const bai = timBaiTheoId(data.id) || {};
+    baiKhungPhat = data.id ? { id: data.id, title: data.title, duration: data.duration, channel: bai.channel || '' } : null;
+    document.getElementById('music-now-playing').textContent = data.title || '';
+    document.getElementById('music-player-phu').textContent =
+      [nhan.replace(/:\s*$/, ''), data.dangChuyen ? '' : (data.trenMay ? (data.tenMay || 'Máy này') : (data.noi_phat || 'Loa Pi')), bai.channel]
+        .filter(Boolean).join(' · ');
+    const img = document.getElementById('music-player-anh');
+    const src = data.id ? 'https://i.ytimg.com/vi/' + encodeURIComponent(data.id) + '/mqdefault.jpg' : '';
+    if (img.dataset.src !== src) {
+      img.dataset.src = src;
+      img.style.display = 'none';
+      if (src) {
+        img.onload = () => { img.style.display = ''; };
+        img.src = src;
+      }
+    }
+    capNhatTimKhungPhat();
+    // Range tạo lúc khung còn ẩn (kích thước 0) -> vừa hiện thì tính lại.
+    if (!khungPhatDangHien) {
+      khungPhatDangHien = true;
+      requestAnimationFrame(() => {
+        if (musicProgressRange) { musicProgressRange.calcSize(); musicProgressRange.setValue(musicProgressRange.value); }
+      });
+    }
+  }
+
+  function apDungTrangThaiNhac(data) {
+    // Đang chuyển "Máy này" -> Loa Pi: Pi còn "stopped" vài giây lúc lấy bài -
+    // hiện tạm đúng bài đó thay vì ẩn khung. Pi phát rồi (hoặc quá hạn) thì bỏ.
+    // Đổi thiết bị (Loa Pi <-> Mi Box...) cũng vậy: chỉ bỏ khi NƠI MỚI đã phát
+    // (thiết bị cũ còn báo "đang phát" vài giây không tính) - trước đây khung
+    // phát biến mất lúc đổi, phải bấm phát lại (phản ánh thật).
+    if (dangChuyenSangPi) {
+      const daToiNoiMoi = !dangChuyenSangPi.noi || (data.noi_phat || 'Loa Pi') === dangChuyenSangPi.noi;
+      if (data.state !== 'stopped' && !data.trenMay && daToiNoiMoi && !data.dangTai) dangChuyenSangPi = null;
+      else if (Date.now() > dangChuyenSangPi.han) dangChuyenSangPi = null;
+      else if (data.state === 'stopped' || !daToiNoiMoi) {
+        data = Object.assign({}, dangChuyenSangPi, { state: 'paused', dangChuyen: true });
+      }
+    }
+    // Mini player (điện thoại) cũng giữ bài đó trong lúc chuyển, không chớp tắt.
+    if (data.dangChuyen) {
+      giuChoMini = true;
+      window.dispatchEvent(new CustomEvent('nhac-tren-may', { detail: data }));
+    } else if (giuChoMini) {
+      giuChoMini = false;
+      window.dispatchEvent(new CustomEvent('nhac-tren-may', { detail: { state: 'stopped' } }));
+    }
+    const nhan = data.dangChuyen ? 'Đang chuyển sang ' + (data.noi || 'Loa Pi') + ': '
+      : data.dangTai ? 'Đang tải: '
+      : ({ playing: 'Đang phát: ', paused: 'Đã tạm dừng: ', stopped: '' }[data.state] || '');
+    capNhatKhungPhat(data, nhan);
+    musicSyncElapsed = data.elapsed || 0;
+    musicSyncTs = Date.now();
+    musicState = data.state;
+    musicDangTai = !!data.dangTai;
+    musicDuration = data.duration;
+    musicBuffered = typeof data.buffered === 'number' ? data.buffered : null;
+    updateProgressUI();
+    updatePlayPauseIcon(data.state);
+    if (typeof data.volume === 'number') ensureMusicHeaderVolumeRange(data.volume);
+    if (baiDangMo && data.id === baiDangMo.id && data.state === 'playing' && !data.dangTai) baiDangMo = null;
+    const doiBai = (data.title || '') !== tenBaiDangPhat;
+    tenBaiDangPhat = data.state === 'stopped' ? '' : (data.title || '');
+    danhDauBaiDangPhat();
+    hienChipDangPhat(data.state !== 'stopped' || !!data.dangChuyen);
+    if (tabDangXem === 'dang_phat' && doiBai && data.state !== 'stopped') capNhatDangPhatTaiCho(data);
+    capNhatChatLuong(data);
+    if (doiBai && data.id && !data.trenMay && data.state === 'playing') {
+      capNhatGanDay({ id: data.id, title: data.title, duration: data.duration, channel: (baiKhungPhat || {}).channel || '' });
+    }
+  }
+
+  // Gọi TAY - dùng ngay sau khi CHÍNH tab này vừa thao tác (tua/phát/dừng...)
+  // để có phản hồi tức thì, không chờ SSE (moKetNoiMusicStatusSSE bên dưới)
+  // tới lượt kiểm tra kế tiếp (tối đa 2 giây).
+  async function loadMusicStatus() {
+    try {
+      const data = locTrangThaiPi(await api('/api/music/status'));
+      nhoTrangThaiPi(data);
+      nhanCheDoLapTuPi(data.lap);
+      if (dangPhatTrenMay()) { capNhatTuMay(); return; }
+      apDungTrangThaiNhac(data);
+    } catch (e) {
+      // Chỉ hiện lỗi khi ĐANG đứng ở tab Nhạc VÀ lần đồng bộ gần nhất còn biết
+      // nhạc đang phát (musicState) - đúng yêu cầu thực tế "báo lỗi nếu đang
+      // chơi nhạc mà bị lỗi", không phải mọi lỗi mọi lúc (đã gặp lỗi thật:
+      // hiện toast đỏ dù đang đứng ở tab khác không hề xem tab Nhạc).
+      const dangOTabNhac = document.getElementById('view-music')?.classList.contains('tab-active');
+      if (dangOTabNhac && musicState === 'playing') {
+        baoLoi(e, 'Lỗi tải trạng thái nhạc: ');
+      }
+    }
+  }
+
+  // SSE (Server-Sent Events) thay cho polling gọi lại API mỗi 3 giây trước
+  // đây - server tự đẩy trạng thái MỚI ngay khi có gì đổi (xem
+  // /api/music/status/stream trong webui.py, server tự so sánh + chỉ đẩy khi
+  // đổi thật). Trang này chỉ pageInit() 1 lần lúc app khởi động (không phải
+  // mỗi lần chuyển tab, xem ghi chú ở pageInit bên dưới) nên không cần tự
+  // đóng kết nối SSE này - EventSource sống suốt phiên làm việc, giống 2
+  // interval cũ trước đây.
+  let musicStatusSSE = null;
+
+  function moKetNoiMusicStatusSSE() {
+    if (musicStatusSSE) musicStatusSSE.close();
+    musicStatusSSE = new EventSource('/api/music/status/stream');
+    musicStatusSSE.onmessage = (e) => {
+      let data;
+      try {
+        data = locTrangThaiPi(JSON.parse(e.data));
+      } catch (err) {
+        return;
+      }
+      // Chia sẻ trạng thái loa Pi cho mini player (mini-player.js) - khỏi mở
+      // thêm 1 SSE trùng (WebKit iPhone giới hạn ~6 kết nối/host). Báo SAU khi
+      // áp trạng thái giữ chỗ "Đang chuyển sang ..." (apDungTrangThaiNhac) - báo
+      // trước thì mini player nhận "dừng" thô của Pi lúc đổi thiết bị, ẩn đi và
+      // ĐÓNG luôn trình phát toàn màn hình rồi mới hiện lại (phản ánh thật).
+      const baoMini = () => window.dispatchEvent(new CustomEvent('nhac-pi', { detail: data }));
+      nhoTrangThaiPi(data);
+      nhanCheDoLapTuPi(data.lap);
+      if (dangPhatTrenMay()) {
+        baoMini();
+        if (typeof data.volume === 'number') ensureMusicHeaderVolumeRange(data.volume);
+        return;
+      }
+      apDungTrangThaiNhac(data);
+      baoMini();
+    };
+  }
+
+  async function seekMusic(seconds) {
+    if (dangPhatTrenMay()) { tuaTrenMay(seconds); return; }
+    try {
+      await api('/api/music/seek', { method: 'POST', body: JSON.stringify({ seconds }) });
+    } catch (e) {
+      baoLoi(e, 'Lỗi tua nhạc: ');
+    } finally {
+      loadMusicStatus();
+    }
+  }
+
+  // phat_nhac() ở backend chạy NỀN (trả lời "đang tìm..." NGAY rồi mới thật sự
+  // phát sau 5-20 giây khi tìm xong - xem music.py) - khác hẳn next/back là
+  // đồng bộ (HTTP chỉ trả lời khi đã phát xong thật). Vì vậy không thể tắt
+  // loader ngay khi API play trả lời như next/back được - phải tự hỏi lại trạng
+  // thái tới khi thấy ĐÃ THẬT SỰ phát bài mới (so tên bài đổi khác bài trước đó,
+  // hoặc giây đã phát còn rất nhỏ - phòng trường hợp phát lại đúng bài đang có).
+  function choToiKhiPhatXongBaiMoi(tenBaiTruocDo) {
+    return new Promise((resolve) => {
+      const batDau = Date.now();
+      const GIOI_HAN_MS = 30000;
+      clearInterval(musicPlayPollTimer);
+      musicPlayPollTimer = setInterval(async () => {
+        let data;
+        try {
+          data = await api('/api/music/status');
+        } catch (e) {
+          return;
+        }
+        const daPhatBaiMoi = data.state === 'playing' &&
+          (data.title !== tenBaiTruocDo || (data.elapsed != null && data.elapsed < 2));
+        const hetGio = Date.now() - batDau > GIOI_HAN_MS;
+        if (daPhatBaiMoi || hetGio) {
+          clearInterval(musicPlayPollTimer);
+          if (hetGio && !daPhatBaiMoi) {
+            $f7.toast.show({ text: 'Không tìm được bài hát phù hợp, hoặc quá lâu chưa phát được.', closeTimeout: 3000 });
+          }
+          resolve();
+        }
+      }, 1000);
+    });
+  }
+
+  // ---------- Tìm nhạc qua F7 Searchbar (navbar, kiểu expandable): gõ -> từ
+  // khoá gợi ý của YouTube (/api/music/suggest, có độ trễ ngắn + bỏ qua phản
+  // hồi cũ đến muộn); Enter/chạm gợi ý -> tìm (/api/music/search, ~3-5s,
+  // server tự LƯU kết quả làm danh sách phát); chạm 1 bài -> phát bài đó
+  // (/api/music/play_item - cả danh sách thành hàng chờ Trước/Tiếp). ----------
+  let musicSearchbar = null;
+  let goiYTimer = null;
+  let goiYLuot = 0;
+  let ketQuaTim = [];
+  let tuKhoaTim = '';
+  let tenBaiDangPhat = '';
+
+  function anGoiY() {
+    clearTimeout(goiYTimer);
+    goiYLuot++;
+    document.getElementById('music-suggest').style.display = 'none';
+  }
+
+  function veGoiY(ds) {
+    const wrap = document.getElementById('music-suggest');
+    const ul = wrap.querySelector('ul');
+    ul.innerHTML = '';
+    ds.forEach((tu) => {
+      const li = document.createElement('li');
+      li.innerHTML =
+        '<a href="#" class="item-link item-content">' +
+          '<div class="item-media"><i class="icon f7-icons" style="font-size:18px;color:var(--f7-list-item-footer-text-color);">search</i></div>' +
+          '<div class="item-inner"><div class="item-title"></div></div>' +
+        '</a>';
+      li.querySelector('.item-title').textContent = tu;
+      li.querySelector('a').addEventListener('click', (e) => {
+        e.preventDefault();
+        document.getElementById('music-query').value = tu;
+        timBai();
+      });
+      ul.appendChild(li);
+    });
+    wrap.style.display = ds.length ? '' : 'none';
+    if (ds.length) dinhViGoiY();
+  }
+
+  // Đặt khung gợi ý NGAY DƯỚI mép ô nhập, rộng đúng bằng ô nhập (toạ độ so
+  // với .page - khung là con trực tiếp của .page, position:absolute).
+  function dinhViGoiY() {
+    const wrap = document.getElementById('music-suggest');
+    const o = document.querySelector('#music-searchbar .searchbar-input-wrap');
+    const trang = wrap && wrap.closest('.page');
+    if (!o || !trang) return;
+    const r = o.getBoundingClientRect();
+    const t = trang.getBoundingClientRect();
+    wrap.style.top = (r.bottom - t.top + 6) + 'px';
+    wrap.style.left = (r.left - t.left) + 'px';
+    wrap.style.width = r.width + 'px';
+  }
+
+  async function layGoiY(q) {
+    const luot = ++goiYLuot;
+    if (!q) { veGoiY([]); return; }
+    try {
+      const data = await api('/api/music/suggest?q=' + encodeURIComponent(q));
+      if (luot === goiYLuot) veGoiY(data.suggestions || []);
+    } catch (e) { /* gợi ý không quan trọng - lỗi thì thôi, vẫn Enter để tìm được */ }
+  }
+
+  function baoTrangThaiTim(chu, coLoader) {
+    const el = document.getElementById('music-search-status');
+    el.textContent = chu || '';
+    if (coLoader) {
+      // Preloader nhỏ của F7 trước dòng chữ - phải TỰ chèn ruột theo theme
+      // (iOS 8 vạch / Material SVG), F7 chỉ tự điền cho .preloader có sẵn
+      // lúc khởi động app (cùng cách htmlPreloader() bên devices.html).
+      const ruot = document.documentElement.classList.contains('md')
+        ? '<span class="preloader-inner"><svg viewBox="0 0 36 36"><circle cx="18" cy="18" r="16"></circle></svg></span>'
+        : '<span class="preloader-inner">' + '<span class="preloader-inner-line"></span>'.repeat(8) + '</span>';
+      el.insertAdjacentHTML('afterbegin',
+        '<span class="preloader color-theme" style="--f7-preloader-size:14px;vertical-align:-2px;margin-right:6px;">' + ruot + '</span>');
+    }
+    el.style.display = chu ? '' : 'none';
+  }
+
+  // ---------- Danh sách: 2 tab "Kết quả tìm" | "Yêu thích" (segmented) ----------
+  let dsYeuThich = [];
+  let tabDangXem = 'kham_pha'; // 'kham_pha' (mặc định) | 'tim' | 'yeu_thich' | 'ds'
+  let dangTim = false;
+
+  // Danh sách phát tự tạo (/api/music/playlists): plMoId = danh sách đang
+  // MỞ trong tab "Danh sách phát" (null = màn tổng quan các danh sách).
+  let dsPlaylist = [];
+  let plMoId = null;
+
+  function plDangMo() {
+    return dsPlaylist.find((p) => p.id === plMoId) || null;
+  }
+
+  function dsDangXem() {
+    if (tabDangXem === 'kham_pha' || tabDangXem === 'dang_phat') return [];
+    if (tabDangXem === 'ds') return (plDangMo() || {}).bai || [];
+    if (tabDangXem === 'yeu_thich') return dsYeuThich;
+    if (ketQuaLaTim && locTim !== 'tat_ca') return ketQuaTim.filter((b) => nhomBai(b) === locTim);
+    return ketQuaTim;
+  }
+
+  // Tên hàng chờ khi phát (hiện ở log/hàng chờ Pi).
+  function tenDanhSachDangXem() {
+    if (tabDangXem === 'ds') return (plDangMo() || {}).ten || 'Danh sách phát';
+    return tabDangXem === 'yeu_thich' ? 'Yêu thích' : tuKhoaTim;
+  }
+
+  function laYeuThich(id) {
+    return dsYeuThich.some((b) => b.id === id);
+  }
+
+  function chonTab(tab, giuPlaylist) {
+    // Playlist nằm TRONG tab Yêu thích (hàng thẻ trên cùng) - 'ds' chỉ là
+    // trạng thái "đang mở 1 playlist", chip Yêu thích vẫn sáng.
+    if (tab === 'ds' && (!giuPlaylist || !plDangMo())) tab = 'yeu_thich';
+    if (tab !== 'ds') plMoId = null;
+    tabDangXem = tab;
+    const chip = tab === 'ds' ? 'yeu_thich' : tab;
+    document.querySelectorAll('#music-tab .music-chip').forEach((b) => {
+      b.classList.toggle('active', b.dataset.value === chip);
+    });
+    veKetQua();
+  }
+
+  // "10 bài · 52 phút" - kiểu dòng phụ dưới tiêu đề playlist của Tidal.
+  function tomTatDanhSach(ds) {
+    if (!ds.length) return '';
+    const giay = ds.reduce((t, b) => t + (b.duration || 0), 0);
+    const phut = Math.round(giay / 60);
+    const tg = phut >= 60 ? Math.floor(phut / 60) + ' giờ ' + (phut % 60) + ' phút' : phut + ' phút';
+    return ds.length + ' bài' + (giay ? ' · ' + tg : '');
+  }
+
+  // Tiêu đề lớn, dòng phụ, dòng hướng dẫn khi trống.
+  function capNhatDauCard() {
+    document.getElementById('music-fav-count').textContent = dsYeuThich.length;
+    const pl = tabDangXem === 'ds' ? plDangMo() : null;
+    document.getElementById('music-pl-quay-lai').style.display = pl ? '' : 'none';
+    document.getElementById('music-pl-menu').style.display = pl ? '' : 'none';
+    if (pl) {
+      const coBai = (pl.bai || []).length > 0;
+      document.getElementById('music-list-title').textContent = pl.ten;
+      document.getElementById('music-list-phu').textContent =
+        ['Playlist', tomTatDanhSach(pl.bai || []) || 'chưa có bài'].join(' · ');
+      baoTrangThaiTim(coBai ? '' : 'Playlist trống - bấm ⋯ ở bài bất kỳ để thêm vào đây.');
+      return;
+    }
+    document.getElementById('music-kp-lam-moi').style.display = tabDangXem === 'kham_pha' ? '' : 'none';
+    // Tab Đang phát: tiêu đề "Đang phát" nằm TRONG cột trái (veDangPhat) để cột
+    // Tiếp theo bên phải đẩy lên ngang hàng tiêu đề - ẩn tiêu đề lớn chung.
+    const laDP = tabDangXem === 'dang_phat';
+    document.getElementById('music-list-title').style.display = laDP ? 'none' : '';
+    document.getElementById('music-list-phu').style.display = laDP ? 'none' : '';
+    if (laDP) { baoTrangThaiTim(''); return; }
+    if (tabDangXem === 'kham_pha') {
+      document.getElementById('music-list-title').textContent = 'Khám phá';
+      document.getElementById('music-list-phu').textContent = 'Gợi ý theo những bài bạn đã nghe và nhạc đang hot';
+      baoTrangThaiTim('');
+      return;
+    }
+    const xemTim = tabDangXem === 'tim';
+    const ds = dsDangXem();
+    // "Kênh: <tên>" (mở từ tên ca sĩ/kênh, xem moKenh) -> tiêu đề kiểu trang
+    // nghệ sĩ: tên kênh (không ngoặc kép) + "Kênh YouTube · n bài".
+    const laKenh = xemTim && tuKhoaTim.startsWith('Kênh: ');
+    document.getElementById('music-list-title').textContent = !xemTim ? 'Yêu thích'
+      : laKenh ? tuKhoaTim.slice(6) : (tuKhoaTim ? '“' + tuKhoaTim + '”' : 'Kết quả tìm');
+    document.getElementById('music-list-phu').textContent =
+      dangTim && xemTim ? (laKenh ? 'Đang tải bài của kênh...' : 'Đang tìm trên YouTube...')
+        : [laKenh ? 'Kênh YouTube' : '', tomTatDanhSach(ds), !xemTim && dsPlaylist.length ? dsPlaylist.length + ' playlist' : '']
+          .filter(Boolean).join(' · ') || (xemTim ? 'Chưa tìm bài nào' : 'Chưa có bài nào');
+    if (dangTim && xemTim) return;      // đang tìm - giữ dòng "Đang tìm..."
+    if (!ds.length) {
+      baoTrangThaiTim(xemTim
+        ? 'Bấm kính lúp trên cùng để tìm bài hát.'
+        : 'Chạm trái tim ở bài bất kỳ để thêm vào đây.');
+    } else {
+      baoTrangThaiTim('');
+    }
+  }
+
+  // Bài đang phát: tên màu chủ đề + cột sóng nhạc động phủ lên ảnh (CSS
+  // .dang-phat), đứng yên khi tạm dừng (.tam-dung).
+  function danhDauBaiDangPhat() {
+    const moBai = baiDangMo && Date.now() < baiDangMo.han ? baiDangMo.id : null;
+    document.querySelectorAll('#music-results li[data-title], #music-results .mkp-the[data-title]').forEach((li) => {
+      const dangPhat = !!tenBaiDangPhat && li.dataset.title === tenBaiDangPhat;
+      li.classList.toggle('dang-phat', dangPhat);
+      li.classList.toggle('tam-dung', dangPhat && musicState !== 'playing');
+      // Loader ngay trên ảnh bài: vừa chạm, chưa có tiếng (Pi lấy link ~2-3s).
+      li.classList.toggle('dang-tai', (!!moBai && li.dataset.id === moBai) || (dangPhat && musicDangTai));
+    });
+    // Nút Phát/Tạm dừng cũng hiện loader (thanh desktop ở đây; mini player +
+    // trình phát mở rộng nghe "nhac-dang-tai" trong mini-player.js).
+    // Cả lúc ĐANG CHUYỂN thiết bị (Loa Pi <-> Mi Box...): vòng xoay ở nút play.
+    const taiNut = !!moBai || (musicState === 'playing' && musicDangTai) || !!dangChuyenSangPi || Date.now() < dangChuyenBaiPi;
+    document.getElementById('music-playpause-btn')?.classList.toggle('dang-tai', taiNut);
+    if (taiNut !== nutDangTai) {
+      nutDangTai = taiNut;
+      window.dispatchEvent(new CustomEvent('nhac-dang-tai', { detail: taiNut }));
+    }
+  }
+  let nutDangTai = false;
+  let dangChuyenBaiPi = 0;       // hạn (ms) vòng xoay nút Phát lúc chờ Pi: Tiếp/Trước, Phát/Tạm dừng
+
+  // Bài vừa chạm phát mà CHƯA phát được (Máy này: đang tải luồng; Loa Pi: Pi
+  // đang lấy bài) - hiện loader trên ảnh dòng đó (CSS .dang-tai). Xong khi
+  // trạng thái báo đúng bài này đang phát có tiếng (apDungTrangThaiNhac), lỗi,
+  // hoặc quá 30s.
+  let baiDangMo = null;
+  function datBaiDangMo(bai) {
+    baiDangMo = bai && bai.id ? { id: bai.id, han: Date.now() + 30000 } : null;
+    danhDauBaiDangPhat();
+    if (baiDangMo) setTimeout(danhDauBaiDangPhat, 30100);
+  }
+
+  function htmlPreloader() {
+    if (document.documentElement.classList.contains('md')) {
+      return '<span class="preloader-inner"><svg viewBox="0 0 36 36"><circle cx="18" cy="18" r="16"></circle></svg></span>';
+    }
+    return '<span class="preloader-inner">' + '<span class="preloader-inner-line"></span>'.repeat(8) + '</span>';
+  }
+
+  // Đang tìm (~3-5s): vài dòng skeleton của F7 (skeleton-text + hiệu ứng
+  // sóng) đúng khuôn 1 dòng bài hát.
+  // Chữ mẫu PHẢI KHÔNG DẤU: font "skeleton" của F7 chỉ có chữ Latin cơ bản,
+  // ký tự có dấu (ê, ă, đ...) rơi về font thường -> lộ chữ thật (đã gặp).
+  // Đủ khuôn như lúc có dữ liệu thật (tránh nhảy bố cục khi tải xong): chip lọc, ô "Kết quả hàng đầu" (chỉ khi TÌM - trang
+  // kênh không có) rồi 10 dòng bài có cả chỗ tim + ⋯. Độ dài chữ mẫu đổi
+  // theo dòng cho tự nhiên.
+  function veSkeletonTim(ul, laTim) {
+    const khoi = (cls, st) => '<span class="skeleton-block ' + (cls || '') + '"' + (st ? ' style="' + st + '"' : '') + '></span>';
+    if (laTim) {
+      const chip = document.createElement('li');
+      chip.className = 'mkq-loc skeleton-effect-wave';
+      chip.innerHTML = [76, 88, 72, 84, 92].map((w) => khoi('mkx-chip', 'width:' + w + 'px')).join('');
+      ul.appendChild(chip);
+      const dau = document.createElement('li');
+      dau.className = 'mkq-hang-dau skeleton-text skeleton-effect-wave';
+      dau.innerHTML = '<div class="mkq-nhan-muc">Ket qua hang dau</div>' +
+        '<div class="mkq-tren">' + khoi('mkq-anh') + '<div class="mkq-chu"><div class="mkq-ten">Ten bai hat dang tim<br>Ten ca si chinh thuc</div>' +
+        '<div class="mkq-phu music-bai-phu">Bai hat - Ten ca si - 0:00<br>000 N luot xem</div></div></div>' +
+        '<div class="mkq-nut">' + khoi('mkx-vien mkx-nut-to') + khoi('mkx-vien mkx-nut-to') + '</div>';
+      ul.appendChild(dau);
+    }
+    const ten = ['Ten bai hat dang tim kiem', 'Ten bai hat dai hon mot chut nua', 'Ten bai ngan', 'Ten bai hat - Ten ca si', 'Ten bai hat dang tim'];
+    const phu = ['Ten kenh - 0:00 - 000 N luot xem', 'Ten kenh dai - 0:00', 'Kenh - 0:00 - 0,0 Tr luot xem'];
+    for (let k = 0; k < 10; k++) {
+      const li = document.createElement('li');
+      li.className = 'music-bai-dong skeleton-text skeleton-effect-wave';
+      li.innerHTML =
+        '<span class="music-bai-anh">' + khoi('', 'width:100%;height:100%;') + '</span>' +
+        '<span class="music-bai-chu"><span class="music-bai-ten">' + ten[k % ten.length] + '</span>' +
+        '<span class="music-bai-phu">' + phu[k % phu.length] + '</span></span>' +
+        khoi('mkx-icon') + khoi('mkx-icon');
+      ul.appendChild(li);
+    }
+  }
+
+  // Tab Yêu thích: hàng thẻ playlist cuộn NGANG trên cùng (kiểu "My
+  // Collection" của Tidal) - thẻ đầu "＋ Tạo playlist", mỗi playlist 1 thẻ
+  // (ảnh bài đầu, tên, số bài), chạm để mở.
+  function veHangPlaylist(ul) {
+    const li = document.createElement('li');
+    li.className = 'music-pl-hang';
+    const tao = document.createElement('a');
+    tao.href = '#';
+    tao.className = 'music-pl-the music-pl-tao';
+    tao.innerHTML = '<span class="music-pl-bia"><i class="icon f7-icons">plus</i></span>' +
+      '<span class="music-pl-ten">Tạo playlist</span><span class="music-pl-so">&nbsp;</span>';
+    tao.addEventListener('click', (e) => { e.preventDefault(); rungNhe(); taoPlaylist(); });
+    li.appendChild(tao);
+    dsPlaylist.forEach((pl) => {
+      const the = document.createElement('a');
+      the.href = '#';
+      the.className = 'music-pl-the';
+      const dau = (pl.bai || [])[0];
+      the.innerHTML = '<span class="music-pl-bia">' +
+        (dau ? '<img alt="" />' : '<i class="icon f7-icons">music_note_list</i>') + '</span>' +
+        '<span class="music-pl-ten"></span><span class="music-pl-so"></span>';
+      if (dau) the.querySelector('img').src = 'https://i.ytimg.com/vi/' + encodeURIComponent(dau.id) + '/mqdefault.jpg';
+      the.querySelector('.music-pl-ten').textContent = pl.ten;
+      the.querySelector('.music-pl-so').textContent = (pl.bai || []).length + ' bài';
+      the.addEventListener('click', (e) => {
+        e.preventDefault();
+        rungNhe();
+        plMoId = pl.id;
+        chonTab('ds', true);
+        document.getElementById('music-results').scrollTop = 0;
+      });
+      li.appendChild(the);
+    });
+    ul.appendChild(li);
+  }
+
+  // Huy hiệu chất lượng: Loa Pi -> trạng thái Pi có sẵn "chat_luong"; Máy này
+  // -> hỏi /api/music/stream_info (lấy từ đệm link stream, 1 lần/bài).
+  const chatLuongMay = {};
+  function capNhatChatLuong(data) {
+    const el = document.getElementById('music-chat-luong');
+    if (!el) return;
+    const ve = (cl) => {
+      const chu = cl ? [cl.codec, cl.kbps ? cl.kbps + ' kbps' : '', cl.khz ? cl.khz + ' kHz' : ''].filter(Boolean).join(' · ') : '';
+      el.textContent = chu;
+      el.title = chu ? 'Chất lượng luồng nhạc: ' + chu : '';
+      el.style.display = chu && data.state !== 'stopped' ? '' : 'none';
+      // Trình phát mở rộng (điện thoại) hiện chữ in hoa giữa 2 mốc thời gian.
+      window.dispatchEvent(new CustomEvent('nhac-chat-luong', { detail: data.state !== 'stopped' ? chu.toUpperCase() : '' }));
+    };
+    if (!data || data.state === 'stopped' || !data.id) { ve(null); return; }
+    if (!data.trenMay) { ve(data.chat_luong); return; }
+    if (data.id in chatLuongMay) { ve(chatLuongMay[data.id]); return; }
+    chatLuongMay[data.id] = null;
+    ve(null);
+    api('/api/music/stream_info/' + encodeURIComponent(data.id)).then((r) => {
+      chatLuongMay[data.id] = r.chat_luong || null;
+      if (baiKhungPhat && baiKhungPhat.id === data.id) ve(chatLuongMay[data.id]);
+    }).catch(() => { delete chatLuongMay[data.id]; });
+  }
+
+  // ---------- Tab "Khám phá" (mặc định) - các hàng thẻ cuộn ngang kiểu Tidal:
+  // Nghe gần đây (lịch sử chung trên Pi) | Dành cho bạn (bài liên quan bài vừa
+  // nghe) | Yêu thích | các chủ đề (Thịnh hành, Hot TikTok, Bolero...). Hàng
+  // nào cần gọi YouTube thì tải RIÊNG (/api/music/kham_pha/<id>, server lưu
+  // đệm vài giờ) - hàng nào xong vẽ hàng đó, không chờ nhau. Chạm thẻ = phát
+  // cả hàng từ thẻ đó; chạm tên hàng = mở cả hàng thành danh sách đầy đủ;
+  // giữ lâu / chuột phải thẻ = menu bài (moMenuBai).
+  let khamPhaHang = [];          // [{id, ten, phu}]
+  const khamPhaBai = {};         // id hàng -> [bài] | null (đang tải)
+  let khamPhaTaiLuc = 0;
+
+  // epMoi: nút ⟳ - Pi bỏ qua đệm, tìm lại ngay (thẻ cũ vẫn hiện tới khi có mới).
+  // Không ép: chỉ tải lại khi đã quá 10 phút (mở tab Khám phá, quay lại app).
+  let khamPhaDangTai = false;
+  let choBanLuc = 0;
+  async function taiKhamPha(epMoi) {
+    if (khamPhaDangTai) return;
+    if (!epMoi && Date.now() - khamPhaTaiLuc < 10 * 60 * 1000 && khamPhaHang.length) return;
+    khamPhaDangTai = true;
+    khamPhaTaiLuc = Date.now();
+    document.getElementById('music-kp-lam-moi')?.classList.add('dang-xoay');
+    let d;
+    // Nghe gần đây / Dành cho bạn RIÊNG từng máy (mã máy) - hàng chủ đề dùng chung.
+    try { d = await api('/api/music/kham_pha?may=' + encodeURIComponent(MAY_ID)); } catch (e) { ketThucTaiKhamPha(); return; }
+    khamPhaBai.gan_day = d.gan_day || [];
+    khamPhaHang = d.hang || [];
+    khamPhaHang.forEach((h) => { if (!khamPhaBai[h.id]) khamPhaBai[h.id] = null; });
+    if (tabDangXem === 'kham_pha') veKetQua();
+    kpCho = new Set(khamPhaHang.map((h) => h.id));
+    kpEpMoi = !!epMoi;
+    kpChay();
+  }
+
+  // Tải các hàng theo ƯU TIÊN NHÌN THẤY: 2 hàng cùng lúc, mỗi lần chọn hàng kế
+  // thì hàng đang trong màn hình (hoặc sắp cuộn tới) lên trước, xếp trên ->
+  // dưới; hàng nằm xa bên dưới tải sau cùng. Trước đây tải lần lượt theo thứ
+  // tự cố định - 1 hàng phía trên chậm (Pi gọi YouTube) chặn cả các hàng dưới.
+  let kpCho = new Set();        // id hàng còn phải tải
+  let kpDangChay = 0;
+  let kpEpMoi = false;
+  const KP_SONG_SONG = 2;
+  function kpThuTu() {
+    const v = document.getElementById('music-results');
+    const vr = v.getBoundingClientRect();
+    return [...kpCho].map((id) => {
+      const li = v.querySelector('.mkp-hang[data-muc="' + id + '"]');
+      const r = li && li.offsetParent ? li.getBoundingClientRect() : null;
+      const thay = !!r && r.bottom > vr.top && r.top < vr.bottom + 300;
+      return { id, diem: (thay ? 0 : 1e6) + (r ? r.top : 2e6) };
+    }).sort((a, b) => a.diem - b.diem).map((x) => x.id);
+  }
+  function kpChay() {
+    while (kpDangChay < KP_SONG_SONG && kpCho.size) {
+      const id = kpThuTu()[0];
+      kpCho.delete(id);
+      kpDangChay++;
+      api('/api/music/kham_pha/' + encodeURIComponent(id) + '?may=' + encodeURIComponent(MAY_ID) + (kpEpMoi ? '&moi=1' : ''))
+        .then((r) => { khamPhaBai[id] = r.bai || []; if (id === 'cho_ban') choBanLuc = Date.now(); })
+        .catch(() => { khamPhaBai[id] = khamPhaBai[id] || []; })
+        .finally(() => {
+          kpDangChay--;
+          veLaiHangKhamPha(id);
+          if (!kpCho.size && !kpDangChay) ketThucTaiKhamPha();
+          else kpChay();
+        });
+    }
+  }
+  function ketThucTaiKhamPha() {
+    khamPhaDangTai = false;
+    document.getElementById('music-kp-lam-moi')?.classList.remove('dang-xoay');
+  }
+
+  // Bài mới bắt đầu phát (Máy này hoặc Loa Pi) -> "Nghe gần đây" cập nhật NGAY;
+  // "Dành cho bạn" tính lại theo bài vừa nghe (tối đa 10 phút/lần - mỗi lần
+  // Pi gọi YouTube ~10s), hẹn 20s sau để không tính khi bấm Tiếp liên tục.
+  let henChoBan = null;
+  function capNhatGanDay(bai) {
+    if (!bai || !bai.id) return;
+    khamPhaBai.gan_day = [bai].concat((khamPhaBai.gan_day || []).filter((b) => b.id !== bai.id)).slice(0, 20);
+    veLaiHangKhamPha('gan_day');
+    clearTimeout(henChoBan);
+    henChoBan = setTimeout(async () => {
+      if (Date.now() - choBanLuc < 10 * 60 * 1000 || khamPhaDangTai) return;
+      choBanLuc = Date.now();
+      try {
+        const ds = (await api('/api/music/kham_pha/cho_ban?may=' + encodeURIComponent(MAY_ID))).bai || [];
+        if (ds.length) { khamPhaBai.cho_ban = ds; veLaiHangKhamPha('cho_ban'); }
+      } catch (e) { /* để lần sau */ }
+    }, 20000);
+  }
+
+  function ghiLichSuMay(bai) {
+    if (!bai || !bai.id) return;
+    capNhatGanDay(bai);
+    fetch('/api/music/history', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ bai, may_id: MAY_ID }) }).catch(() => {});
+  }
+
+  function cacHangKhamPha() {
+    const out = [{ id: 'gan_day', ten: 'Nghe gần đây', phu: 'Những bài bạn vừa nghe' }];
+    const hang = khamPhaHang.length ? khamPhaHang : [{ id: 'cho_ban', ten: 'Dành cho bạn', phu: '' }];
+    out.push(hang[0]);
+    out.push({ id: 'yeu_thich', ten: 'Yêu thích của bạn', phu: dsYeuThich.length + ' bài' });
+    return out.concat(hang.slice(1));
+  }
+
+  function baiCuaHang(id) {
+    return id === 'yeu_thich' ? dsYeuThich : khamPhaBai[id];
+  }
+
+  function veKhamPha(ul) {
+    cacHangKhamPha().forEach((h) => {
+      const li = document.createElement('li');
+      li.className = 'mkp-hang';
+      li.dataset.muc = h.id;
+      li.innerHTML = '<div class="mkp-dau"><a href="#" class="mkp-ten"><span></span><i class="icon f7-icons">chevron_right</i></a>' +
+        '<span class="mkp-phu"></span><span class="mkp-mui">' +
+        '<a href="#" class="link icon-only mkp-lui" title="Trước"><i class="icon f7-icons">chevron_left</i></a>' +
+        '<a href="#" class="link icon-only mkp-toi" title="Tiếp"><i class="icon f7-icons">chevron_right</i></a></span></div>' +
+        '<div class="mkp-cuon"></div>';
+      // ‹ › kiểu Tidal (máy có chuột): cuộn hàng gần 1 khung; mờ khi tới đầu/cuối.
+      const cuon = li.querySelector('.mkp-cuon');
+      const truot = (huong) => cuon.scrollBy({ left: huong * Math.max(200, cuon.clientWidth * 0.85), behavior: 'smooth' });
+      li.querySelector('.mkp-lui').addEventListener('click', (e) => { e.preventDefault(); truot(-1); });
+      li.querySelector('.mkp-toi').addEventListener('click', (e) => { e.preventDefault(); truot(1); });
+      cuon.addEventListener('scroll', () => capNhatMuiTen(li), { passive: true });
+      li.querySelector('.mkp-ten span').textContent = h.ten;
+      li.querySelector('.mkp-phu').textContent = h.phu || '';
+      li.querySelector('.mkp-ten').addEventListener('click', (e) => {
+        e.preventDefault();
+        const ds = baiCuaHang(h.id) || [];
+        if (!ds.length) return;
+        rungNhe();
+        if (h.id === 'yeu_thich') { chonTab('yeu_thich'); return; }
+        // Mở cả hàng thành danh sách đầy đủ (dùng chỗ "Kết quả tìm").
+        ketQuaTim = ds.slice();
+        tuKhoaTim = h.ten;
+        ketQuaLaTim = false;
+        locTim = 'tat_ca';
+        hienChipTim(true);
+        luuKetQuaMay();
+        chonTab('tim');
+        document.getElementById('music-results').scrollTop = 0;
+      });
+      ul.appendChild(li);
+      veTheHang(li, h);
+    });
+  }
+
+  function veLaiHangKhamPha(id) {
+    if (tabDangXem !== 'kham_pha') return;
+    const li = document.querySelector('#music-results .mkp-hang[data-muc="' + id + '"]');
+    const h = cacHangKhamPha().find((x) => x.id === id);
+    if (li && h) { veTheHang(li, h); danhDauBaiDangPhat(); }
+  }
+
+  // Thẻ RỘNG GẤP ĐÔI (ảnh ngang 16:9) - 1 thẻ/hàng chọn THEO TIÊU CHÍ, kèm
+  // nhãn nói lý do: hàng chủ đề = bài NHIỀU LƯỢT XEM nhất; Dành cho bạn = gợi
+  // ý hàng đầu; Yêu thích = bài mới thích. Nghe gần đây: KHÔNG có thẻ rộng -
+  // mọi thẻ cùng khung.
+  // -> { i: vị trí, nhan: chữ trên ảnh } hoặc null.
+  function theRongCuaHang(idHang, ds) {
+    if (!ds || ds.length < 3) return null;
+    if (idHang === 'gan_day') return null;
+    if (idHang === 'cho_ban') return { i: 0, nhan: 'Gợi ý hàng đầu' };
+    if (idHang === 'yeu_thich') return { i: 0, nhan: 'Mới thích' };
+    let i = -1, nhieu = 0;
+    ds.forEach((b, k) => { if ((b.view_count || 0) > nhieu) { nhieu = b.view_count; i = k; } });
+    return i >= 0 ? { i, nhan: '🔥 ' + fmtLuotXem(nhieu) } : null;
+  }
+
+  function veTheHang(li, h) {
+    const cuon = li.querySelector('.mkp-cuon');
+    const ds = baiCuaHang(h.id);
+    cuon.innerHTML = '';
+    if (ds === null || ds === undefined) {          // đang tải -> thẻ xương
+      for (let k = 0; k < 6; k++) cuon.insertAdjacentHTML('beforeend', '<span class="mkp-the mkp-xuong"><span class="mkp-anh"></span><span class="mkp-ten-bai">&nbsp;</span><span class="mkp-kenh">&nbsp;</span></span>');
+      li.style.display = '';
+      return;
+    }
+    li.style.display = ds.length ? '' : 'none';      // hàng trống (chưa nghe gì...) thì ẩn
+    const rong = theRongCuaHang(h.id, ds);
+    // Thẻ rộng luôn ĐỨNG ĐẦU hàng (bài nhiều lượt xem nhất hay nằm tít cuối,
+    // phải vuốt mới thấy) - thứ tự phát khi chạm thẻ đi theo đúng thứ tự hiện.
+    const dsHien = rong && rong.i > 0 ? [ds[rong.i]].concat(ds.filter((_, k) => k !== rong.i)) : ds;
+    if (rong) rong.i = 0;
+    dsHien.forEach((bai, i) => {
+      const the = document.createElement('a');
+      the.href = '#';
+      const laRong = !!rong && i === rong.i;
+      the.className = 'mkp-the' + (laRong ? ' mkp-the-rong' : '');
+      the.dataset.id = bai.id || '';
+      the.dataset.title = bai.title || '';
+      the.innerHTML = '<span class="mkp-anh"><span class="mkp-nut">' +
+          '<span class="mkp-choi" title="Phát"><i class="icon f7-icons icon-play-bu">play_fill</i></span>' +
+          '<span class="mkp-nut-phu mkp-menu" title="Tuỳ chọn"><i class="icon f7-icons">ellipsis</i></span>' +
+          '<span class="mkp-nut-phu mkp-tim" title="Yêu thích"><i class="icon f7-icons">' + (laYeuThich(bai.id) ? 'heart_fill' : 'heart') + '</i></span>' +
+        '</span>' +
+        '<span class="music-tai"><span class="preloader">' + htmlPreloader() + '</span></span></span>' +
+        '<span class="mkp-ten-bai"></span><span class="mkp-kenh"></span>';
+      the.querySelector('.mkp-tim').classList.toggle('da-thich', laYeuThich(bai.id));
+      if (laRong) {
+        const nhan = document.createElement('span');
+        nhan.className = 'mkp-nhan';
+        nhan.textContent = rong.nhan;
+        the.querySelector('.mkp-anh').appendChild(nhan);
+      }
+      the.querySelector('.mkp-anh').style.backgroundImage = "url('https://i.ytimg.com/vi/" + encodeURIComponent(bai.id) + "/hqdefault.jpg')";
+      the.querySelector('.mkp-ten-bai').textContent = bai.title || '';
+      the.querySelector('.mkp-kenh').textContent = bai.channel || '';
+      let giu = null, daGiu = false;
+      const huyGiu = () => { clearTimeout(giu); giu = null; };
+      the.addEventListener('touchstart', () => { daGiu = false; giu = setTimeout(() => { daGiu = true; rungNhe(); moMenuBai(bai, the); }, 550); }, { passive: true });
+      the.addEventListener('touchmove', huyGiu, { passive: true });
+      the.addEventListener('touchend', huyGiu);
+      the.addEventListener('contextmenu', (e) => { e.preventDefault(); moMenuBai(bai, the); });
+      the.addEventListener('pointerdown', () => taiTruoc([bai]), { passive: true });
+      ganTaiTruocKhiRe(the, bai);
+      the.addEventListener('click', (e) => {
+        e.preventDefault();
+        if (daGiu) { daGiu = false; return; }
+        if (e.target.closest('.mkp-menu')) { moMenuBai(bai, e.target.closest('.mkp-menu')); return; }
+        if (e.target.closest('.mkp-tim')) { doiYeuThich(bai); return; }
+        phatDanhSach(dsHien.slice(), i, h.ten);
+        moTrangDangPhat();         // như lúc phát từ kết quả tìm
+      });
+      cuon.appendChild(the);
+    });
+    requestAnimationFrame(() => capNhatMuiTen(li));
+  }
+
+  function capNhatMuiTen(li) {
+    const c = li.querySelector('.mkp-cuon');
+    li.querySelector('.mkp-lui').classList.toggle('mkp-het', c.scrollLeft <= 2);
+    li.querySelector('.mkp-toi').classList.toggle('mkp-het', c.scrollLeft + c.clientWidth >= c.scrollWidth - 2);
+  }
+
+  // ---------- Thông tin thêm cho kết quả tìm (kiểu YouTube Music) ----------
+  // Nhãn đóng khung theo tên bài: KARAOKE / HÁT LẠI / REMIX / LIVE; bản gốc thì
+  // ghi loại "Bài hát" (kênh đã xác minh / Official / MV) hoặc "Video".
+  function boDauJs(t) {
+    return String(t || '').normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[đĐ]/g, 'd').toLowerCase();
+  }
+  function nhanBai(b) {
+    const t = boDauJs(b.title);
+    if (/karaoke|\bbeat\b|tone (nam|nu)/.test(t)) return 'KARAOKE';
+    if (/cover|hat lai/.test(t)) return 'HÁT LẠI';
+    if (/remix|cha ?cha|\bedm\b|vinahouse|nonstop|lofi/.test(t)) return 'REMIX';
+    if (/\blive\b|concert|liveshow|music box|truc tiep/.test(t)) return 'LIVE';
+    return '';
+  }
+  function loaiBai(b) {
+    if (nhanBai(b)) return '';
+    return b.verified || /official|topic/i.test(b.channel || '') || /official|\bmv\b/i.test(b.title || '') ? 'Bài hát' : 'Video';
+  }
+  // 1234567 -> "1,2 Tr lượt xem" (N = nghìn, Tr = triệu, T = tỷ - như YouTube tiếng Việt).
+  function fmtLuotXem(n) {
+    if (typeof n !== 'number' || n < 0) return '';
+    const gon = (v) => (v < 10 ? v.toFixed(1) : String(Math.round(v))).replace('.', ',').replace(/,0$/, '');
+    if (n < 1000) return n + ' lượt xem';
+    if (n < 1e6) return gon(n / 1e3) + ' N lượt xem';
+    if (n < 1e9) return gon(n / 1e6) + ' Tr lượt xem';
+    return gon(n / 1e9) + ' T lượt xem';
+  }
+  // Dòng phụ: [nhãn | loại] · kênh (chạm được) · thời lượng · lượt xem.
+  function veDongPhuBai(phu, bai, coLoai) {
+    const nhan = nhanBai(bai);
+    if (nhan) {
+      const n = document.createElement('span');
+      n.className = 'music-nhan';
+      n.textContent = nhan;
+      phu.appendChild(n);
+    }
+    const phan = [];
+    if (!nhan && coLoai) phan.push(loaiBai(bai));
+    phan.forEach((p) => phu.appendChild(document.createTextNode(p + ' · ')));
+    if (bai.channel && bai.channel_id) {
+      const kenh = document.createElement('span');
+      kenh.className = 'music-kenh';
+      kenh.textContent = bai.channel;
+      phu.appendChild(kenh);
+    } else if (bai.channel) {
+      phu.appendChild(document.createTextNode(bai.channel));
+    }
+    const sau = [bai.duration ? fmtTime(bai.duration) : '', fmtLuotXem(bai.view_count)].filter(Boolean);
+    if (sau.length) phu.appendChild(document.createTextNode((bai.channel ? ' · ' : '') + sau.join(' · ')));
+  }
+
+  // Danh sách "Kết quả tìm" là kết quả TÌM thật (không phải trang kênh / hàng
+  // Khám phá mở ra) -> có ô "Kết quả hàng đầu" + chip lọc.
+  let ketQuaLaTim = true;
+  // Chip "Kết quả tìm" chỉ hiện khi vừa tìm/mở danh sách ở chỗ đó (không nhớ
+  // qua lần mở app) - chạm bài để nghe thì ẩn đi, về Khám phá.
+  let coTabTim = false;
+  function hienChipTim(co) {
+    coTabTim = co;
+    const c = document.querySelector('#music-tab .music-chip-tim');
+    if (c) c.style.display = co ? '' : 'none';
+  }
+  let locTim = 'tat_ca';
+  function laKetQuaTimThat() { return tabDangXem === 'tim' && ketQuaLaTim && !dangTim; }
+  function nhomBai(b) { return nhanBai(b) || loaiBai(b); }
+
+  // Kết quả hàng đầu: ưu tiên BẢN GỐC (không karaoke/hát lại/remix) của kênh đã
+  // xác minh, tên gần với từ khoá; xếp hạng YouTube làm phụ.
+  function chonHangDau(ds) {
+    const q = boDauJs(tuKhoaTim);
+    let tot = 0, diemTot = -1e9;
+    ds.slice(0, 10).forEach((b, i) => {
+      let d = -i * 2;
+      if (nhanBai(b)) d -= 100;
+      if (b.verified) d += 30;
+      if (loaiBai(b) === 'Bài hát') d += 10;
+      const t = boDauJs(b.title);
+      if (q && t.includes(q)) d += 15;
+      if (q && (t === q || t.startsWith(q + ' -') || t.startsWith(q + ' |'))) d += 15;
+      if (d > diemTot) { diemTot = d; tot = i; }
+    });
+    return tot;
+  }
+
+  function veHangDau(ul, ds) {
+    const i = chonHangDau(ds);
+    const bai = ds[i];
+    const li = document.createElement('li');
+    li.className = 'mkq-hang-dau';
+    li.innerHTML = '<div class="mkq-nhan-muc">Kết quả hàng đầu</div>' +
+      '<div class="mkq-tren"><span class="mkq-anh"></span><div class="mkq-chu"><div class="mkq-ten"></div><div class="mkq-phu music-bai-phu"></div></div>' +
+      '<a href="#" class="link icon-only mkq-them" title="Tuỳ chọn"><i class="icon f7-icons">ellipsis</i></a></div>' +
+      '<div class="mkq-nut"><a href="#" class="button button-round mkq-phat"><i class="icon f7-icons">play_fill</i><span>Phát</span></a>' +
+      '<a href="#" class="button button-round mkq-luu"><i class="icon f7-icons"></i><span></span></a></div>';
+    li.querySelector('.mkq-anh').style.backgroundImage = "url('https://i.ytimg.com/vi/" + encodeURIComponent(bai.id) + "/hqdefault.jpg')";
+    li.querySelector('.mkq-ten').textContent = bai.title;
+    veDongPhuBai(li.querySelector('.mkq-phu'), bai, true);
+    const co = laYeuThich(bai.id);
+    li.querySelector('.mkq-luu i').textContent = co ? 'heart_fill' : 'heart';
+    li.querySelector('.mkq-luu span').textContent = co ? 'Đã lưu' : 'Lưu';
+    li.querySelector('.mkq-luu').classList.toggle('da-luu', co);
+    li.querySelector('.mkq-phat').addEventListener('click', (e) => { e.preventDefault(); rungNhe(); phatKetQua(i); });
+    li.querySelector('.mkq-luu').addEventListener('click', (e) => { e.preventDefault(); doiYeuThich(bai); });
+    li.querySelector('.mkq-them').addEventListener('click', (e) => { e.preventDefault(); moMenuBai(bai, e.currentTarget); });
+    li.querySelector('.mkq-phu').addEventListener('click', (e) => { if (e.target.closest('.music-kenh')) { e.preventDefault(); moKenh(bai); } });
+    ganTaiTruocKhiRe(li, bai);
+    ul.appendChild(li);
+  }
+
+  // Chip lọc theo loại - chỉ loại có trong kết quả, ít nhất 2 loại mới hiện.
+  function veChipLoc(ul, dsGoc) {
+    const thuTu = ['Bài hát', 'Video', 'HÁT LẠI', 'KARAOKE', 'REMIX', 'LIVE'];
+    const co = new Set(dsGoc.map(nhomBai));
+    const loai = thuTu.filter((x) => co.has(x));
+    if (loai.length < 2) return;
+    const li = document.createElement('li');
+    li.className = 'mkq-loc';
+    [['tat_ca', 'Tất cả']].concat(loai.map((x) => [x, x === x.toUpperCase() ? x.charAt(0) + x.slice(1).toLowerCase() : x])).forEach(([gt, chu]) => {
+      const b = document.createElement('button');
+      b.className = 'music-chip' + (locTim === gt ? ' active' : '');
+      b.textContent = chu;
+      b.addEventListener('click', () => { rungNhe(); locTim = gt; veKetQua(); });
+      li.appendChild(b);
+    });
+    ul.appendChild(li);
+  }
+
+  // ---------- Tab "Đang phát" (kiểu trang phát YouTube Music) ----------
+  // Trái: ảnh bài lớn + tên/kênh. Phải: thẻ TIẾP THEO (Đang phát từ ... + Lưu,
+  // công tắc Tự phát, danh sách đang phát) | LIÊN QUAN (bài liên quan bài
+  // đang nghe, chạm = phát ngay). Điện thoại: xếp dọc.
+  let dpThe = 'tiep';
+  // Hiệu ứng vào trang kiểu YouTube Music (trượt lên + ảnh phóng nhẹ) - CHỈ khi
+  // vừa chuyển sang từ trang khác, không chạy lại mỗi lần đổi bài/đổi thẻ.
+  let dpHieuUng = false;
+  function moTrangDangPhat() {
+    hienChipDangPhat(true);
+    if (tabDangXem !== 'dang_phat') dpHieuUng = true;
+    dpThe = 'tiep';
+    chonTab('dang_phat');
+    document.getElementById('music-results').scrollTop = 0;
+  }
+  const lienQuanCache = {};
+  function hienChipDangPhat(co) {
+    const c = document.querySelector('#music-tab .music-chip-dp');
+    if (c) c.style.display = co ? '' : 'none';
+    if (!co && tabDangXem === 'dang_phat') chonTab('kham_pha');
+  }
+
+  let dpLuot = 0;
+  let dpDs = [];         // hàng chờ đang hiện ở tab Đang phát
+  let dpBai = {};        // bài đang hiện ở ảnh lớn (chạm tên kênh -> trang kênh)
+
+  // Đổi bài (Tiếp/Trước, hết bài): KHÔNG vẽ lại cả trang - chỉ đổi ảnh (mờ dần
+  // sang ảnh mới), tên/kênh, dời vạch sáng trong danh sách. Bài mới không có
+  // trong danh sách đang hiện (vd vừa nối bài gợi ý) thì mới vẽ lại.
+  function capNhatDangPhatTaiCho(data) {
+    const khung = document.querySelector('#music-results .mdp-khung');
+    const k = dpDs.findIndex((b) => b.id === data.id);
+    if (!khung || k < 0) { veKetQua(); return; }
+    const bai = dpDs[k];
+    dpBai = bai;
+    const img = khung.querySelector('.mdp-anh img');
+    img.classList.add('mdp-doi-anh');
+    const moi = new Image();
+    const dat = (src) => { img.src = src; img.classList.remove('mdp-doi-anh'); };
+    // Video không có maxres: YouTube trả 404 KÈM ảnh xám 120x90 -> onload vẫn chạy,
+    // onerror không. Nhận ra placeholder theo kích thước rồi lùi về hqdefault.
+    const hq = 'https://i.ytimg.com/vi/' + encodeURIComponent(bai.id) + '/hqdefault.jpg';
+    moi.onload = () => { if (moi.naturalWidth <= 120 && moi.src !== hq) moi.src = hq; else dat(moi.src); };
+    moi.onerror = () => { moi.onerror = null; if (moi.src !== hq) moi.src = hq; else dat(hq); };
+    moi.src = 'https://i.ytimg.com/vi/' + encodeURIComponent(bai.id) + '/maxresdefault.jpg';
+    khung.querySelector('.mdp-ten').textContent = bai.title || '';
+    const phu = khung.querySelector('.mdp-kenh');
+    phu.innerHTML = '';
+    veDongPhuBai(phu, bai, true);
+    document.querySelectorAll('#music-dp-ds li.music-bai-dong').forEach((li, j) => {
+      li.classList.toggle('dang-phat', j === k);
+      li.classList.toggle('tam-dung', j === k && data.state !== 'playing');
+      li.classList.toggle('da-qua', j < k);
+    });
+    // Liên quan theo bài mới: đang xem thì tìm lại ngay, không thì để lúc mở thẻ.
+    const ulLq = document.getElementById('music-dp-lq');
+    if (ulLq && ulLq.dataset.bai !== bai.id) {
+      if (dpThe === 'lien_quan') veLienQuan(ulLq, bai, dpDs); else ulLq.dataset.bai = '';
+    }
+    if (dpThe === 'tiep' && document.documentElement.classList.contains('device-desktop')) cuonToiBaiDangPhat(true);
+  }
+
+  // Cuộn #music-results cho bài đang phát nằm giữa vùng nhìn (dưới thanh thẻ ghim).
+  function cuonToiBaiDangPhat(muot) {
+    const vung = document.getElementById('music-results');
+    const li = document.querySelector('#music-dp-ds li.dang-phat');
+    if (!vung || !li || li.offsetParent === null) return;
+    const rv = vung.getBoundingClientRect(), rl = li.getBoundingClientRect();
+    const dich = vung.scrollTop + rl.top - rv.top - (rv.height - rl.height) / 2;
+    vung.scrollTo({ top: Math.max(0, dich), behavior: muot ? 'smooth' : 'auto' });
+  }
+
+  // Đổi thẻ Tiếp theo / Liên quan: chỉ ẩn/hiện 2 ngăn có sẵn, KHÔNG vẽ lại trang.
+  function chonTheDangPhat(the) {
+    dpThe = the;
+    document.querySelectorAll('#music-results .mdp-the a').forEach((a) => a.classList.toggle('active', a.dataset.the === the));
+    document.querySelectorAll('#music-results .mdp-ngan').forEach((n) => { n.hidden = n.dataset.ngan !== the; });
+    if (the === 'lien_quan') {
+      const ulLq = document.getElementById('music-dp-lq');
+      if (ulLq && ulLq.dataset.bai !== dpBai.id) veLienQuan(ulLq, dpBai, dpDs);
+    } else {
+      cuonToiBaiDangPhat(true);
+    }
+  }
+  async function veDangPhat(ul) {
+    const luot = ++dpLuot;            // vẽ lại liên tiếp (đổi bài/đổi thẻ) -> chỉ lượt mới nhất được vẽ
+    const { ds, i, trenMay } = await layHangCho();
+    if (tabDangXem !== 'dang_phat' || luot !== dpLuot) return;
+    ul.innerHTML = '';
+    dpDs = ds;
+    const bai = ds[i] || baiKhungPhat || {};
+    const tenNguon = (trenMay ? tenHangChoMay : (hangChoPi || {}).query) || 'Danh sách đang phát';
+    const goiY = trenMay ? hangChoGoiY : (hangChoPi || {}).goi_y !== false;
+    const li = document.createElement('li');
+    li.className = 'mdp-khung' + (dpHieuUng ? ' mdp-vao' : '');
+    dpHieuUng = false;
+    li.innerHTML =
+      '<div class="mdp-trai"><div class="mdp-tieu-de">Đang phát</div><div class="mdp-noi">' + (trenMay ? tenMayNay() : noiPhatTen) + '</div>' +
+        '<div class="mdp-anh"><img alt="" /></div>' +
+        '<div class="mdp-ten"></div><div class="mdp-kenh music-bai-phu"></div></div>' +
+      '<div class="mdp-phai">' +
+        '<div class="mdp-the"><a href="#" data-the="tiep">Tiếp theo</a><a href="#" data-the="lien_quan">Liên quan</a></div>' +
+        '<div class="mdp-noi-dung"></div></div>';
+    const img = li.querySelector('.mdp-anh img');
+    if (bai.id) {
+      // maxres thiếu -> 404 kèm ảnh xám 120x90 (onerror không chạy): xem kích thước.
+      const hq = 'https://i.ytimg.com/vi/' + encodeURIComponent(bai.id) + '/hqdefault.jpg';
+      img.onload = () => { if (img.naturalWidth <= 120 && img.src !== hq) img.src = hq; };
+      img.onerror = () => { img.onerror = null; if (img.src !== hq) img.src = hq; };
+      img.src = 'https://i.ytimg.com/vi/' + encodeURIComponent(bai.id) + '/maxresdefault.jpg';
+    }
+    li.querySelector('.mdp-ten').textContent = bai.title || '';
+    if (bai.id) veDongPhuBai(li.querySelector('.mdp-kenh'), bai, true);
+    dpBai = bai;
+    li.querySelector('.mdp-kenh').addEventListener('click', (e) => { if (e.target.closest('.music-kenh')) moKenh(dpBai); });
+    // Bấm ảnh bìa = Phát/Tạm dừng (như nút Phát ở thanh phát).
+    li.querySelector('.mdp-anh').addEventListener('click', () => { rungNhe(); togglePlayPause(); });
+    li.querySelectorAll('.mdp-the a').forEach((a) => {
+      a.classList.toggle('active', a.dataset.the === dpThe);
+      a.addEventListener('click', (e) => { e.preventDefault(); if (a.dataset.the === dpThe) return; rungNhe(); chonTheDangPhat(a.dataset.the); });
+    });
+    const nd = li.querySelector('.mdp-noi-dung');
+    ul.appendChild(li);
+    if (document.documentElement.classList.contains('device-desktop')) datChipVao(li.querySelector('.mdp-trai'));
+    {
+      nd.innerHTML =
+        '<div class="mdp-ngan" data-ngan="tiep"' + (dpThe === 'tiep' ? '' : ' hidden') + '>' +
+        '<div class="mdp-nguon"><div class="mdp-nguon-chu"><div class="mdp-nhan">Đang phát từ</div><div class="mdp-nguon-ten"></div></div>' +
+          '<a href="#" class="button button-round mdp-luu"><i class="icon f7-icons">music_note_list</i><span>Lưu</span></a></div>' +
+        '<label class="mdp-tu-phat"><div><div class="mdp-tu-phat-ten">Tự phát</div><div class="mdp-nhan">Thêm bài tương tự vào cuối danh sách</div></div>' +
+          '<span class="toggle"><input type="checkbox"' + (goiY ? ' checked' : '') + ' /><span class="toggle-icon"></span></span></label>' +
+        '<ul class="music-ds-bai music-hang-cho" id="music-dp-ds"></ul><span id="music-dp-so" hidden></span></div>' +
+        '<div class="mdp-ngan" data-ngan="lien_quan"' + (dpThe === 'lien_quan' ? '' : ' hidden') + '>' +
+          '<ul class="music-ds-bai music-hang-cho" id="music-dp-lq"></ul></div>';
+      nd.querySelector('.mdp-nguon-ten').textContent = tenNguon;
+      nd.querySelector('.mdp-luu').addEventListener('click', (e) => { e.preventDefault(); luuHangChoThanhPlaylist(ds, tenNguon); });
+      nd.querySelector('.mdp-tu-phat input').addEventListener('change', (e) => datTuPhat(e.target.checked, trenMay));
+      veHangChoVao(document.getElementById('music-dp-ds'), document.getElementById('music-dp-so'), { ds, i, trenMay });
+      if (dpThe === 'lien_quan') veLienQuan(nd.querySelector('#music-dp-lq'), bai, ds);
+      // Máy tính: danh sách cuộn tới bài đang phát ngay khi vào. Điện thoại
+      // giữ ảnh lớn ở đầu, cuộn khi chạm thẻ Tiếp theo.
+      else if (document.documentElement.classList.contains('device-desktop')) requestAnimationFrame(() => cuonToiBaiDangPhat(false));
+    }
+  }
+
+  async function veLienQuan(ulLq, bai, ds) {
+    if (!bai.id) return;
+    ulLq.dataset.bai = bai.id;
+    if (!lienQuanCache[bai.id]) {
+      ulLq.innerHTML = '<li class="mdp-cho">Đang tìm bài liên quan...</li>';
+      try {
+        const bo = ds.map((b) => b.id).join(',');
+        lienQuanCache[bai.id] = (await api('/api/music/related?id=' + encodeURIComponent(bai.id) + '&bo_qua=' + encodeURIComponent(bo))).results || [];
+      } catch (e) { lienQuanCache[bai.id] = []; }
+      if (!document.body.contains(ulLq) || ulLq.dataset.bai !== bai.id) return;
+    }
+    ulLq.innerHTML = '';
+    const lq = lienQuanCache[bai.id];
+    if (!lq.length) { ulLq.innerHTML = '<li class="mdp-cho">Không tìm được bài liên quan.</li>'; return; }
+    lq.forEach((b) => {
+      const li = document.createElement('li');
+      li.className = 'music-bai-dong';
+      li.innerHTML = '<span class="music-bai-anh"><img alt="" /></span><span class="music-bai-chu"><span class="music-bai-ten"></span><span class="music-bai-phu"></span></span>';
+      li.querySelector('img').src = 'https://i.ytimg.com/vi/' + encodeURIComponent(b.id) + '/mqdefault.jpg';
+      li.querySelector('.music-bai-ten').textContent = b.title || '';
+      veDongPhuBai(li.querySelector('.music-bai-phu'), b, false);
+      li.addEventListener('click', (e) => { if (e.target.closest('.music-kenh')) { moKenh(b); return; } rungNhe(); phatNgayBai(b); });
+      ganTaiTruocKhiRe(li, b);
+      ulLq.appendChild(li);
+    });
+  }
+
+  // Chạm bài ở thẻ Liên quan: chèn ngay sau bài đang nghe rồi chuyển tới nó.
+  async function phatNgayBai(b) {
+    if (dangPhatTrenMay()) {
+      hangChoMay.splice(viTriMay + 1, 0, b);
+      phatBaiTrenMay(viTriMay + 1);
+      setTimeout(veKetQua, 300);
+      return;
+    }
+    try {
+      const ok = (await api('/api/music/queue/add', { method: 'POST', body: JSON.stringify({ bai: b, tiep_theo: true }) })).ok;
+      if (ok) await api('/api/music/next', { method: 'POST' });
+      else phatDanhSach([b], 0, b.title || '');
+    } catch (e) { baoLoi(e); }
+  }
+
+  async function datTuPhat(bat, trenMay) {
+    rungNhe();
+    if (trenMay) { hangChoGoiY = bat; return; }
+    try {
+      await api('/api/music/queue/goi_y', { method: 'POST', body: JSON.stringify({ bat }) });
+      if (hangChoPi) hangChoPi.goi_y = bat;
+    } catch (e) { baoLoi(e); }
+  }
+
+  function luuHangChoThanhPlaylist(ds, tenGoiY) {
+    if (!ds.length) return;
+    $f7.dialog.prompt('Lưu ' + ds.length + ' bài đang phát thành danh sách phát', 'Lưu danh sách', async (ten) => {
+      if (!(ten || '').trim()) return;
+      try {
+        const data = await api('/api/music/playlists', { method: 'POST', body: JSON.stringify({ ten, bai: ds, may_id: MAY_ID }) });
+        dsPlaylist = data.playlists || dsPlaylist;
+        rungNhe();
+        $f7.toast.show({ text: 'Đã lưu "' + esc(ten.trim()) + '"', closeTimeout: 1500 });
+      } catch (e) { baoLoi(e); }
+    }, null, String(tenGoiY || '').slice(0, 60));
+  }
+
+  // Máy tính, tab Đang phát: hàng chip nằm ĐẦU CỘT TRÁI để cột Tiếp theo /
+  // Liên quan bên phải ngang hàng chip (không kéo cột phải chồng lên đầu trang
+  // được - vùng danh sách cắt phần tràn). Trả về đầu trang TRƯỚC khi xoá nội
+  // dung (chip nằm trong nội dung sẽ bị xoá mất cùng).
+  function datChipVao(noi) {
+    const tab = document.getElementById('music-tab');
+    if (tab && noi && tab.parentElement !== noi) noi.prepend(tab);
+  }
+
+  function veKetQua() {
+    const ul = document.querySelector('#music-results ul');
+    datChipVao(document.querySelector('#music-list-card .music-ds-dau'));
+    ul.innerHTML = '';
+    if (dangTim && tabDangXem === 'tim') {
+      veSkeletonTim(ul, ketQuaLaTim);
+      capNhatDauCard();
+      // Dòng phụ dưới tiêu đề đã ghi "Đang tìm..." - bỏ dòng trạng thái riêng
+      // để skeleton nằm ĐÚNG chỗ dữ liệu thật sẽ hiện (không nhảy 44px).
+      baoTrangThaiTim('');
+      return;
+    }
+    if (tabDangXem === 'kham_pha') {
+      veKhamPha(ul);
+      capNhatDauCard();
+      danhDauBaiDangPhat();
+      return;
+    }
+    if (tabDangXem === 'dang_phat') {
+      veDangPhat(ul);
+      capNhatDauCard();
+      return;
+    }
+    if (tabDangXem === 'yeu_thich') veHangPlaylist(ul);
+    if (laKetQuaTimThat() && ketQuaTim.length) {
+      veChipLoc(ul, ketQuaTim);
+      if (locTim === 'tat_ca') veHangDau(ul, ketQuaTim);
+    }
+    dsDangXem().forEach((bai, i) => {
+      const li = document.createElement('li');
+      li.className = 'music-bai-dong';
+      li.dataset.title = bai.title || '';
+      li.dataset.id = bai.id || '';
+      li.innerHTML =
+        '<a href="#" class="music-bai-anh music-bai"><img alt="" />' +
+          '<span class="music-choi"><i class="icon f7-icons">play_fill</i></span>' +
+          '<span class="music-song"><i></i><i></i><i></i></span>' +
+          '<span class="music-tai"><span class="preloader">' + htmlPreloader() + '</span></span></a>' +
+        '<div class="music-bai-chu"><span class="music-bai-ten"></span><span class="music-bai-phu"></span></div>' +
+        '<a href="#" class="link icon-only music-tim" title="Yêu thích"><i class="icon f7-icons"></i></a>' +
+        '<a href="#" class="link icon-only music-them" title="Tuỳ chọn"><i class="icon f7-icons">ellipsis</i></a>';
+      li.querySelector('img').src = 'https://i.ytimg.com/vi/' + encodeURIComponent(bai.id) + '/mqdefault.jpg';
+      li.querySelector('.music-bai-ten').textContent = bai.title;
+      // Tên kênh/ca sĩ CHẠM ĐƯỢC (có channel_id) -> mở danh sách bài của kênh.
+      veDongPhuBai(li.querySelector('.music-bai-phu'), bai, laKetQuaTimThat());
+      const tim = li.querySelector('.music-tim');
+      const co = laYeuThich(bai.id);
+      tim.querySelector('i').textContent = co ? 'heart_fill' : 'heart';
+      tim.classList.toggle('da-thich', co);
+      tim.addEventListener('click', (e) => { e.preventDefault(); doiYeuThich(bai); });
+      li.querySelector('.music-them').addEventListener('click', (e) => { e.preventDefault(); moMenuBai(bai, e.currentTarget); });
+      li.addEventListener('pointerdown', (e) => { if (!e.target.closest('.music-them, .music-tim, .music-kenh')) taiTruoc([bai]); }, { passive: true });
+      ganTaiTruocKhiRe(li, bai);
+      li.querySelector('.music-bai').addEventListener('click', (e) => { e.preventDefault(); phatKetQua(i); });
+      li.querySelector('.music-bai-chu').addEventListener('click', (e) => {
+        if (e.target.closest('.music-kenh')) moKenh(bai);
+        else phatKetQua(i);
+      });
+      ul.appendChild(li);
+    });
+    danhDauBaiDangPhat();
+    capNhatDauCard();
+  }
+
+  async function doiYeuThich(bai) {
+    const them = !laYeuThich(bai.id);
+    rungNhe();
+    try {
+      const data = await api('/api/music/favorites', { method: 'POST', body: JSON.stringify({ bai, them, may_id: MAY_ID }) });
+      dsYeuThich = data.results || [];
+      if (tabDangXem === 'kham_pha') {
+        document.querySelectorAll('#music-results .mkp-the[data-id]').forEach((the) => {
+          const co = laYeuThich(the.dataset.id);
+          const t = the.querySelector('.mkp-tim');
+          if (t) { t.classList.toggle('da-thich', co); t.querySelector('i').textContent = co ? 'heart_fill' : 'heart'; }
+        });
+        veLaiHangKhamPha('yeu_thich');
+        document.getElementById('music-fav-count').textContent = dsYeuThich.length;
+      } else {
+        veKetQua();
+      }
+      capNhatTimKhungPhat();
+      $f7.toast.show({ text: them ? 'Đã thêm vào yêu thích' : 'Đã bỏ khỏi yêu thích', closeTimeout: 1500 });
+    } catch (e) {
+      baoLoi(e);
+    }
+  }
+
+  // Kết quả tìm / trang kênh lưu RIÊNG trên máy này (localStorage) - 2 điện
+  // thoại tìm bài khác nhau không đè danh sách của nhau. Máy chưa có (lần đầu)
+  // thì lấy danh sách chung cũ trên server (/api/music/list).
+  const KHOA_KET_QUA = 'music_ket_qua_tim';
+  function luuKetQuaMay() {
+    try { localStorage.setItem(KHOA_KET_QUA, JSON.stringify({ query: tuKhoaTim, results: ketQuaTim.slice(0, 50), laTim: ketQuaLaTim })); } catch (e) { /* đầy/riêng tư */ }
+  }
+  function docKetQuaMay() {
+    try {
+      const d = JSON.parse(localStorage.getItem(KHOA_KET_QUA) || 'null');
+      return d && Array.isArray(d.results) ? d : null;
+    } catch (e) { return null; }
+  }
+
+  async function timBai() {
+    const input = document.getElementById('music-query');
+    const q = input.value.trim();
+    if (!q) return;
+    anGoiY();
+    input.blur();
+    if (musicSearchbar) musicSearchbar.disable();
+    ketQuaTim = [];
+    tuKhoaTim = q;
+    ketQuaLaTim = true;
+    locTim = 'tat_ca';
+    hienChipTim(true);
+    dangTim = true;
+    chonTab('tim');
+    // (dòng phụ dưới tiêu đề đã ghi "Đang tìm trên YouTube..." - không thêm dòng trạng thái, skeleton nằm đúng chỗ)
+    try {
+      const data = await api('/api/music/search?q=' + encodeURIComponent(q));
+      ketQuaTim = data.results || [];
+      dangTim = false;
+      luuKetQuaMay();
+      veKetQua();
+      if (!ketQuaTim.length) baoTrangThaiTim('Không tìm thấy bài nào.');
+    } catch (e) {
+      dangTim = false;
+      veKetQua();
+      baoLoi(e);
+    }
+  }
+
+  // Chạm tên ca sĩ/kênh ở 1 dòng bài -> video mới nhất của kênh đó
+  // (/api/music/channel - server tự lưu làm danh sách phát "Kênh: <tên>").
+  async function moKenh(bai) {
+    rungNhe();
+    ketQuaTim = [];
+    tuKhoaTim = 'Kênh: ' + (bai.channel || '');
+    ketQuaLaTim = false;
+    locTim = 'tat_ca';
+    hienChipTim(true);
+    dangTim = true;
+    chonTab('tim');
+    document.getElementById('music-results').scrollTop = 0;
+    try {
+      const data = await api('/api/music/channel?id=' + encodeURIComponent(bai.channel_id));
+      ketQuaTim = data.results || [];
+      tuKhoaTim = 'Kênh: ' + (data.channel || bai.channel || '');
+      dangTim = false;
+      luuKetQuaMay();
+      veKetQua();
+      if (!ketQuaTim.length) baoTrangThaiTim('Kênh này chưa có video nào.');
+    } catch (e) {
+      dangTim = false;
+      veKetQua();
+      baoLoi(e);
+    }
+  }
+
+  // Danh sách đã lưu trên server: kết quả tìm gần nhất + bài yêu thích.
+  async function taiDanhSachDaLuu() {
+    try {
+      const may = docKetQuaMay();
+      const [ds, yt, pls] = await Promise.all([may ? Promise.resolve(may) : api('/api/music/list'), api('/api/music/favorites?may=' + encodeURIComponent(MAY_ID)), api('/api/music/playlists?may=' + encodeURIComponent(MAY_ID))]);
+      ketQuaTim = ds.results || [];
+      tuKhoaTim = ds.query || '';
+      ketQuaLaTim = ds.laTim !== undefined ? !!ds.laTim : !tuKhoaTim.startsWith('Kênh: ');
+      // Lần đầu (lấy danh sách chung của server) -> giữ luôn làm danh sách
+      // RIÊNG của máy này, không thì máy khác tìm bài là danh sách này đổi theo.
+      if (!may) luuKetQuaMay();
+      dsYeuThich = yt.results || [];
+      dsPlaylist = pls.playlists || [];
+    } catch (e) { /* chưa có/không đọc được thì để trống */ }
+    // Chưa từng tìm mà đã có bài yêu thích -> mở sẵn tab Yêu thích.
+    chonTab(tabDangXem, true);
+    taiKhamPha();
+  }
+
+  // ---------- Hàng chờ (thẻ "Tiếp theo" ở tab Đang phát): bài đang phát đánh
+  // dấu, chạm 1 bài để nhảy tới. Lấy đúng nơi đang phát: Máy này (hangChoMay)
+  // hay Loa Pi (/api/music/queue). ----------
+  let hangChoPi = null;          // {query, index, entries, goi_y} lần đọc gần nhất
+
+  async function layHangCho() {
+    if (dangPhatTrenMay()) return { ds: hangChoMay, i: viTriMay, trenMay: true };
+    try {
+      hangChoPi = await api('/api/music/queue');
+    } catch (e) { hangChoPi = null; }
+    const ds = (hangChoPi && hangChoPi.entries) || [];
+    return { ds, i: Number((hangChoPi || {}).index) || 0, trenMay: false };
+  }
+
+  // Vẽ lại danh sách ở tab Đang phát (sau khi hàng chờ đổi: trộn, chèn bài,
+  // nhảy bài). khongDangPhat: bỏ qua (đổi bài thì tab tự cập nhật tại chỗ).
+  async function veHangCho(khongDangPhat) {
+    if (khongDangPhat || tabDangXem !== 'dang_phat' || !document.getElementById('music-dp-ds')) return;
+    const duLieu = await layHangCho();
+    veHangChoVao(document.getElementById('music-dp-ds'), document.getElementById('music-dp-so'), duLieu);
+  }
+
+  function veHangChoVao(ul, phu, { ds, i, trenMay }) {
+    if (!ul) return;
+    ul.innerHTML = '';
+    phu.textContent = ds.length
+      ? (trenMay ? 'Máy này' : noiPhatTen) + ' · ' + ds.length + ' bài' : 'Chưa có bài nào đang phát';
+    ds.forEach((bai, k) => {
+      const li = document.createElement('li');
+      li.className = 'music-bai-dong' + (k === i ? ' dang-phat' : '') + (k === i && musicState !== 'playing' ? ' tam-dung' : '');
+      li.dataset.id = bai.id || '';
+      if (k < i) li.classList.add('da-qua');
+      li.innerHTML =
+        '<span class="music-bai-anh"><img alt="" /><span class="music-song"><i></i><i></i><i></i></span></span>' +
+        '<span class="music-bai-chu"><span class="music-bai-ten"></span><span class="music-bai-phu"></span></span>';
+      li.querySelector('img').src = 'https://i.ytimg.com/vi/' + encodeURIComponent(bai.id) + '/mqdefault.jpg';
+      li.querySelector('.music-bai-ten').textContent = bai.title;
+      li.querySelector('.music-bai-phu').textContent =
+        [bai.channel || '', bai.duration ? fmtTime(bai.duration) : ''].filter(Boolean).join(' · ');
+      li.addEventListener('click', () => {
+        // Theo vạch sáng HIỆN TẠI (tab Đang phát dời vạch tại chỗ khi đổi bài).
+        if (li.classList.contains('dang-phat')) return;
+        rungNhe();
+        nhayToiBaiHangCho(k, trenMay);
+      });
+      ul.appendChild(li);
+    });
+  }
+
+  function nhayToiBaiHangCho(k, trenMay) {
+    if (trenMay) {
+      phatBaiTrenMay(k);
+      setTimeout(veHangCho, 300);
+      return;
+    }
+    const q = hangChoPi || {};
+    api('/api/music/play_item', {
+      method: 'POST',
+      body: JSON.stringify({ query: q.query || '', index: k, entries: q.entries || [], goi_y: q.goi_y !== false, thong_bao: false, may_id: q.chu || '' }),
+    }).then(() => setTimeout(veHangCho, 1500)).catch((e) => baoLoi(e));
+  }
+
+  // ---------- Thao tác danh sách phát ----------
+  // Actions/toast của F7 hiển thị chữ dạng HTML - escape tên bài/danh sách
+  // (lấy từ YouTube/người dùng nhập) trước khi đưa vào.
+  function esc(t) {
+    return String(t == null ? '' : t).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  }
+  // Yêu thích + danh sách phát lưu RIÊNG từng máy (mã máy gửi kèm - xem MAY_ID).
+  async function guiPlaylist(url, body) {
+    const data = await api(url, { method: 'POST', body: JSON.stringify(Object.assign({ may_id: MAY_ID }, body)) });
+    dsPlaylist = data.playlists || dsPlaylist;
+    // Vừa xoá playlist đang mở -> về tab Yêu thích.
+    if (tabDangXem === 'ds' && !plDangMo()) chonTab('yeu_thich');
+    else veKetQua();
+    return data;
+  }
+
+  // Tạo danh sách mới (hỏi tên); baiThem: bài vừa chọn "Thêm vào..." -> thêm luôn.
+  function taoPlaylist(baiThem) {
+    $f7.dialog.prompt('Đặt tên cho danh sách phát', 'Tạo danh sách phát', async (ten) => {
+      if (!(ten || '').trim()) return;
+      try {
+        const data = await guiPlaylist('/api/music/playlists', { ten });
+        if (baiThem && data.playlist) await themVaoPlaylist(data.playlist.id, baiThem);
+        else $f7.toast.show({ text: 'Đã tạo "' + esc(ten.trim()) + '"', closeTimeout: 1500 });
+      } catch (e) { baoLoi(e); }
+    });
+  }
+
+  async function themVaoPlaylist(plId, bai) {
+    try {
+      await guiPlaylist('/api/music/playlists/' + plId, { bai, them: true });
+      const pl = dsPlaylist.find((p) => p.id === plId);
+      rungNhe();
+      $f7.toast.show({ text: 'Đã thêm vào "' + esc(pl ? pl.ten : '') + '"', closeTimeout: 1500 });
+    } catch (e) { baoLoi(e); }
+  }
+
+  // Menu của nút ⋯ (đầu danh sách phát đang mở): F7 Actions hiện thành POPOVER bám ngay nút vừa bấm
+  // (forceToPopover - cả điện thoại lẫn máy tính) thay vì trượt từ đáy lên.
+  // Popover chạm ra ngoài là đóng nên bỏ nhóm "Đóng". Không có nút (gọi từ chỗ
+  // khác) thì vẫn là Actions thường.
+  function moMenu(nhom, nutGoc) {
+    if (nutGoc && document.body.contains(nutGoc)) {
+      return $f7.actions.create({ buttons: nhom, targetEl: nutGoc, convertToPopover: true, forceToPopover: true }).open();
+    }
+    return $f7.actions.create({ buttons: [...nhom, [{ text: 'Đóng' }]] }).open();
+  }
+
+  // ---------- Menu ⋯ của 1 bài - kiểu Tidal ----------
+  // Máy tính (>= 630px): popover bám nút ⋯ (đầu: ảnh nhỏ + tên + kênh, mục
+  // căn trái, mục có menu con thì có ›). Điện thoại: màn tối toàn trang (F7
+  // popup) - ảnh bìa, mục có icon, "Đóng" ở cuối, vuốt xuống để đóng. Cùng 1 nội dung
+  // (htmlMenuBai); "Thêm vào danh sách phát" mở danh sách NGAY TRONG menu.
+  function mucMenuBai(bai, coDung) {
+    const pl = tabDangXem === 'ds' ? plDangMo() : null;
+    const co = laYeuThich(bai.id);
+    const m = [
+      ['pl', 'music_note_list', 'Thêm vào danh sách phát', true],
+      ['tim', co ? 'heart_fill' : 'heart', co ? 'Bỏ khỏi Yêu thích' : 'Thêm vào Yêu thích'],
+      ['tiep', 'text_insert', 'Phát tiếp theo'],
+      ['cuoi', 'text_append', 'Thêm vào hàng chờ'],
+      ['radio', 'dot_radiowaves_left_right', 'Phát radio từ bài này'],
+    ];
+    if (bai.channel && bai.channel_id) m.push(['kenh', 'person', 'Xem kênh ' + bai.channel, true]);
+    m.push(['chia_se', 'square_arrow_up', 'Chia sẻ']);
+    if (pl) m.push(['xoa_pl', 'minus_circle', 'Xoá khỏi "' + pl.ten + '"']);
+    if (coDung) m.push(['dung', 'stop_circle', 'Dừng phát']);
+    return m;
+  }
+
+  function htmlMucMenu(hd, icon, ten, them) {
+    return '<a href="#" class="mmb-muc' + (hd === 'xoa_pl' || hd === 'dung' ? ' mmb-do' : '') + '" data-hd="' + esc(hd) + '">' +
+      '<i class="icon f7-icons">' + icon + '</i><span>' + esc(ten) + '</span>' + (them || '') + '</a>';
+  }
+
+  function htmlMenuBai(bai, trang, coDung) {
+    const anh = 'https://i.ytimg.com/vi/' + encodeURIComponent(bai.id) + '/hqdefault.jpg';
+    let ds;
+    if (trang === 'pl') {
+      ds = htmlMucMenu('lui', 'chevron_left', 'Thêm vào danh sách phát') +
+        dsPlaylist.map((p) => htmlMucMenu('pl:' + p.id, 'music_note_list', p.ten, '<em>' + (p.bai || []).length + '</em>')).join('') +
+        htmlMucMenu('pl_moi', 'plus', 'Tạo danh sách mới');
+    } else {
+      ds = mucMenuBai(bai, coDung).map(([hd, icon, ten, con]) =>
+        htmlMucMenu(hd, icon, ten, con ? '<i class="icon f7-icons mmb-con">chevron_right</i>' : '')).join('');
+    }
+    return '<div class="mmb-dau"><span class="mmb-anh" style="background-image:url(\'' + anh + '\')"></span>' +
+      '<div class="mmb-chu"><div class="mmb-ten">' + esc(bai.title) + '</div><div class="mmb-phu">' + esc(bai.channel || '') + '</div></div></div>' +
+      '<div class="mmb-ds' + (trang === 'pl' ? ' mmb-ds-pl' : '') + '">' + ds + '</div>';
+  }
+
+  // coDung: mở từ thanh phát (bài đang phát) -> thêm "Dừng phát".
+  function moMenuBai(bai, nutGoc, coDung) {
+    const rong = !!nutGoc && window.innerWidth >= 630;
+    const modal = rong
+      ? $f7.popover.create({
+          targetEl: nutGoc,
+          content: '<div class="popover music-menu-bai"><div class="popover-inner"><div class="mmb-vung"></div></div></div>',
+          on: { closed: (m) => m.destroy() },
+        })
+      : $f7.popup.create({
+          swipeToClose: 'to-bottom',       // vuốt xuống là đóng
+          content: '<div class="popup music-menu-bai music-menu-bai-dt"><div class="mmb-vung"></div><a href="#" class="mmb-huy" title="Đóng" aria-label="Đóng"><i class="icon f7-icons">xmark</i></a></div>',
+          on: { closed: (m) => m.destroy() },
+        });
+    const vung = modal.el.querySelector('.mmb-vung');
+    const ve = (trang) => { vung.innerHTML = htmlMenuBai(bai, trang, coDung); if (rong && modal.opened) modal.resize(); };
+    ve('chinh');
+    modal.el.addEventListener('click', (e) => {
+      if (e.target.closest('.mmb-huy')) { e.preventDefault(); modal.close(); return; }
+      const a = e.target.closest('[data-hd]');
+      if (!a) return;
+      e.preventDefault();
+      const hd = a.dataset.hd;
+      if (hd === 'pl') { ve('pl'); return; }
+      if (hd === 'lui') { ve('chinh'); return; }
+      modal.close();
+      thucHienMenuBai(hd, bai);    // chạy NGAY trong lúc chạm (navigator.share cần)
+    });
+    modal.open();
+  }
+
+  function thucHienMenuBai(hd, bai) {
+    const pl = tabDangXem === 'ds' ? plDangMo() : null;
+    if (hd === 'tim') doiYeuThich(bai);
+    else if (hd.startsWith('pl:')) themVaoPlaylist(hd.slice(3), bai);
+    else if (hd === 'pl_moi') taoPlaylist(bai);
+    else if (hd === 'tiep' || hd === 'cuoi') chenHangCho(bai, hd === 'tiep');
+    // Radio: phát riêng bài này, hết bài tự nối bài liên quan (YouTube Mix).
+    else if (hd === 'radio') phatDanhSach([bai], 0, 'Radio: ' + (bai.title || ''));
+    else if (hd === 'kenh') moKenh(bai);
+    else if (hd === 'chia_se') chiaSeBai(bai);
+    else if (hd === 'xoa_pl' && pl) xoaKhoiPlaylist(pl, bai);
+    else if (hd === 'dung') stopMusic();
+  }
+
+  // "Phát tiếp theo" / "Thêm vào hàng chờ": Máy này sửa hàng chờ tại chỗ; Loa
+  // Pi qua /api/music/queue/add. Chưa phát gì thì phát luôn bài đó.
+  async function chenHangCho(bai, tiepTheo) {
+    rungNhe();
+    if (dangPhatTrenMay()) {
+      hangChoMay.splice(tiepTheo ? viTriMay + 1 : hangChoMay.length, 0, bai);
+    } else {
+      const st = trangThaiPiCuoi && trangThaiPiCuoi.state;
+      let ok = false;
+      if (st === 'playing' || st === 'paused') {
+        try {
+          ok = (await api('/api/music/queue/add', { method: 'POST', body: JSON.stringify({ bai, tiep_theo: tiepTheo }) })).ok;
+        } catch (e) { baoLoi(e); return; }
+      }
+      if (!ok) { phatDanhSach([bai], 0, bai.title || ''); return; }
+    }
+    $f7.toast.show({ text: tiepTheo ? 'Sẽ phát tiếp theo' : 'Đã thêm vào hàng chờ', closeTimeout: 1500 });
+    veHangCho();
+  }
+
+  // Chia sẻ link YouTube: bảng chia sẻ của máy nếu có; web UI chạy http (không
+  // phải https) thì trình duyệt khoá navigator.share/clipboard -> chép kiểu cũ.
+  function chiaSeBai(bai) {
+    const url = 'https://youtu.be/' + bai.id;
+    if (navigator.share) {
+      navigator.share({ title: bai.title, url }).catch(() => {});
+      return;
+    }
+    const ta = document.createElement('textarea');
+    ta.value = url;
+    ta.setAttribute('readonly', '');
+    ta.style.cssText = 'position:fixed;top:0;left:0;opacity:0;';
+    document.body.appendChild(ta);
+    ta.select();
+    let chep = false;
+    try { chep = document.execCommand('copy'); } catch (e) { chep = false; }
+    ta.remove();
+    if (chep) $f7.toast.show({ text: 'Đã chép link bài hát', closeTimeout: 1500 });
+    else $f7.dialog.alert(esc(url), 'Link bài hát');
+  }
+
+  function xoaKhoiPlaylist(pl, bai) {
+    $f7.dialog.confirm(esc(bai.title), 'Xoá khỏi "' + esc(pl.ten) + '"?', () => {
+      guiPlaylist('/api/music/playlists/' + pl.id, { bai, them: false }).catch((e) => baoLoi(e));
+    });
+  }
+
+  // Nút ⋯ của danh sách đang mở: đổi tên / xoá.
+  function moMenuPlaylist(nutGoc) {
+    const pl = plDangMo();
+    if (!pl) return;
+    moMenu([[
+      { text: 'Đổi tên', onClick: () => {
+        $f7.dialog.prompt('Tên mới', 'Đổi tên danh sách', (ten) => {
+          if ((ten || '').trim()) guiPlaylist('/api/music/playlists/' + pl.id, { ten }).catch((e) => baoLoi(e));
+        }, null, pl.ten);
+      } },
+      { text: 'Xoá danh sách phát', color: 'red', onClick: () => {
+        $f7.dialog.confirm('Xoá "' + esc(pl.ten) + '"? Các bài trong đó vẫn còn ở nơi khác.', 'Xoá danh sách phát', () => {
+          guiPlaylist('/api/music/playlists/' + pl.id, { xoa: true }).catch((e) => baoLoi(e));
+        });
+      } },
+    ]], nutGoc);
+  }
+
+  function phatKetQua(i) {
+    const tuTrangTim = tabDangXem === 'tim';
+    phatDanhSach(dsDangXem().slice(), i, tenDanhSachDangXem());
+    // Nghe từ trang tìm -> ẩn trang tìm, sang tab "Đang phát" (ảnh lớn + danh
+    // sách tiếp theo, kiểu YouTube Music) - hàng chờ chính là danh sách vừa
+    // tìm. Máy này có hàng chờ ngay; Loa Pi tự vẽ lại khi Pi đổi bài.
+    if (tuTrangTim) {
+      hienChipTim(false);
+      moTrangDangPhat();
+    }
+  }
+
+  async function phatDanhSach(ds, i, ten) {
+    // Mọi nguồn: hết danh sách thì tự gợi ý bài liên quan (radio kiểu Tidal).
+    // Yêu thích / danh sách tự tạo: ưu tiên phát HẾT danh sách trước - bấm bài
+    // giữa thì xoay vòng (bài đó -> cuối -> các bài phía trên) rồi mới gợi ý.
+    const goiY = true;
+    if ((tabDangXem === 'yeu_thich' || tabDangXem === 'ds') && i > 0) { ds = ds.slice(i).concat(ds.slice(0, i)); i = 0; }
+    datBaiDangMo(ds[i]);
+    if (cheDoPhat === 'may') {
+      rungNhe();
+      hangChoMay = ds;
+      hangChoGoiY = goiY;
+      tenHangChoMay = ten || '';
+      datLaiTronMay();
+      phatBaiTrenMay(i);
+      return;
+    }
+    // Loa Pi: không che màn hình bằng hộp thoại "Đang mở bài..." nữa - loader
+    // hiện ngay trên ảnh bài vừa chạm (datBaiDangMo) cho tới khi Pi phát.
+    try {
+      const truoc = await api('/api/music/status');
+      await api('/api/music/play_item', { method: 'POST', body: JSON.stringify({ query: ten, index: i, entries: ds, goi_y: goiY, may_id: MAY_ID }) });
+      rungNhe();
+      await choToiKhiPhatXongBaiMoi(truoc.title);
+    } catch (e) {
+      datBaiDangMo(null);
+      baoLoi(e);
+    } finally {
+      loadMusicStatus();
+    }
+  }
+
+  async function stopMusic() {
+    if (dangPhatTrenMay()) { dungTrenMay(); return; }
+    try {
+      await api('/api/music/stop', { method: 'POST' });
+    } catch (e) {
+      baoLoi(e);
+    } finally {
+      loadMusicStatus();
+    }
+  }
+
+  // Nút Phát/Tạm dừng chung - đọc icon hiện tại để biết đang phát hay đang dừng
+  // mà gọi đúng API tương ứng (dùng lại cơ chế tam_dung()/tiep_tuc() vốn đã có
+  // sẵn cho việc nhường loa lúc TTS nói).
+  async function togglePlayPause() {
+    if (dangPhatTrenMay()) { batTatTrenMay(); return; }
+    if (Date.now() < dangChuyenBaiPi) return;        // đang chờ Pi xử lý lệnh trước - khỏi bấm trùng
+    const dangPhat = document.getElementById('music-playpause-icon').textContent === 'pause_fill';
+    // Vòng xoay ở nút Phát (thanh phát, mini player, trình phát mở rộng) trong
+    // lúc chờ Pi dừng/phát tiếp (phát tiếp còn phải lấy lại link ~1-3s).
+    dangChuyenBaiPi = Date.now() + 20000;
+    danhDauBaiDangPhat();
+    try {
+      await api(dangPhat ? '/api/music/pause' : '/api/music/resume', { method: 'POST' });
+    } catch (e) {
+      baoLoi(e);
+    } finally {
+      await loadMusicStatus();
+      dangChuyenBaiPi = 0;
+      danhDauBaiDangPhat();
+    }
+  }
+
+  async function skipMusic(path) {
+    if (dangPhatTrenMay()) { chuyenBaiTrenMay(path.endsWith('/next')); return; }
+    // Vòng xoay ngay ở nút Phát (thanh phát, mini player, trình phát mở rộng)
+    // thay cho hộp thoại "Đang chuyển bài..." che màn hình.
+    dangChuyenBaiPi = Date.now() + 20000;
+    danhDauBaiDangPhat();
+    try {
+      const data = await api(path, { method: 'POST' });
+      if (data.message) $f7.toast.show({ text: data.message, closeTimeout: 2000 });
+    } catch (e) {
+      baoLoi(e);
+    } finally {
+      await loadMusicStatus();
+      dangChuyenBaiPi = 0;
+      danhDauBaiDangPhat();
+    }
+  }
+
+  $on('pageInit', () => {
+    // Searchbar thật của F7 (cùng cách tạo với devices.html) - customSearch:
+    // tự xử lý (gợi ý/tìm qua API), F7 chỉ lo phần mở/đóng/xoá chữ.
+    try {
+      musicSearchbar = $f7.searchbar.create({
+        el: '#music-searchbar',
+        customSearch: true,
+        expandable: true,
+        // Đúng chuẩn F7 (như searchbar trang Thiết bị): CÓ backdrop - chạm ra
+        // ngoài (vào lớp mờ) thì F7 tự đóng thanh tìm, về lại navbar thường.
+        // Trước đây tắt backdrop nên chạm ra ngoài thanh tìm vẫn mở mãi.
+        backdrop: true,
+        on: {
+          search(sb, query) {
+            clearTimeout(goiYTimer);
+            goiYTimer = setTimeout(() => layGoiY(query.trim()), 250);
+          },
+          clear() { anGoiY(); },
+          disable() { anGoiY(); },
+        },
+      });
+    } catch (e) {
+      console.error('Lỗi khởi tạo searchbar nhạc:', e);
+    }
+    window.addEventListener('resize', () => {
+      if (document.getElementById('music-suggest').style.display !== 'none') dinhViGoiY();
+    });
+    // Enter trên bàn phím = submit form searchbar -> tìm (chặn tải lại trang).
+    document.getElementById('music-searchbar').addEventListener('submit', (e) => { e.preventDefault(); timBai(); });
+    document.getElementById('music-repeat-btn').addEventListener('click', (e) => { e.preventDefault(); doiCheDoLap(); });
+    apDungCheDoLap();     // vẽ chế độ lặp đã nhớ của máy này (nút desktop + trình phát mở rộng)
+    document.getElementById('music-player-tim').addEventListener('click', (e) => {
+      e.preventDefault();
+      if (baiKhungPhat) doiYeuThich(baiKhungPhat);
+    });
+    document.getElementById('music-output-btn').addEventListener('click', (e) => {
+      e.preventDefault();
+      rungNhe();
+      moChonNoiPhat(e.currentTarget);
+    });
+    chonCheDoPhat(cheDoPhat, false);
+    // Segmented Kết quả tìm | Yêu thích - tự xử lý (không dùng bindSegmented()
+    // của settings-common.js vì hàm đó còn tô màu nút Lưu của trang cài đặt
+    // đang mở ở tab khác).
+    document.querySelectorAll('#music-tab .music-chip').forEach((b) => {
+      b.addEventListener('click', () => {
+        rungNhe();
+        if (b.dataset.value === 'dang_phat' && tabDangXem !== 'dang_phat') dpHieuUng = true;
+        chonTab(b.dataset.value);
+        if (b.dataset.value === 'kham_pha') taiKhamPha();
+      });
+    });
+    // Tab Đang phát (desktop): lăn chuột chỉ cuộn khi con trỏ nằm trên danh sách
+    // (cột phải) - đặt chuột lên ảnh bìa/cột trái thì trang đứng yên.
+    document.getElementById('music-results').addEventListener('wheel', (e) => {
+      if (tabDangXem !== 'dang_phat' || !document.documentElement.classList.contains('device-desktop')) return;
+      if (!e.target.closest('.mdp-phai')) e.preventDefault();
+    }, { passive: false });
+    document.getElementById('music-pl-menu').addEventListener('click', (e) => { e.preventDefault(); moMenuPlaylist(e.currentTarget); });
+    document.getElementById('music-pl-quay-lai').addEventListener('click', (e) => { e.preventDefault(); rungNhe(); chonTab('yeu_thich'); });
+    taiDanhSachDaLuu();
+    $f7.on('daDangNhap', taiDanhSachDaLuu);
+    document.getElementById('music-playpause-btn').addEventListener('click', (e) => { e.preventDefault(); togglePlayPause(); });
+    // Phím Space = Phát/Tạm dừng khi đang đứng ở tab Nhạc và có bài (khung phát
+    // đang hiện) - bỏ qua lúc đang gõ trong ô nhập (ô tìm kiếm...).
+    document.addEventListener('keydown', (e) => {
+      if (e.code !== 'Space' || e.repeat || e.ctrlKey || e.metaKey || e.altKey) return;
+      const t = e.target;
+      if (t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName))) return;
+      if (!document.getElementById('view-music')?.classList.contains('tab-active')) return;
+      if (document.getElementById('music-player').style.display === 'none') return;
+      e.preventDefault();
+      togglePlayPause();
+    });
+    document.getElementById('music-shuffle-btn').addEventListener('click', (e) => { e.preventDefault(); doiTron(); });
+    document.getElementById('music-kp-lam-moi').addEventListener('click', (e) => { e.preventDefault(); rungNhe(); taiKhamPha(true); });
+    // Quay lại app/tab trình duyệt sau một lúc -> tải lại các hàng đã cũ (quá 10 phút).
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible' && tabDangXem === 'kham_pha') taiKhamPha();
+    });
+    document.getElementById('music-player-them').addEventListener('click', (e) => {
+      e.preventDefault();
+      if (baiKhungPhat) moMenuBai(baiKhungPhat, e.currentTarget, true);
+    });
+    document.getElementById('music-back-btn').addEventListener('click', (e) => { e.preventDefault(); skipMusic('/api/music/back'); });
+    document.getElementById('music-next-btn').addEventListener('click', (e) => { e.preventDefault(); skipMusic('/api/music/next'); });
+    // Icon loa ở hàng nút -> mở popover âm lượng. Range tạo lúc popover còn ẩn
+    // (kích thước 0) nên phải tính lại kích thước mỗi lần popover mở xong.
+    musicVolumePopover = $f7.popover.create({
+      el: '#music-volume-popover',
+      targetEl: '#music-mute-btn',
+      on: {
+        opened() {
+          if (!musicVolumeRange) return;
+          musicVolumeRange.calcSize();
+          if (typeof musicVolumeRange.layout === 'function') musicVolumeRange.layout();
+          else musicVolumeRange.setValue(musicVolumeRange.value);   // vẽ lại knob theo kích thước mới
+        },
+      },
+    });
+    document.getElementById('music-mute-btn').addEventListener('click', (e) => {
+      e.preventDefault();
+      rungNhe();
+      musicVolumePopover.open('#music-mute-btn');
+    });
+    document.getElementById('music-volume-mute-btn').addEventListener('click', (e) => { e.preventDefault(); toggleMuteNhac(); });
+    document.getElementById('music-volume-down-btn').addEventListener('click', (e) => { e.preventDefault(); chinhNhanhAmLuong(-10); });
+    document.getElementById('music-volume-up-btn').addEventListener('click', (e) => { e.preventDefault(); chinhNhanhAmLuong(10); });
+
+    // Kéo thanh tiến trình để tua: chặn tick/đồng bộ tự đổi giá trị trong lúc
+    // đang kéo (musicSeeking), chỉ thật sự gọi API tua lúc THẢ tay ra - gọi liên
+    // tục trong lúc kéo sẽ tua/khởi động lại luồng phát rất nhiều lần rất tốn.
+    document.getElementById('music-progressbar').addEventListener('pointerdown', () => {
+      musicSeeking = true;
+    });
+    document.addEventListener('pointerup', () => {
+      if (!musicSeeking) return;
+      musicSeeking = false;
+      if (musicProgressRange) seekMusic(musicProgressRange.value);
+    });
+
+    // Chặn đồng bộ SSE đè giá trị thanh âm lượng giữa lúc đang tự kéo tay -
+    // cùng lý do/cách làm với thanh tua nhạc ngay trên.
+    document.getElementById('music-volume-range').addEventListener('pointerdown', () => {
+      dangKeoMusicVolume = true;
+    });
+    document.addEventListener('pointerup', () => {
+      dangKeoMusicVolume = false;
+    });
+
+    loadMusicStatus();
+    $f7.on('daDangNhap', loadMusicStatus);
+    moKetNoiMusicStatusSSE();
+    $f7.on('daDangNhap', moKetNoiMusicStatusSSE);
+    // Đồng bộ thật với server qua SSE (sửa lệch, bắt bài mới/trạng thái mới
+    // như đang bị TTS tạm dừng - xem moKetNoiMusicStatusSSE), và tự chạy số
+    // giây mượt mỗi giây ở giữa 2 lần đồng bộ đó (tickMusicProgress, KHÔNG
+    // qua mạng) - trang này chỉ pageInit() một lần lúc app khởi động (không
+    // phải mỗi lần chuyển tab) nên EventSource + interval này chạy suốt
+    // phiên làm việc, chi phí không đáng kể.
+    clearInterval(musicTickTimer);
+    musicTickTimer = setInterval(tickMusicProgress, 1000);
+  });
+
+  return $render;
+};
+</script>

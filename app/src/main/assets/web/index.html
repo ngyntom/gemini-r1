@@ -9,6 +9,8 @@
      (trình duyệt xem Web UI có mạng; loa chỉ phục vụ file này). -->
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/framework7@9.1.3/framework7-bundle.min.css">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/framework7-icons@5.0.5/css/framework7-icons.css">
+<!-- CSS tự viết của Voicebot trên Pi (static/css/app.css, chép nguyên) cho giao diện giống hệt Pi, cả trang Nhạc -->
+<link rel="stylesheet" href="/static/css/app.css">
 <style>
   :root { --sidebar-w: 270px; --bubble-bot: #e9e9eb; --bubble-bot-text: #000; }
   .dark { --bubble-bot: #26252a; --bubble-bot-text: #fff; }
@@ -108,6 +110,10 @@
         <div class="item-media"><i class="icon f7-icons">chat_bubble_2_fill</i></div>
         <div class="item-inner"><div class="item-title-wrap"><div class="item-title">Chat</div></div>
           <div class="item-subtitle">Trò chuyện, hỏi Gemini bằng chữ</div></div></a></li>
+      <li><a href="#view-music" class="item-content item-link tab-link">
+        <div class="item-media"><i class="icon f7-icons">music_note_fill</i></div>
+        <div class="item-inner"><div class="item-title-wrap"><div class="item-title">Nhạc</div></div>
+          <div class="item-subtitle">Tìm và phát nhạc YouTube trên loa</div></div></a></li>
       <li><a href="#view-speaker" class="item-content item-link tab-link">
         <div class="item-media"><i class="icon f7-icons">speaker_3_fill</i></div>
         <div class="item-inner"><div class="item-title-wrap"><div class="item-title">Loa</div></div>
@@ -128,12 +134,16 @@
       <div class="toolbar-inner">
         <div class="toolbar-pane">
           <a href="#view-chat" class="tab-link tab-link-active"><i class="icon f7-icons">chat_bubble_2_fill</i><span class="tabbar-label">Chat</span></a>
+          <a href="#view-music" class="tab-link"><i class="icon f7-icons">music_note_fill</i><span class="tabbar-label">Nhạc</span></a>
           <a href="#view-speaker" class="tab-link"><i class="icon f7-icons">speaker_3_fill</i><span class="tabbar-label">Loa</span></a>
           <a href="#view-devices" class="tab-link"><i class="icon f7-icons">square_grid_2x2_fill</i><span class="tabbar-label">Thiết bị</span></a>
           <a href="#view-settings" class="tab-link"><i class="icon f7-icons">gear_alt_fill</i><span class="tabbar-label">Cài đặt</span></a>
         </div>
       </div>
     </div>
+
+    <!-- ===== Nhạc: trang Nhạc của Voicebot trên Pi (static/pages/music.html, F7 component), tải khi mở tab ===== -->
+    <div id="view-music" class="view tab"></div>
 
     <!-- ===== Chat ===== -->
     <div id="view-chat" class="view view-main tab tab-active" data-url="/">
@@ -247,6 +257,9 @@
       <div class="page" data-name="settings">
         <div class="navbar"><div class="navbar-bg"></div><div class="navbar-inner">
           <div class="title">Cài đặt</div>
+          <!-- Như Pi: chỉ hiện trong app iOS (Capacitor) - quay về màn nhập địa chỉ để chọn loa / Pi khác -->
+          <div class="right" id="settingsNavRight" style="display:none"><a href="#" class="link icon-only" id="btnDoiDiaChi"
+            title="Đổi địa chỉ Voicebot"><i class="icon f7-icons">arrow_right_arrow_left_square</i></a></div>
         </div></div>
         <div class="page-content"><div class="page-inner">
           <div class="list list-strong list-dividers inset media-list">
@@ -528,14 +541,39 @@ const routes = Object.keys(PAGES).map(name => ({
   path: `/${name}/`,
   async({ resolve }) { resolve({ content: PAGES[name]() }); },
 }));
+routes.push({ path: '/music/', componentUrl: '/static/pages/music.html' });
+
+// ---------- Hàm chung mà trang Nhạc của Pi (music.html) gọi - bản rút gọn của static/js/common.js trên Pi ----------
+async function api(path, opts) {
+  const r = await fetch(path, Object.assign({ headers: { 'Content-Type': 'application/json' } }, opts || {}));
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(j.error || ('HTTP ' + r.status));
+  return j;
+}
+function baoLoi(e, tienTo, ms) { app.toast.create({ text: (tienTo || 'Lỗi: ') + (e && e.message || e), closeTimeout: ms || 3000, position: 'center' }).open(); }
+function luuCaiDatTk(khoa, giaTri) { try { localStorage.setItem(khoa, String(giaTri)); } catch (e) {} } // loa không có tài khoản
+function rungNhe() {}
+function rungThanhCong() {}
+function htmlPreloader() { return '<span class="preloader-inner">' + '<span class="preloader-inner-line"></span>'.repeat(8) + '</span>'; }
 
 // ---------- Khởi tạo Framework7 ----------
 const app = new Framework7({
   el: '#app', theme: 'ios', darkMode: 'auto', colors: { primary: '#2f80ed' }, routes,
   on: { pageInit(page) { if (PAGES[page.name]) initSubpage(page); } },
 });
-['#view-chat', '#view-speaker', '#view-devices', '#view-settings'].forEach(v => {
-  app.views.create(v);
+window.f7app = app; // baoLoi() của Pi dùng tên này
+// App iOS (Capacitor) mở Web UI bằng location.href từ màn nhập địa chỉ, F7 không dùng history ->
+// history.back() quay đúng về màn đó (cùng cách nút "Đổi địa chỉ Voicebot" của Pi)
+if (window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform()) {
+  $('settingsNavRight').style.display = '';
+  $('btnDoiDiaChi').addEventListener('click', e => { e.preventDefault(); history.back(); });
+}
+// Tab Nhạc: tạo view (tải music.html) lần đầu mở tab, không làm chậm lúc mở Web UI
+document.querySelector('#view-music').addEventListener('tab:show', () => {
+  if (!app.views.get('#view-music')) app.views.create('#view-music', { url: '/music/' });
+});
+['#view-chat', '#view-music', '#view-speaker', '#view-devices', '#view-settings'].forEach(v => {
+  if (v !== '#view-music') app.views.create(v);
   // F7 chỉ tô nút trong menu vừa bấm -> đồng bộ cả menu trái (máy tính) lẫn thanh tab dưới (điện thoại)
   document.querySelector(v).addEventListener('tab:show', () => document.querySelectorAll('.tab-link')
     .forEach(a => a.classList.toggle('tab-link-active', a.getAttribute('href') === v)));
