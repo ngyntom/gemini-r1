@@ -113,11 +113,13 @@ final class Led {
     private static String command(String mode) {
         String stop = "kill $(cat " + PID + " 2>/dev/null) 2>/dev/null; rm -f " + PID + "; ";
         switch (mode) {
-            // Lệnh viền để cuối: lệnh lights_test cuối của sao chổi vừa bị dừng có thể chạy trễ ~40 ms
+            // Viền TRƯỚC rồi mới hiệu ứng đèn trong: "set" CẢ VÒNG viền sau "show" sẽ huỷ hiệu ứng đèn trong (thử
+            // trên loa: chỉ còn viền trắng); "set" từng đèn như sao chổi thì không huỷ. INNER_OFF (~150 ms) chạy
+            // trước nên lệnh sót của sao chổi đã xong.
             case "listening":
-                return stop + INNER_OFF + "; lights_test show 203; lights_test set " + RING + " ffffff";
+                return stop + INNER_OFF + "; lights_test set " + RING + " ffffff; lights_test show 203";
             case "speaking":
-                return stop + INNER_OFF + "; lights_test show 501; lights_test set " + RING + " ffffff";
+                return stop + INNER_OFF + "; lights_test set " + RING + " ffffff; lights_test show 501";
             case "error":
                 return stop + INNER_OFF + "; lights_test set " + RING + " 0; lights_test show 500";
             case "thinking":
