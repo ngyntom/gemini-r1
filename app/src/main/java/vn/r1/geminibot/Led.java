@@ -30,6 +30,13 @@ final class Led {
      */
     private static final String INNER_OFF =
             "lights_test close 203; lights_test close 500; lights_test close 501; lights_test close 504";
+    /**
+     * gpio20 cấp điện chip đèn trong (thử trên loa: hạ xuống 0 thì đèn trong tắt hẳn). Màu "đọng" lại từ app cũ
+     * (vd. xanh lá 501 còn sáng sau khi cập nhật) không tắt được bằng close -> ngắt điện chip 1 s cho nó quên.
+     * File direction của gpio này ai cũng ghi được nên không cần root.
+     */
+    private static final String INNER_RESET = "echo low > /sys/class/gpio/gpio20/direction; sleep 1; "
+            + "echo high > /sys/class/gpio/gpio20/direction";
     /** Lúc app mới chạy: đóng hết hiệu ứng đèn trong có thể còn chạy (khởi động loa, app cũ…). */
     private static final String INNER_ALL_OFF = "for i in 200 202 203 204 206 251 252 253 254 255 500 501 502 504 "
             + "510 511 512 513 514 515; do lights_test close $i; done";
@@ -65,7 +72,9 @@ final class Led {
                     // đầu thành công chứ không từ lúc app chạy: vừa cài bằng adb thì adbd có thể bận ~1 phút.
                     long now = System.currentTimeMillis();
                     if (firstOk == 0 || ("off".equals(mode) && now - firstOk < 30000 && now - lastOff > 5000)) {
-                        String out = LocalAdb.shell(command("off").replace(INNER_OFF, INNER_ALL_OFF) + "\necho OK", 6000);
+                        String cmd = command("off").replace(INNER_OFF, INNER_ALL_OFF);
+                        if (firstOk == 0) cmd = INNER_RESET + "; " + cmd; // chỉ lần đầu: xoá màu đọng của app cũ
+                        String out = LocalAdb.shell(cmd + "\necho OK", 8000);
                         if (!out.contains("OK")) throw new Exception("lights_test lỗi: " + out.trim());
                         if (firstOk == 0) firstOk = now;
                         lastOff = now;
