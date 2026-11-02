@@ -23,6 +23,7 @@ import java.io.FileOutputStream;
  *           gửi từng khung qua adb thì quá chậm)
  *   nói   = viền trắng + đèn trong xanh lá
  *   lỗi   = viền tắt + đèn trong đỏ
+ *   tắt mic = viền tắt + đèn trong đỏ mờ
  *   rảnh  = tắt hết
  * Nghe thấy từ đánh thức thì vệt sáng quét 1 vòng quanh viền (script nền) rồi mới vào hiệu ứng
  * nghe; nút "Nghe ngay" trên Web UI không quét vì bot không nghe thấy từ khóa.
@@ -72,6 +73,8 @@ final class Led {
     private static final String RING_OFF = blackAll(RING_COLOR, RING_IDS);
     private static final String INNER_GREEN = setColor(INNER_COLOR, INNER_IDS, "00ff00");
     private static final String INNER_RED = setColor(INNER_COLOR, INNER_IDS, "ff0000");
+    /** Mic tắt (nút bấm / Web UI): đỏ mờ, khác đỏ sáng của lỗi. */
+    private static final String INNER_MUTED = setColor(INNER_COLOR, INNER_IDS, "300000");
     /** close cho hiệu ứng lặp (thở) dừng hẳn, rồi ghi đen xoá màu còn đọng. */
     private static final String INNER_OFF = "lights_test close 203; lights_test close 500; lights_test close 501; "
             + "lights_test close 504; " + blackAll(INNER_COLOR, INNER_IDS);
@@ -177,6 +180,8 @@ final class Led {
             case "speaking":
             case "error":
                 return state;
+            case "paused":
+                return "muted";
             default:
                 return "off";
         }
@@ -196,6 +201,8 @@ final class Led {
                 return stop + INNER_OFF + "; " + RING_WHITE + "; " + INNER_GREEN;
             case "error":
                 return stop + INNER_OFF + "; " + RING_OFF + "; " + INNER_RED;
+            case "muted":
+                return stop + INNER_OFF + "; " + RING_OFF + "; " + INNER_MUTED;
             case "thinking":
                 if (comet != null) {
                     // Ghi PID ngay ở đây chứ không để script tự ghi khi chạy: bấm "về rảnh" liền sau "nghĩ" thì

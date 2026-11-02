@@ -52,6 +52,7 @@ public class BotService extends Service {
         local = new LocalAnswer(this);
         Led.setEnabled(Config.load(this).led);
         Led.start(this);
+        Button.start(this);
         new Thread(() -> Updater.reportLastInstall(this), "update-log").start();
     }
 

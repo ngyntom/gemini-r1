@@ -139,14 +139,15 @@
       <div class="page" data-name="chat">
         <div class="navbar"><div class="navbar-bg"></div><div class="navbar-inner">
           <div class="title">Chat<span class="subtitle" data-state-text>…</span></div>
-          <div class="right"><a href="#" class="link icon-only" id="listenBtn" title="Nghe ngay (không cần từ đánh thức)"><i class="icon f7-icons">mic_fill</i></a></div>
+          <div class="right"><a href="#" class="link icon-only popover-open" data-popover="#volPopover" title="Âm lượng"><i class="icon f7-icons">speaker_3_fill</i></a>
+            <a href="#" class="link icon-only" id="listenBtn" title="Nghe ngay (không cần từ đánh thức)"><i class="icon f7-icons">mic_fill</i></a></div>
         </div></div>
         <div class="page-content" id="chatScroll">
           <div class="chat-list" id="chatList"><div class="chat-empty">Chưa có hội thoại. Gọi từ đánh thức hoặc nhắn bên dưới.</div></div>
         </div>
         <div class="chat-bar">
           <input id="chatInput" placeholder="Nhắn cho Gemini…" autocomplete="off">
-          <a href="#" class="round-btn" id="sayBtn" title="Loa đọc nguyên văn"><i class="icon f7-icons">speaker_2_fill</i></a>
+          <a href="#" class="round-btn" id="sayBtn" title="Loa đọc nguyên văn câu đã nhập (không hỏi Gemini)"><i class="icon f7-icons">quote_bubble</i></a>
           <a href="#" class="round-btn fill" id="sendBtn" title="Hỏi Gemini"><i class="icon f7-icons">arrow_up</i></a>
         </div>
       </div>
@@ -289,6 +290,12 @@
     </div>
   </div>
 </div>
+
+<!-- Âm lượng nhanh ở tab Chat, đồng bộ với thanh trong tab Loa -->
+<div class="popover" id="volPopover"><div class="popover-inner"><div class="block" style="margin:14px 0">
+  <div style="display:flex;justify-content:space-between"><span>Âm lượng</span><span id="volLabel2"></span></div>
+  <input type="range" id="vol2" min="0" max="15" step="1" style="width:100%;accent-color:var(--f7-theme-color)">
+</div></div></div>
 
 <!-- Cửa sổ Thêm/bớt thiết bị - cùng kiểu Voicebot trên Pi: 2 tab Đã thêm / Chưa thêm, tìm kiếm,
      công tắc + "Tên gọi khác". Bot chỉ thấy và chỉ điều khiển được thiết bị đã thêm. -->
@@ -674,8 +681,13 @@ $('btnReset').addEventListener('click', e => { e.preventDefault(); post('/api/re
 $('btnMic').addEventListener('click', e => { e.preventDefault(); $('micAudio').src = '/api/mic.wav?t=' + Date.now(); $('micAudio').play(); });
 document.querySelectorAll('[data-led]').forEach(b => b.addEventListener('click', e => { e.preventDefault(); post('/api/led', { state: b.dataset.led }); }));
 ['runToggle', 'runToggle2'].forEach(id => $(id).addEventListener('change', e => post('/api/pause', { paused: !e.target.checked }).then(refresh)));
-$('vol').addEventListener('input', () => { volDragging = true; $('volLabel').textContent = $('vol').value + '/' + $('vol').max; });
-$('vol').addEventListener('change', () => { post('/api/volume', { level: +$('vol').value }).finally(() => volDragging = false); });
+['vol', 'vol2'].forEach(id => {
+  $(id).addEventListener('input', () => {
+    volDragging = true;
+    ['volLabel', 'volLabel2'].forEach(l => $(l).textContent = $(id).value + '/' + $(id).max);
+  });
+  $(id).addEventListener('change', () => { post('/api/volume', { level: +$(id).value }).finally(() => volDragging = false); });
+});
 
 // ---------- Thiết bị (Home Assistant) ----------
 const DOMAINS = {
@@ -862,8 +874,10 @@ async function refresh() {
     $('wakeName').textContent = S.wake_name || '—';
     $('diag').textContent = (S.mic_level || 0) + ' · ' + (S.wake_score || 0).toFixed(2);
     ['runToggle', 'runToggle2'].forEach(id => $(id).checked = !S.paused);
-    if (!volDragging) { $('vol').max = S.volume_max; $('vol').value = S.volume; }
-    $('volLabel').textContent = S.volume + '/' + S.volume_max;
+    if (!volDragging) {
+      ['vol', 'vol2'].forEach(id => { $(id).max = S.volume_max; $(id).value = S.volume; });
+      ['volLabel', 'volLabel2'].forEach(l => $(l).textContent = S.volume + '/' + S.volume_max);
+    }
     renderSys(S.sys || {});
     const log = $('log'), atBottom = log.scrollTop + log.clientHeight >= log.scrollHeight - 10;
     log.textContent = (S.log || []).join('\n');
