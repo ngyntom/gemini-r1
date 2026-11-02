@@ -42,12 +42,11 @@ final class Led {
     private static final String INNER_OFF =
             "lights_test close 203; lights_test close 500; lights_test close 501; lights_test close 504";
     /**
-     * gpio20 cấp điện chip đèn trong (thử trên loa: hạ xuống 0 thì đèn trong tắt hẳn). Màu "đọng" lại từ app cũ
-     * (vd. xanh lá 501 còn sáng sau khi cập nhật) không tắt được bằng close -> ngắt điện chip 1 s cho nó quên.
-     * File direction của gpio này ai cũng ghi được nên không cần root.
+     * Xoá màu "đọng" của đèn trong: đóng hiệu ứng giữa chừng (vd. thở 203) để lại khung cuối (xanh mờ), close và
+     * cả 504 (phủ đen) không xoá được. Hiệu ứng 400 (mờ dần 01010f -> 000000) ghi hẳn màu đen nên xoá được (thử
+     * trên loa). KHÔNG ngắt điện chip qua gpio20: cách đó xoá được màu nhưng làm viền ngoài chết vài phút.
      */
-    private static final String INNER_RESET = "echo low > /sys/class/gpio/gpio20/direction; sleep 1; "
-            + "echo high > /sys/class/gpio/gpio20/direction";
+    private static final String INNER_BLACK = "lights_test show 400; sleep 1; lights_test close 400";
     /** Lúc app mới chạy: đóng hết hiệu ứng đèn trong có thể còn chạy (khởi động loa, app cũ…). */
     private static final String INNER_ALL_OFF = "for i in 200 202 203 204 206 251 252 253 254 255 500 501 502 504 "
             + "510 511 512 513 514 515; do lights_test close $i; done";
@@ -83,7 +82,7 @@ final class Led {
                     // đầu thành công chứ không từ lúc app chạy: vừa cài bằng adb thì adbd có thể bận ~1 phút.
                     long now = System.currentTimeMillis();
                     if (firstOk == 0 || ("off".equals(mode) && now - firstOk < 30000 && now - lastOff > 5000)) {
-                        // command("off") đã gồm ngắt điện chip đèn trong -> xoá cả màu đọng của app cũ
+                        // command("off") đã gồm ghi đen đèn trong (400) -> xoá cả màu đọng của app cũ
                         String out = LocalAdb.shell(command("off").replace(INNER_OFF, INNER_ALL_OFF) + "\necho OK", 8000);
                         if (!out.contains("OK")) throw new Exception("lights_test lỗi: " + out.trim());
                         if (firstOk == 0) firstOk = now;
@@ -92,7 +91,7 @@ final class Led {
                     }
                     if (!mode.equals(shown)) {
                         // Xuống dòng, không dùng ";": lệnh "nghĩ" kết thúc bằng "&" và "& ;" là lỗi cú pháp sh
-                        String out = LocalAdb.shell(command(mode) + "\necho OK", 8000); // "off" có reset chip 1 s
+                        String out = LocalAdb.shell(command(mode) + "\necho OK", 8000); // "off" chờ 400 chạy 1 s
                         if (!out.contains("OK")) throw new Exception("lights_test lỗi: " + out.trim());
                         shown = mode;
                         if (!lastError.isEmpty()) BotLog.i("Đèn LED hoạt động lại");
@@ -153,10 +152,8 @@ final class Led {
                 }
                 return stop + INNER_OFF + "; lights_test set " + RING + " ffffff";
             default:
-                // Về rảnh: đóng hiệu ứng TRƯỚC rồi mới ngắt điện chip đèn trong 1 s. Chip đôi khi giữ lại màu cũ
-                // mà close không xoá được; nhưng reset trước thì hiệu ứng thở 203 còn chạy vẽ lại, close sau đó
-                // dừng đúng lúc đang mờ -> đọng xanh dương mờ (thử trên loa).
-                return stop + INNER_OFF + "; " + INNER_RESET + "; lights_test set " + RING + " 0";
+                // Về rảnh: đóng hiệu ứng TRƯỚC rồi mới ghi đen bằng 400 (đóng sau thì 203 vẽ lại màu mờ)
+                return stop + INNER_OFF + "; " + INNER_BLACK + "; lights_test set " + RING + " 0";
         }
     }
 
