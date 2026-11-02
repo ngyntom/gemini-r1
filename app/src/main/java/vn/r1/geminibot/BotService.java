@@ -152,8 +152,11 @@ public class BotService extends Service {
                         BotLog.i("Bộ nhận từ đánh thức: " + wakeEngine);
                     }
                     recorder.setGain(cfg.micGain);
-                    if (cfg.localTime) local.loadAsync();
-                    recorder.setSink(cfg.localTime && local.ready() ? local : null);
+                    // Vosk nghe câu hỏi giờ chỉ là dự phòng khi không có Google STT: nó nghe sai nhiều
+                    // ("mình giờ", "hôm bạn là"…), còn Google STT cho chữ đúng để trả lời tại loa
+                    boolean voskAsk = cfg.localTime && !GoogleStt.usable(cfg);
+                    if (voskAsk) local.loadAsync();
+                    recorder.setSink(voskAsk && local.ready() ? local : null);
                     Led.setEnabled(cfg.led);
                     recorder.ensureOpen();
 
@@ -204,7 +207,7 @@ public class BotService extends Service {
                             continue;
                         }
                     }
-                    if (cfg.localTime && local.ready()) {
+                    if (voskAsk && local.ready()) {
                         String heard = local.heard();
                         String quick = LocalAnswer.answer(heard);
                         if (quick != null) {
@@ -223,6 +226,9 @@ public class BotService extends Service {
                         if (!heard.isEmpty()) BotLog.i("Vosk nghe: " + heard + " (không phải hỏi giờ)");
                     }
                     BotLog.state = "thinking";
+                    // Đọc lại cấu hình: vòng chờ từ đánh thức có thể đã kéo dài nhiều phút, cấu hình lưu từ
+                    // Web UI trong lúc đó (vd. service account) phải có tác dụng ngay với câu hỏi này
+                    cfg = Config.load(this);
                     GeminiClient.Answer a = null;
                     if (GoogleStt.usable(cfg)) {
                         // Đổi giọng nói thành chữ trước: câu đơn giản trả lời tại loa, còn lại gửi chữ (nhanh hơn audio)
