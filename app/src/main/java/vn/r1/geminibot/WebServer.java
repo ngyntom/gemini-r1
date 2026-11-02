@@ -36,7 +36,8 @@ import java.util.Map;
  *   POST /api/install           (body = file APK) cập nhật app
  *   POST /api/led    {state}    thử đèn LED
  *   POST /api/ha_test           kiểm tra kết nối Home Assistant
- *   GET  /api/ha/devices        thiết bị Home Assistant cho tab Thiết bị
+ *   GET  /api/ha/devices[?all=1]  thiết bị đã lưu (all=1: mọi entity để chọn)
+ *   POST /api/ha/selection {devices: {entity_id: tên gọi khác}}  lưu thiết bị cho bot
  *   POST /api/ha/service {entity_id, service}   bật / tắt thiết bị
  */
 class WebServer {
@@ -156,7 +157,8 @@ class WebServer {
                 return;
             }
             try {
-                sendJson(s, 200, new JSONObject().put("devices", HomeAssistant.devices(c)));
+                sendJson(s, 200, new JSONObject()
+                        .put("devices", HomeAssistant.devices(c, "1".equals(query.get("all")))));
             } catch (Exception e) {
                 sendJson(s, 502, new JSONObject().put("error", String.valueOf(e.getMessage())));
             }
@@ -217,6 +219,12 @@ class WebServer {
                     sendJson(s, 502, new JSONObject().put("error", String.valueOf(e.getMessage())));
                 }
                 return;
+            }
+            case "/api/ha/selection": { // {devices: {entity_id: tên gọi khác}}: thiết bị đã lưu cho bot
+                JSONObject sel = req.optJSONObject("devices");
+                Config.saveHaDevices(bot, sel != null ? sel : new JSONObject());
+                BotLog.i("Đã lưu " + (sel != null ? sel.length() : 0) + " thiết bị Home Assistant cho bot");
+                break;
             }
             case "/api/ha/service": { // {entity_id, service}: bật / tắt từ tab Thiết bị
                 Config c = Config.load(bot);
@@ -299,6 +307,7 @@ class WebServer {
                 .put("wake_name", BotLog.wakeName)
                 .put("mic_level", BotLog.micLevel)
                 .put("wake_score", BotLog.wakeScore)
+                .put("sys", SysInfo.read(bot))
                 .put("last_heard", BotLog.lastHeard)
                 .put("last_reply", BotLog.lastReply)
                 .put("volume", am.getStreamVolume(AudioManager.STREAM_MUSIC))

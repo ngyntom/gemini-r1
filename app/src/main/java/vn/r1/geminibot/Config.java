@@ -62,6 +62,11 @@ public class Config {
 
     /** File JSON service account Google Cloud (STT / TTS); rỗng = dùng API key. */
     public String gcloudSa;
+    /**
+     * Thiết bị Home Assistant đã chọn cho bot: entity_id -> tên gọi khác ("" = dùng tên gốc).
+     * Rỗng = chưa chọn, dùng mọi thiết bị điều khiển được như trước.
+     */
+    public JSONObject haDevices;
 
     public boolean haEnabled() {
         return !haUrl.isEmpty() && !haToken.isEmpty();
@@ -119,6 +124,11 @@ public class Config {
         c.haUrl = p.getString("ha_url", "").trim().replaceAll("/+$", "");
         c.haToken = p.getString("ha_token", "").trim();
         c.gcloudSa = p.getString("gcloud_sa", "").trim();
+        try {
+            c.haDevices = new JSONObject(p.getString("ha_devices", "{}"));
+        } catch (Exception e) {
+            c.haDevices = new JSONObject();
+        }
         c.sttEngine = p.getString("stt_engine", "google").trim().toLowerCase();
         c.live = "1".equals(p.getString("live", "0").trim());
         c.liveModel = p.getString("live_model", "gemini-2.5-flash-native-audio-latest").trim();
@@ -161,6 +171,7 @@ public class Config {
                 .put("ha_url", c.haUrl)
                 .put("ha_token_set", !c.haToken.isEmpty())
                 .put("gcloud_sa_email", c.gcloudSa.isEmpty() ? "" : GoogleAuth.email(c.gcloudSa))
+                .put("ha_selected", c.haDevices.length())
                 .put("stt_engine", c.sttEngine)
                 .put("live", c.live ? "1" : "0")
                 .put("live_model", c.liveModel)
@@ -180,6 +191,12 @@ public class Config {
             e.putString(k, v);
         }
         e.apply();
+    }
+
+    /** Lưu danh sách thiết bị HA đã chọn ({entity_id: tên gọi khác}); rỗng = dùng tất cả. */
+    public static void saveHaDevices(Context ctx, JSONObject devices) {
+        ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
+                .putString("ha_devices", devices.toString()).apply();
     }
 
     /** Lưu các extras có trong intent (ví dụ --es api_key XXX). */

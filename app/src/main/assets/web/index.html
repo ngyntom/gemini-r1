@@ -76,6 +76,19 @@
   .tile .t-badge { position: absolute; top: 10px; right: 10px; font-size: 11px; border: 1px solid currentColor;
                    border-radius: 999px; padding: 2px 6px; opacity: .8; }
   .tile.busy { opacity: .5; }
+  .tile .t-del { position: absolute; top: 8px; right: 8px; width: 26px; height: 26px; border-radius: 50%;
+                 background: #ff3b30; color: #fff; display: none; align-items: center; justify-content: center; }
+  .tile .t-del i { font-size: 15px !important; }
+  .editing .tile .t-del { display: flex; }
+  .editing .tile .t-badge { display: none; }
+  .editing .tile { animation: wiggle .35s ease-in-out infinite alternate; }
+  @keyframes wiggle { from { transform: rotate(-.6deg); } to { transform: rotate(.6deg); } }
+  #devPopup .page-content { overflow-x: hidden; }
+  .dev-row .item-subtitle { font-size: 12px; opacity: .6; }
+  .dev-row input.alias { width: 100%; margin-top: 6px; padding: 6px 10px; border-radius: 8px; font-size: 14px;
+                         background: rgba(120,120,128,.12); border: none; color: inherit; outline: none; }
+  .sys-bar { height: 6px; border-radius: 3px; background: rgba(120,120,128,.2); overflow: hidden; margin-top: 4px; width: 120px; }
+  .sys-bar span { display: block; height: 100%; background: var(--f7-theme-color); }
 
   .range-row { padding: 6px 16px 12px; }
   .range-row input[type=range] { width: 100%; accent-color: var(--f7-theme-color); }
@@ -155,6 +168,26 @@
             </ul>
           </div>
 
+          <div class="block-title">Hệ thống</div>
+          <div class="list list-strong list-dividers inset">
+            <ul>
+              <li class="item-content"><div class="item-media"><i class="icon f7-icons">speedometer</i></div>
+                <div class="item-inner"><div class="item-title">CPU<div class="item-footer" id="sysCpuSub"></div></div>
+                  <div class="item-after"><div style="text-align:right"><span id="sysCpu">—</span><div class="sys-bar"><span id="sysCpuBar" style="width:0"></span></div></div></div></div></li>
+              <li class="item-content"><div class="item-media"><i class="icon f7-icons">thermometer</i></div>
+                <div class="item-inner"><div class="item-title">Nhiệt độ CPU</div><div class="item-after" id="sysTemp">—</div></div></li>
+              <li class="item-content"><div class="item-media"><i class="icon f7-icons">memories</i></div>
+                <div class="item-inner"><div class="item-title">RAM<div class="item-footer" id="sysRamSub"></div></div>
+                  <div class="item-after"><div style="text-align:right"><span id="sysRam">—</span><div class="sys-bar"><span id="sysRamBar" style="width:0"></span></div></div></div></div></li>
+              <li class="item-content"><div class="item-media"><i class="icon f7-icons">wifi</i></div>
+                <div class="item-inner"><div class="item-title">Wi-Fi<div class="item-footer" id="sysWifiSub"></div></div><div class="item-after" id="sysWifi">—</div></div></li>
+              <li class="item-content"><div class="item-media"><i class="icon f7-icons">floppy_disk</i></div>
+                <div class="item-inner"><div class="item-title">Bộ nhớ trong</div><div class="item-after" id="sysDisk">—</div></div></li>
+              <li class="item-content"><div class="item-media"><i class="icon f7-icons">clock</i></div>
+                <div class="item-inner"><div class="item-title">Đã bật<div class="item-footer" id="sysOs"></div></div><div class="item-after" id="sysUp">—</div></div></li>
+            </ul>
+          </div>
+
           <div class="block-title">Điều khiển</div>
           <div class="list list-strong list-dividers inset">
             <ul>
@@ -201,7 +234,10 @@
       <div class="page" data-name="devices">
         <div class="navbar"><div class="navbar-bg"></div><div class="navbar-inner">
           <div class="title">Thiết bị</div>
-          <div class="right"><a href="#" class="link icon-only" id="devReload" title="Tải lại"><i class="icon f7-icons">arrow_clockwise</i></a></div>
+          <div class="right">
+            <a href="#" class="link icon-only" id="devEditBtn" title="Sửa: bỏ thiết bị, đổi tên"><i class="icon f7-icons" id="devEditIcon">pencil</i></a>
+            <a href="#" class="link icon-only" id="devAddBtn" title="Thêm/bớt thiết bị"><i class="icon f7-icons">plus</i></a>
+          </div>
         </div></div>
         <div class="page-content"><div class="page-inner" id="devices">
           <div class="block muted">Đang tải…</div>
@@ -252,6 +288,30 @@
       </div>
     </div>
   </div>
+</div>
+
+<!-- Cửa sổ Thêm/bớt thiết bị - cùng kiểu Voicebot trên Pi: 2 tab Đã thêm / Chưa thêm, tìm kiếm,
+     công tắc + "Tên gọi khác". Bot chỉ thấy và chỉ điều khiển được thiết bị đã thêm. -->
+<div class="popup" id="devPopup">
+  <div class="view"><div class="page">
+    <div class="navbar"><div class="navbar-bg"></div><div class="navbar-inner">
+      <div class="title">Thêm/bớt thiết bị</div>
+      <div class="right"><a href="#" class="link popup-close icon-only"><i class="icon f7-icons">xmark</i></a></div>
+      <div class="subnavbar"><div class="subnavbar-inner">
+        <div class="segmented segmented-strong">
+          <a href="#" class="button button-active" data-devtab="on">Đã thêm (<span id="cntOn">0</span>)</a>
+          <a href="#" class="button" data-devtab="off">Chưa thêm (<span id="cntOff">0</span>)</a>
+          <span class="segmented-highlight"></span>
+        </div>
+      </div></div>
+    </div></div>
+    <div class="page-content">
+      <div class="block" style="margin:12px 0 4px"><input id="devSearch" placeholder="Tìm theo tên hoặc entity_id…"
+        style="width:100%;height:36px;border-radius:10px;padding:0 12px;border:none;background:rgba(120,120,128,.14);color:inherit;font-size:15px"></div>
+      <div class="block-footer" id="devHint" style="margin-top:0"></div>
+      <div id="devPick"></div>
+    </div>
+  </div></div>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/framework7@9.1.3/framework7-bundle.min.js"></script>
@@ -355,9 +415,15 @@ const PAGES = {
       </ul><div class="btn-row" style="padding-top:6px"><a href="#" class="button button-fill" id="saUpload">Lưu file JSON</a><a href="#" class="button button-tonal color-red" id="saClear">Xoá</a></div></div>`
     + list('Gemini Live (trò chuyện liên tục)', [
       tog('live', 'Bật Gemini Live', 'Gọi từ đánh thức một lần rồi nói chuyện liên tục; nói "tạm biệt" để dừng'),
-      inp('live_model', 'Model Live', { ph: 'gemini-2.5-flash-native-audio-latest' }),
+      inp('live_model', 'Model Live', { ph: 'gemini-2.5-flash-native-audio-latest', list: 'liveList',
+        foot: 'Không có bản Live 3.5 để trò chuyện (3.5 chỉ có Live dịch / chép lời).' }),
       inp('live_idle', 'Im lặng bao nhiêu giây thì kết thúc', { type: 'number', min: 5, max: 300 }),
-    ], 'Loa không khử được tiếng vọng nên không nói chen ngang được khi loa đang nói.')),
+    ], 'Loa không khử được tiếng vọng nên không nói chen ngang được khi loa đang nói.')
+    + `<datalist id="liveList">
+      <option value="gemini-2.5-flash-native-audio-latest">2.5 Flash Native Audio (đã thử)</option>
+      <option value="gemini-3.1-flash-live-preview">3.1 Flash Live (preview)</option>
+      <option value="gemini-3.8-live">3.8 Live</option>
+      <option value="gemini-3.8-live-extended-thinking">3.8 Live suy nghĩ sâu (chậm hơn)</option></datalist>`),
 
   ha: () => subpage('ha', 'Home Assistant',
     list('', [
@@ -410,7 +476,12 @@ const app = new Framework7({
   el: '#app', theme: 'ios', darkMode: 'auto', colors: { primary: '#2f80ed' }, routes,
   on: { pageInit(page) { if (PAGES[page.name]) initSubpage(page); } },
 });
-['#view-chat', '#view-speaker', '#view-devices', '#view-settings'].forEach(v => app.views.create(v));
+['#view-chat', '#view-speaker', '#view-devices', '#view-settings'].forEach(v => {
+  app.views.create(v);
+  // F7 chỉ tô nút trong menu vừa bấm -> đồng bộ cả menu trái (máy tính) lẫn thanh tab dưới (điện thoại)
+  document.querySelector(v).addEventListener('tab:show', () => document.querySelectorAll('.tab-link')
+    .forEach(a => a.classList.toggle('tab-link-active', a.getAttribute('href') === v)));
+});
 
 function fillFields(el) {
   el.querySelectorAll('[data-k]').forEach(f => {
@@ -587,12 +658,27 @@ const DOMAINS = {
   script: ['Kịch bản', 'play_rectangle_fill'], input_boolean: ['Công tắc ảo', 'checkmark_square_fill'], vacuum: ['Máy hút bụi', 'circle_grid_hex_fill'],
   humidifier: ['Máy tạo ẩm', 'drop_fill'], button: ['Nút', 'hand_point_right_fill'], input_button: ['Nút', 'hand_point_right_fill'],
   lock: ['Khoá', 'lock_fill'], siren: ['Còi', 'speaker_zzz_fill'], valve: ['Van', 'drop'], water_heater: ['Bình nóng lạnh', 'flame_fill'],
+  input_number: ['Số', 'number'], input_select: ['Lựa chọn', 'list_bullet'], select: ['Lựa chọn', 'list_bullet'], number: ['Số', 'number'],
+  automation: ['Tự động hoá', 'gear_alt'], sensor: ['Cảm biến', 'gauge'], binary_sensor: ['Cảm biến bật/tắt', 'dot_radiowaves_left_right'],
+  weather: ['Thời tiết', 'cloud_sun_fill'], person: ['Người', 'person_fill'], device_tracker: ['Vị trí', 'location_fill'], sun: ['Mặt trời', 'sun_max_fill'],
 };
+// Chạm để điều khiển được; nhóm khác (cảm biến…) chỉ xem trạng thái
+const TAPPABLE = ['climate', 'light', 'switch', 'fan', 'cover', 'media_player', 'scene', 'script', 'input_boolean', 'vacuum',
+  'humidifier', 'button', 'input_button', 'siren', 'valve', 'water_heater', 'automation'];
 const ON = ['on', 'open', 'opening', 'playing', 'cleaning', 'heat', 'cool', 'heat_cool', 'auto', 'dry', 'fan_only', 'unlocked'];
 const STATE_VI = { on: 'Bật', off: 'Tắt', open: 'Mở', closed: 'Đóng', playing: 'Đang phát', paused: 'Tạm dừng', idle: 'Rảnh',
   unavailable: 'Mất kết nối', cool: 'Làm lạnh', heat: 'Sưởi', auto: 'Tự động', dry: 'Hút ẩm', fan_only: 'Quạt', locked: 'Đã khoá', unlocked: 'Mở khoá' };
-let devices = [], devTimer = null;
+let devices = [], devTimer = null, devEdit = false;
+const stateText = d => (STATE_VI[d.state] || d.state) + (d.unit ? ' ' + d.unit : '');
+const groupBy = list => { const g = {}; list.forEach(d => (g[d.domain] = g[d.domain] || []).push(d));
+  return Object.keys(DOMAINS).filter(k => g[k]).concat(Object.keys(g).filter(k => !DOMAINS[k]).sort()).map(k => [k, g[k]]); };
+// Danh sách đã lưu cho bot: {entity_id: tên gọi khác}
+const selFrom = list => Object.fromEntries(list.filter(d => d.enabled !== false).map(d => [d.id, d.alias || '']));
+async function saveSelection(sel) {
+  await post('/api/ha/selection', { devices: sel });
+}
 async function loadDevices() {
+  if (devEdit) return; // đang sửa thì không tự làm mới, tránh mất thao tác
   try {
     const r = await fetch('/api/ha/devices'), j = await r.json();
     if (!r.ok) throw new Error(j.error || r.status);
@@ -603,21 +689,102 @@ async function loadDevices() {
   }
 }
 function renderDevices() {
-  const groups = {};
-  devices.forEach(d => (groups[d.domain] = groups[d.domain] || []).push(d));
-  const order = Object.keys(DOMAINS).filter(k => groups[k]).concat(Object.keys(groups).filter(k => !DOMAINS[k]));
-  $('devices').innerHTML = order.map(dom => {
+  const root = $('devices');
+  root.classList.toggle('editing', devEdit);
+  if (!devices.length) {
+    root.innerHTML = `<div class="block" style="text-align:center;margin-top:20vh">
+      <i class="icon f7-icons" style="font-size:48px;opacity:.4">square_grid_2x2</i>
+      <p>Chưa lưu thiết bị nào.<br><span class="muted">Bot chỉ biết và chỉ điều khiển được thiết bị bạn thêm vào đây.</span></p>
+      <a href="#" class="button button-fill button-round" onclick="openDevPopup();return false;" style="display:inline-flex;padding:0 20px">Thêm thiết bị</a></div>`;
+    return;
+  }
+  root.innerHTML = groupBy(devices).map(([dom, list]) => {
     const [title, icon] = DOMAINS[dom] || [dom, 'circle'];
-    return `<div class="block-title">${title} (${groups[dom].length})</div><div class="list list-strong list-dividers inset"><div class="tiles">` +
-      groups[dom].map(d => `<div class="tile ${ON.includes(d.state) ? 'on' : ''}" data-id="${esc(d.id)}">
+    return `<div class="block-title">${title} (${list.length})</div><div class="list list-strong list-dividers inset"><div class="tiles">` +
+      list.map(d => `<div class="tile ${ON.includes(d.state) ? 'on' : ''}" data-id="${esc(d.id)}">
         ${d.current || d.temp ? `<span class="t-badge">${esc(d.current || d.temp)}°C</span>` : ''}
+        <a href="#" class="t-del" title="Bỏ khỏi bot"><i class="icon f7-icons">xmark</i></a>
         <i class="icon f7-icons">${icon}</i>
-        <div><div class="t-name">${esc(d.name)}</div><div class="t-state">${esc(STATE_VI[d.state] || d.state)}</div></div></div>`).join('') + '</div></div>';
-  }).join('') || '<div class="block muted">Không có thiết bị điều khiển được.</div>';
-  $('devices').querySelectorAll('.tile').forEach(t => t.addEventListener('click', () => tapDevice(t)));
+        <div><div class="t-name">${esc(d.name)}</div><div class="t-state">${esc(stateText(d))}</div></div></div>`).join('') + '</div></div>';
+  }).join('') + (devEdit ? '<div class="block-footer">Chạm vào ô để đổi tên gọi khác, ✕ để bỏ khỏi bot. Bấm ✓ ở trên khi xong.</div>' : '');
+  root.querySelectorAll('.tile').forEach(t => t.addEventListener('click', e => {
+    if (e.target.closest('.t-del')) { e.preventDefault(); removeDevice(t.dataset.id); }
+    else if (devEdit) renameDevice(t.dataset.id);
+    else tapDevice(t);
+  }));
 }
+async function removeDevice(id) {
+  devices = devices.filter(d => d.id !== id);
+  renderDevices();
+  await saveSelection(selFrom(devices));
+}
+function renameDevice(id) {
+  const d = devices.find(x => x.id === id); if (!d) return;
+  app.dialog.prompt(`Tên gốc: ${esc(d.original)}<br><span class="muted">Để trống = dùng tên gốc. Bot gọi được theo tên này.</span>`,
+    'Tên gọi khác', async v => {
+      d.alias = v.trim() === d.original ? '' : v.trim();
+      d.name = d.alias || d.original;
+      renderDevices();
+      await saveSelection(selFrom(devices)); toast('Đã đổi tên');
+    }, null, d.alias || d.original);
+}
+$('devEditBtn').addEventListener('click', e => {
+  e.preventDefault(); devEdit = !devEdit;
+  $('devEditIcon').textContent = devEdit ? 'checkmark_alt' : 'pencil';
+  renderDevices(); if (!devEdit) loadDevices();
+});
+
+// ----- Cửa sổ Thêm/bớt thiết bị -----
+let allDevs = [], pickSel = {}, pickTab = 'on', saveTimer = null;
+const devPopup = app.popup.create({ el: '#devPopup', on: { closed: () => { clearTimeout(saveTimer); flushPick().then(loadDevices); } } });
+function openDevPopup() {
+  $('devPick').innerHTML = '<div class="block muted">Đang tải danh sách từ Home Assistant…</div>';
+  $('devSearch').value = '';
+  devPopup.open();
+  fetch('/api/ha/devices?all=1').then(r => r.json().then(j => { if (!r.ok) throw new Error(j.error || r.status); return j; }))
+    .then(j => { allDevs = j.devices; pickSel = selFrom(allDevs.filter(d => d.enabled)); renderPick(); })
+    .catch(e => $('devPick').innerHTML = `<div class="block muted">${esc(e.message)}</div>`);
+}
+async function flushPick() { if (saveTimer !== null) { saveTimer = null; await saveSelection(pickSel); } }
+function schedulePickSave() { clearTimeout(saveTimer); saveTimer = setTimeout(() => { saveTimer = null; saveSelection(pickSel); }, 800); }
+function renderPick() {
+  const q = $('devSearch').value.trim().toLowerCase();
+  const on = allDevs.filter(d => d.id in pickSel), off = allDevs.filter(d => !(d.id in pickSel));
+  $('cntOn').textContent = on.length; $('cntOff').textContent = off.length;
+  let list = (pickTab === 'on' ? on : off).filter(d => !q || (d.original + ' ' + d.id + ' ' + (pickSel[d.id] || '')).toLowerCase().includes(q));
+  const total = list.length, LIMIT = 200;
+  if (list.length > LIMIT) list = list.slice(0, LIMIT);
+  $('devHint').textContent = pickTab === 'on'
+    ? `${on.length} thiết bị đã thêm cho bot. Bấm công tắc để bỏ, gõ tên gọi khác để đổi tên (bot gọi được theo tên này).`
+    : `${off.length} thiết bị chưa thêm` + (total > LIMIT ? ` – đang hiện ${LIMIT}/${total}, gõ để tìm` : '') + '. Bấm công tắc để thêm.';
+  $('devPick').innerHTML = groupBy(list).map(([dom, items]) => `<div class="list list-strong list-dividers inset media-list"><ul>
+      <li class="list-group-title">${(DOMAINS[dom] || [dom])[0]} (${items.length})</li>` +
+    items.map(d => { const en = d.id in pickSel; return `<li class="item-content dev-row"><div class="item-inner">
+      <div class="item-title-row"><div class="item-title">${esc(d.original)}</div>
+        <div class="item-after"><label class="toggle"><input type="checkbox" data-pick="${esc(d.id)}" ${en ? 'checked' : ''}><span class="toggle-icon"></span></label></div></div>
+      <div class="item-subtitle">${esc(stateText(d))} · ${esc(d.id)}</div>
+      ${en ? `<input class="alias" data-alias="${esc(d.id)}" value="${esc(pickSel[d.id])}" placeholder="Tên gọi khác (để trống dùng tên gốc)">` : ''}
+      </div></li>`; }).join('') + '</ul></div>').join('') || '<div class="block muted">Không có thiết bị nào.</div>';
+  $('devPick').querySelectorAll('[data-pick]').forEach(cb => cb.addEventListener('change', () => {
+    if (cb.checked) pickSel[cb.dataset.pick] = ''; else delete pickSel[cb.dataset.pick];
+    schedulePickSave(); renderPick();
+  }));
+  $('devPick').querySelectorAll('[data-alias]').forEach(inp => {
+    inp.addEventListener('change', () => { pickSel[inp.dataset.alias] = inp.value.trim(); schedulePickSave(); });
+    inp.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.isComposing) inp.blur(); });
+  });
+}
+document.querySelectorAll('[data-devtab]').forEach(b => b.addEventListener('click', e => {
+  e.preventDefault(); pickTab = b.dataset.devtab;
+  document.querySelectorAll('[data-devtab]').forEach(x => x.classList.toggle('button-active', x === b));
+  renderPick();
+}));
+$('devSearch').addEventListener('input', () => renderPick());
+$('devAddBtn').addEventListener('click', e => { e.preventDefault(); openDevPopup(); });
+
 async function tapDevice(t) {
   const d = devices.find(x => x.id === t.dataset.id); if (!d || t.classList.contains('busy')) return;
+  if (!TAPPABLE.includes(d.domain)) return toast(d.name + ': ' + stateText(d));
   const on = ON.includes(d.state);
   let service = 'toggle';
   if (d.domain === 'climate') service = on ? 'turn_off' : 'turn_on';
@@ -628,9 +795,34 @@ async function tapDevice(t) {
   try { await post('/api/ha/service', { entity_id: d.id, service }); setTimeout(loadDevices, 600); }
   catch (e) { t.classList.remove('busy'); }
 }
-$('devReload').addEventListener('click', e => { e.preventDefault(); loadDevices(); });
 $('view-devices').addEventListener('tab:show', () => { loadDevices(); clearInterval(devTimer); devTimer = setInterval(loadDevices, 5000); });
 $('view-devices').addEventListener('tab:hide', () => clearInterval(devTimer));
+
+// ---------- Thông tin hệ thống (tab Loa) ----------
+function renderSys(y) {
+  const set = (id, v) => { $(id).textContent = v; };
+  const bar = (id, pct) => { $(id).style.width = Math.max(0, Math.min(100, pct)) + '%';
+    $(id).style.background = pct >= 85 ? '#ff3b30' : pct >= 65 ? '#ff9500' : ''; };
+  if (y.cpu_pct != null && y.cpu_pct >= 0) { set('sysCpu', y.cpu_pct + '%'); bar('sysCpuBar', y.cpu_pct); }
+  set('sysCpuSub', [y.cores && y.cores + ' nhân', y.cpu_mhz && y.cpu_mhz + ' MHz'].filter(Boolean).join(' · '));
+  if (y.cpu_temp != null) { set('sysTemp', y.cpu_temp + ' °C'); $('sysTemp').style.color = y.cpu_temp >= 80 ? '#ff3b30' : y.cpu_temp >= 70 ? '#ff9500' : ''; }
+  if (y.ram_total_mb) {
+    const pct = Math.round(100 * y.ram_used_mb / y.ram_total_mb);
+    set('sysRam', y.ram_used_mb + ' / ' + y.ram_total_mb + ' MB'); bar('sysRamBar', pct);
+    set('sysRamSub', 'App Gemini R1 dùng ' + (y.app_mem_mb || 0) + ' MB');
+  }
+  if (y.wifi_ssid != null) {
+    const q = y.wifi_rssi >= -55 ? 'rất mạnh' : y.wifi_rssi >= -67 ? 'mạnh' : y.wifi_rssi >= -75 ? 'trung bình' : 'yếu';
+    set('sysWifi', (y.wifi_ssid || '—') + ' · ' + y.wifi_rssi + ' dBm');
+    set('sysWifiSub', 'Sóng ' + q + ' · ' + y.wifi_mbps + ' Mbps · IP ' + y.ip);
+  }
+  if (y.storage_total_mb) set('sysDisk', (y.storage_free_mb / 1024).toFixed(1) + ' GB trống / ' + (y.storage_total_mb / 1024).toFixed(1) + ' GB');
+  if (y.uptime_s != null) {
+    const d = Math.floor(y.uptime_s / 86400), h = Math.floor(y.uptime_s % 86400 / 3600), m = Math.floor(y.uptime_s % 3600 / 60);
+    set('sysUp', (d ? d + ' ngày ' : '') + h + ' giờ ' + m + ' phút');
+  }
+  set('sysOs', [y.model, y.android && 'Android ' + y.android].filter(Boolean).join(' · '));
+}
 
 // ---------- Cập nhật trạng thái mỗi 1,5 giây ----------
 async function refresh() {
@@ -646,6 +838,7 @@ async function refresh() {
     ['runToggle', 'runToggle2'].forEach(id => $(id).checked = !S.paused);
     if (!volDragging) { $('vol').max = S.volume_max; $('vol').value = S.volume; }
     $('volLabel').textContent = S.volume + '/' + S.volume_max;
+    renderSys(S.sys || {});
     const log = $('log'), atBottom = log.scrollTop + log.clientHeight >= log.scrollHeight - 10;
     log.textContent = (S.log || []).join('\n');
     if (atBottom) log.scrollTop = log.scrollHeight;

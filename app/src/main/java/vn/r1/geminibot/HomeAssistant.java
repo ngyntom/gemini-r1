@@ -23,40 +23,38 @@ final class HomeAssistant {
             "light", "switch", "fan", "cover", "climate", "media_player", "scene", "script", "lock",
             "input_boolean", "input_number", "input_select", "vacuum", "humidifier", "water_heater",
             "button", "input_button", "automation", "siren", "valve", "select", "number"));
-    /** Chỉ đọc trạng thái (hỏi nhiệt độ, cửa đang mở không…). */
-    private static final Set<String> READ_ONLY = new HashSet<>(Arrays.asList(
-            "sensor", "binary_sensor", "weather", "person", "device_tracker", "sun"));
-    /** Thiết bị điều khiển được luôn đưa trước; cảm biến chỉ lấp phần còn lại. */
-    private static final int MAX_ENTITIES = 400;
 
     private HomeAssistant() {}
 
-    /** Danh sách thiết bị dạng "entity_id | tên | trạng thái", mỗi dòng một thiết bị. */
+    /**
+     * Danh sách thiết bị đã lưu trên Web UI, dạng "entity_id | tên | trạng thái", mỗi dòng một thiết bị;
+     * null nếu chưa lưu thiết bị nào (bot không đụng tới Home Assistant). Chỉ các thiết bị này nằm trong
+     * ids nên ha_call không điều khiển được thiết bị chưa lưu.
+     */
     static String entities(Config cfg, Set<String> ids) throws Exception {
+        if (cfg.haDevices.length() == 0) return null;
         JSONArray states = new JSONArray(request(cfg, "GET", "/api/states", null));
         StringBuilder sb = new StringBuilder();
-        int n = 0;
-        for (int pass = 0; pass < 2; pass++) {
-            for (int i = 0; i < states.length() && n < MAX_ENTITIES; i++) {
-                JSONObject s = states.getJSONObject(i);
-                String id = s.optString("entity_id");
-                String domain = id.contains(".") ? id.substring(0, id.indexOf('.')) : "";
-                if (!(pass == 0 ? CONTROL : READ_ONLY).contains(domain)) continue;
-                // Cảm biến mất kết nối chỉ làm dài danh sách
-                if (pass == 1 && ("unavailable".equals(s.optString("state")) || "unknown".equals(s.optString("state")))) continue;
-                appendEntity(sb, s, id, domain);
-                ids.add(id);
-                n++;
-            }
+        for (int i = 0; i < states.length(); i++) {
+            JSONObject s = states.getJSONObject(i);
+            String id = s.optString("entity_id");
+            if (!cfg.haDevices.has(id)) continue;
+            appendEntity(sb, s, id, domainOf(id), cfg.haDevices.optString(id, ""));
+            ids.add(id);
         }
         return sb.toString();
     }
 
-    private static void appendEntity(StringBuilder sb, JSONObject s, String id, String domain) {
+    static String domainOf(String id) {
+        return id.contains(".") ? id.substring(0, id.indexOf('.')) : "";
+    }
+
+    private static void appendEntity(StringBuilder sb, JSONObject s, String id, String domain, String alias) {
         {
             JSONObject a = s.optJSONObject("attributes");
             if (a == null) a = new JSONObject();
-            sb.append(id).append(" | ").append(a.optString("friendly_name", id))
+            String name = a.optString("friendly_name", id);
+            sb.append(id).append(" | ").append(alias.isEmpty() ? name : alias + " (tên gốc: " + name + ")")
               .append(" | ").append(s.optString("state"));
             String unit = a.optString("unit_of_measurement", "");
             if (!unit.isEmpty()) sb.append(' ').append(unit);
@@ -139,22 +137,32 @@ final class HomeAssistant {
         return new JSONObject().put("ok", true).put("new_states", states);
     }
 
-    /** Thiết bị điều khiển được cho tab Thiết bị trên Web UI: [{id, name, domain, state, temp, current}]. */
-    static JSONArray devices(Config cfg) throws Exception {
+    /**
+     * Thiết bị cho tab Thiết bị trên Web UI: [{id, name, original, alias, enabled, domain, state, unit, temp, current}].
+     * all = false: thiết bị đã lưu; all = true: mọi entity của HA, để chọn trong cửa sổ "Thêm/bớt thiết bị".
+     */
+    static JSONArray devices(Config cfg, boolean all) throws Exception {
         JSONArray states = new JSONArray(request(cfg, "GET", "/api/states", null));
         JSONArray out = new JSONArray();
         for (int i = 0; i < states.length(); i++) {
             JSONObject s = states.getJSONObject(i);
             String id = s.optString("entity_id");
-            String domain = id.contains(".") ? id.substring(0, id.indexOf('.')) : "";
-            if (!CONTROL.contains(domain) || domain.equals("automation")) continue;
+            String domain = domainOf(id);
+            boolean enabled = cfg.haDevices.has(id);
+            if (!all && !enabled) continue;
             JSONObject a = s.optJSONObject("attributes");
             if (a == null) a = new JSONObject();
+            String original = a.optString("friendly_name", id);
+            String alias = cfg.haDevices.optString(id, "");
             JSONObject d = new JSONObject()
                     .put("id", id)
-                    .put("name", a.optString("friendly_name", id))
+                    .put("name", alias.isEmpty() ? original : alias)
+                    .put("original", original)
+                    .put("alias", alias)
+                    .put("enabled", enabled)
                     .put("domain", domain)
-                    .put("state", s.optString("state"));
+                    .put("state", s.optString("state"))
+                    .put("unit", a.optString("unit_of_measurement", ""));
             if (a.has("temperature") && !a.isNull("temperature")) d.put("temp", a.optString("temperature"));
             if (a.has("current_temperature") && !a.isNull("current_temperature")) d.put("current", a.optString("current_temperature"));
             out.put(d);
@@ -176,11 +184,11 @@ final class HomeAssistant {
 
     /** Kiểm tra kết nối cho Web UI: trả về số thiết bị đọc được. */
     static String test(Config cfg) throws Exception {
-        Set<String> ids = new HashSet<>();
-        entities(cfg, ids);
+        int total = devices(cfg, true).length();
         JSONObject info = new JSONObject(request(cfg, "GET", "/api/config", null));
         return "Đã kết nối " + info.optString("location_name", "Home Assistant") + " (HA "
-                + info.optString("version") + "), " + ids.size() + " thiết bị";
+                + info.optString("version") + "), " + total + " entity, bot dùng " + cfg.haDevices.length()
+                + " thiết bị đã lưu";
     }
 
     private static String request(Config cfg, String method, String path, JSONObject body) throws Exception {
