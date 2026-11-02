@@ -1,9 +1,12 @@
 package vn.r1.geminibot;
 
 import android.content.Context;
+import android.text.TextUtils;
 
 import java.io.File;
 import java.io.FileOutputStream;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * Đèn của R1 theo trạng thái bot. Loa có 2 nhóm đèn, mỗi nhóm một file của driver
@@ -91,6 +94,13 @@ final class Led {
     private static String lastError = "";
     private static File comet;
     private static File sweep;
+    private static File music;
+    /** Đèn theo nhạc (Cài đặt → Đèn LED), xem MusicLight. */
+    private static volatile boolean musicEnabled = true;
+
+    static void setMusicEnabled(boolean on) {
+        musicEnabled = on;
+    }
     /** Thời điểm nghe thấy từ đánh thức (wake()); lần vào "listening" kế tiếp trong ~2,5 s sẽ quét sáng viền. */
     private static volatile long wakeAt;
 
@@ -119,6 +129,12 @@ final class Led {
             sweep = writeSweep(ctx);
         } catch (Exception e) {
             BotLog.w("Không tạo được hiệu ứng quét đánh thức: " + e.getMessage());
+        }
+        try {
+            MusicLight.init(ctx);
+            music = writeMusic(ctx);
+        } catch (Exception e) {
+            BotLog.w("Không tạo được hiệu ứng đèn theo nhạc: " + e.getMessage());
         }
         Thread t = new Thread(() -> {
             long firstOk = 0, lastOff = 0;
@@ -183,7 +199,8 @@ final class Led {
             case "paused":
                 return "muted";
             default:
-                return "off";
+                // Rảnh mà đang phát nhạc: đèn theo nhạc (nếu bật)
+                return musicEnabled && music != null && MusicLight.active() ? "music" : "off";
         }
     }
 
@@ -203,6 +220,12 @@ final class Led {
                 return stop + INNER_OFF + "; " + RING_OFF + "; " + INNER_RED;
             case "muted":
                 return stop + INNER_OFF + "; " + RING_OFF + "; " + INNER_MUTED;
+            case "music":
+                if (music != null) {
+                    return stop + INNER_OFF + "; " + RING_OFF + "; rm -f " + STOPF + "; trap '' HUP; sh "
+                            + music.getAbsolutePath() + " </dev/null >/dev/null 2>&1 & echo $! > " + PID;
+                }
+                return stop + INNER_OFF + "; " + RING_OFF;
             case "thinking":
                 if (comet != null) {
                     // Ghi PID ngay ở đây chứ không để script tự ghi khi chạy: bấm "về rảnh" liền sau "nghĩ" thì
@@ -258,6 +281,32 @@ final class Led {
             sb.append(PACE).append('\n');
         }
         return writeScript(ctx, "led_wake_sweep.sh", sb.toString());
+    }
+
+    /**
+     * Script đèn theo nhạc: đọc số đèn (0..24, MusicLight ghi) mỗi 40 ms, đổi thì bật đúng chừng ấy đèn
+     * viền tính đối xứng từ đèn 16 sang hai bên, tắt phần còn lại. Dừng bằng STOPF như sao chổi.
+     */
+    private static File writeMusic(Context ctx) throws Exception {
+        File level = MusicLight.levelFile();
+        if (level == null) throw new Exception("không có bộ nhớ ngoài");
+        int[] order = new int[MusicLight.RING];
+        for (int i = 0, a = 0, b = 23; i < order.length; i++) order[i] = 16 + (i % 2 == 0 ? a++ : b--);
+        StringBuilder sb = new StringBuilder(RING_OFF).append("\np=-1\nwhile [ ! -f ").append(STOPF).append(" ]; do\n")
+                .append("  read l < ").append(level.getAbsolutePath()).append("\n")
+                .append("  if [ \"$l\" != \"$p\" ]; then\n    case \"$l\" in\n");
+        for (int n = 0; n <= MusicLight.RING; n++) {
+            StringBuilder on = new StringBuilder(), off = new StringBuilder();
+            for (int i = 0; i < order.length; i++) (i < n ? on : off).append(' ').append(order[i]);
+            List<String> cmds = new ArrayList<>();
+            if (n > 0) cmds.add(setColor(RING_COLOR, n + on.toString(), "ffffff"));
+            if (n < order.length) cmds.add(blackAll(RING_COLOR, (order.length - n) + off.toString()));
+            sb.append("      ").append(n).append(") ").append(TextUtils.join("; ", cmds)).append(" ;;\n");
+        }
+        sb.append("    esac\n    p=$l\n  fi\n  sleep 0.04\ndone\n")
+          .append(RING_OFF).append('\n')
+          .append("rm -f ").append(STOPF).append(' ').append(PID).append('\n');
+        return writeScript(ctx, "led_music.sh", sb.toString());
     }
 
     private static File writeScript(Context ctx, String name, String body) throws Exception {

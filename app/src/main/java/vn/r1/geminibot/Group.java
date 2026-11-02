@@ -430,42 +430,67 @@ final class Group {
             BotLog.i("Nhóm loa: phát " + name + " (" + r + " Hz)");
         }
 
-        /** Lúc mẫu kế tiếp (written) sẽ ra loa, theo System.nanoTime; -1 nếu chưa đo được. */
+        /** Trễ cố định từ lúc ghi vào loa phát hết đệm tới tai (ước lượng, giống nhau trên mọi R1). */
+        private static final long OUT_LATENCY_NS = 40_000_000L;
+        private long dropped, inserted, lastLog;
+        private long sumErr, nErr;
+
+        /**
+         * Lúc mẫu kế tiếp (written) sẽ ra loa, theo System.nanoTime; -1 = loa đang trống (mới mở / vừa hết
+         * dữ liệu), cần bắt đầu lại. Ưu tiên AudioTrack.getTimestamp nếu mốc còn mới (< 0,5 s); mốc cũ
+         * (loa bị đói dữ liệu) làm ước lượng sai rất xa - lỗi khiến cả nhóm im lặng ở bản đầu.
+         */
         private long nextFrameTime() {
             if (written == 0) return -1;
-            if (track.getTimestamp(ts) && ts.framePosition > 0) {
+            long now = System.nanoTime();
+            long head = track.getPlaybackHeadPosition() & 0xffffffffL;
+            if (head >= written) return -1; // đã phát hết những gì ghi: loa trống
+            if (track.getTimestamp(ts) && ts.framePosition > 0 && now - ts.nanoTime < 500_000_000L) {
                 return ts.nanoTime + (written - ts.framePosition) * 1_000_000_000L / rate;
             }
-            long head = track.getPlaybackHeadPosition() & 0xffffffffL;
-            return System.nanoTime() + (written - head) * 1_000_000_000L / rate + 40_000_000L;
+            return now + (written - head) * 1_000_000_000L / rate + OUT_LATENCY_NS;
         }
 
         private void write(short[] pcm, long playAt) {
+            long now = System.nanoTime();
             long next = nextFrameTime();
             int start = 0;
             if (next < 0) {
-                // Mới mở: chèn im lặng cho tới đúng lúc
-                long gap = playAt - System.nanoTime() - 40_000_000L;
-                if (gap > 0) silence((int) (gap * rate / 1_000_000_000L));
+                // Loa trống: chèn im lặng cho tới đúng lúc rồi phát; quá trễ thì bỏ phần đã qua
+                long gap = playAt - now - OUT_LATENCY_NS;
+                if (gap > 0) silence((int) Math.min(gap * rate / 1_000_000_000L, rate / 2));
+                else start = (int) Math.min(-gap * rate / 1_000_000_000L, pcm.length);
             } else {
                 long errFrames = (next - playAt) * rate / 1_000_000_000L; // > 0: đang trễ
-                long big = rate / 50;   // 20 ms
+                sumErr += errFrames;
+                nErr++;
+                long big = rate / 50;     // 20 ms
                 long small = rate / 1000; // 1 ms
                 long dead = rate / 500;   // 2 ms
                 if (errFrames > big) {
                     start = (int) Math.min(errFrames, pcm.length);
                 } else if (errFrames < -big) {
-                    silence((int) -errFrames);
+                    silence((int) Math.min(-errFrames, rate / 2));
                 } else if (errFrames > dead) {
                     start = (int) Math.min(small, pcm.length);
                 } else if (errFrames < -dead) {
                     silence((int) small);
                 }
             }
+            dropped += start;
             if (start < pcm.length) {
+                if (!ducked) MusicLight.feed(pcm, playAt); // đèn theo nhạc đúng lúc tiếng ra loa này
                 if (ducked) pcm = new short[pcm.length];
                 track.write(pcm, start, pcm.length - start);
                 written += pcm.length - start;
+            }
+            if (now - lastLog > 10_000_000_000L) { // 10 s: ghi độ lệch để chỉnh
+                lastLog = now;
+                BotLog.i(String.format(java.util.Locale.ROOT,
+                        "Nhóm loa %s: lệch TB %.1f ms, bỏ %d ms, chèn %d ms, chờ %d gói", name,
+                        nErr > 0 ? sumErr * 1000.0 / nErr / rate : 0.0, dropped * 1000 / rate,
+                        inserted * 1000 / rate, q.size()));
+                sumErr = nErr = dropped = inserted = 0;
             }
         }
 
@@ -474,6 +499,7 @@ final class Group {
             frames = Math.min(frames, rate * 2);
             track.write(new short[frames], 0, frames);
             written += frames;
+            inserted += frames;
         }
 
         private static short[] toMono(byte[] pcm, int ch, int role) {

@@ -61,6 +61,7 @@ final class Music {
     private volatile JSONObject quality;
     private int generation;              // tăng mỗi lần đổi bài: bỏ kết quả lấy link của bài cũ
     private int errorsInRow;
+    private volatile int teeChannels;
     /** Bot đang nghe / nói: tạm dừng nhạc, xong thì phát tiếp (xem holdForBot). */
     private boolean heldForBot;
 
@@ -82,11 +83,15 @@ final class Music {
             TeeAudioProcessor tee = new TeeAudioProcessor(new TeeAudioProcessor.AudioBufferSink() {
                 @Override
                 public void flush(int sampleRateHz, int channelCount, int encoding) {
+                    teeChannels = encoding == C.ENCODING_PCM_16BIT ? channelCount : 0;
                     group.onFlush(encoding == C.ENCODING_PCM_16BIT ? sampleRateHz : 0, channelCount, encoding);
                 }
 
                 @Override
                 public void handleBuffer(ByteBuffer buffer) {
+                    // Đèn theo nhạc: PCM ở đây ra loa sau ~0,3 s (đệm AudioTrack của ExoPlayer); phát theo
+                    // nhóm thì Group tự báo đúng lúc ra loa
+                    if (!group.active() && teeChannels > 0) MusicLight.feed(buffer, teeChannels, 300_000_000L);
                     group.onPcm(buffer);
                 }
             });

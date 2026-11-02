@@ -54,6 +54,7 @@ public class BotService extends Service {
         web.start();
         local = new LocalAnswer(this);
         Led.setEnabled(Config.load(this).led);
+        Led.setMusicEnabled(Config.load(this).musicLed);
         Led.start(this);
         Button.start(this);
         Music.get(this); // dựng trình phát nhạc sẵn (hàng chờ cũ đọc lại từ file)
@@ -122,6 +123,7 @@ public class BotService extends Service {
     void configChanged() {
         Config cfg = Config.load(this);
         Led.setEnabled(cfg.led); // vòng chính có thể đang chờ từ đánh thức rất lâu -> áp dụng ngay ở đây
+        Led.setMusicEnabled(cfg.musicLed);
         if (!cfg.live) live.cancel();
     }
 

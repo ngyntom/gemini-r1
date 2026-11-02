@@ -244,19 +244,9 @@
         <div class="navbar"><div class="navbar-bg"></div><div class="navbar-inner">
           <div class="title">Thiết bị</div>
           <div class="right">
-            <a href="#" class="link icon-only searchbar-enable" data-searchbar="#devSearchbar" title="Tìm"><i class="icon f7-icons">search</i></a>
             <a href="#" class="link icon-only" id="devEditBtn" title="Sửa: bỏ thiết bị, đổi tên"><i class="icon f7-icons" id="devEditIcon">pencil</i></a>
             <a href="#" class="link icon-only" id="devAddBtn" title="Thêm/bớt thiết bị"><i class="icon f7-icons">plus</i></a>
           </div>
-          <!-- Như Pi: bấm kính lúp mới mở thanh tìm phủ lên navbar (searchbar-expandable) -->
-          <form class="searchbar searchbar-expandable" id="devSearchbar">
-            <div class="searchbar-inner">
-              <div class="searchbar-input-wrap">
-                <input type="search" placeholder="Tìm thiết bị..."><i class="searchbar-icon"></i><span class="input-clear-button"></span>
-              </div>
-              <span class="searchbar-disable-button">Huỷ</span>
-            </div>
-          </form>
         </div></div>
         <div class="page-content"><div class="page-inner" id="devices">
           <div class="block muted">Đang tải…</div>
@@ -343,7 +333,18 @@
   <div class="view"><div class="page">
     <div class="navbar"><div class="navbar-bg"></div><div class="navbar-inner">
       <div class="title">Thêm/bớt thiết bị</div>
-      <div class="right"><a href="#" class="link popup-close icon-only"><i class="icon f7-icons">xmark</i></a></div>
+      <div class="right">
+        <a href="#" class="link icon-only searchbar-enable" data-searchbar="#devSearchbar" title="Tìm"><i class="icon f7-icons">search</i></a>
+        <a href="#" class="link popup-close icon-only"><i class="icon f7-icons">xmark</i></a></div>
+      <!-- Như Pi: bấm kính lúp mới mở thanh tìm phủ lên navbar (searchbar-expandable) -->
+      <form class="searchbar searchbar-expandable" id="devSearchbar">
+        <div class="searchbar-inner">
+          <div class="searchbar-input-wrap">
+            <input type="search" id="devSearch" placeholder="Tìm thiết bị..."><i class="searchbar-icon"></i><span class="input-clear-button"></span>
+          </div>
+          <span class="searchbar-disable-button">Huỷ</span>
+        </div>
+      </form>
       <div class="subnavbar"><div class="subnavbar-inner">
         <div class="segmented segmented-strong">
           <a href="#" class="button button-active" data-devtab="on">Đã thêm (<span id="cntOn">0</span>)</a>
@@ -353,9 +354,7 @@
       </div></div>
     </div></div>
     <div class="page-content">
-      <div class="block" style="margin:12px 0 4px"><input id="devSearch" placeholder="Tìm theo tên hoặc entity_id…"
-        style="width:100%;height:36px;border-radius:10px;padding:0 12px;border:none;background:rgba(120,120,128,.14);color:inherit;font-size:15px"></div>
-      <div class="block-footer" id="devHint" style="margin-top:0"></div>
+      <div class="block-footer" id="devHint" style="margin-top:12px"></div>
       <div id="devPick"></div>
     </div>
   </div></div>
@@ -531,6 +530,7 @@ const PAGES = {
   led: () => subpage('led', 'Đèn LED',
     list('', [
       tog('led', 'Bật đèn LED', 'Đèn đổi theo trạng thái bot. Tắt = tắt hết đèn của loa (có tác dụng ngay).'),
+      tog('music_led', 'Đèn theo nhạc', 'Đang phát nhạc thì viền sáng nhiều / ít theo độ to của nhạc (cả nhạc nhóm loa).'),
     ])
     + `<div class="block-title">Thử đèn</div>
       <div class="list list-strong inset"><div class="led-grid">
@@ -540,7 +540,7 @@ const PAGES = {
     + list('Ý nghĩa', [
       ['Đánh thức', 'vệt sáng quét một vòng viền'], ['Nghe', 'viền trắng + đèn trong thở xanh dương'],
       ['Nghĩ', 'sao chổi chạy vòng + nhịp xanh lá'], ['Nói', 'viền trắng + đèn trong xanh lá'],
-      ['Lỗi', 'đèn trong đỏ'], ['Tắt mic', 'đèn trong đỏ mờ'], ['Rảnh', 'tắt hết'],
+      ['Lỗi', 'đèn trong đỏ'], ['Tắt mic', 'đèn trong đỏ mờ'], ['Phát nhạc', 'viền nháy theo nhạc (nếu bật)'], ['Rảnh', 'tắt hết'],
     ].map(([a, b]) => `<li class="item-content"><div class="item-inner"><div class="item-title">${a}</div><div class="item-after">${b}</div></div></li>`))),
 
   group: () => subpage('group', 'Nhóm loa',
@@ -658,6 +658,10 @@ function initSubpage(page) {
     el.querySelector('[data-k="led"]').addEventListener('change', e => {
       const v = e.target.checked ? '1' : '0';
       post('/api/config', { led: v }).then(() => { S.config.led = v; toast(v === '1' ? 'Đã bật đèn' : 'Đã tắt đèn'); });
+    });
+    el.querySelector('[data-k="music_led"]').addEventListener('change', e => {
+      const v = e.target.checked ? '1' : '0';
+      post('/api/config', { music_led: v }).then(() => { S.config.music_led = v; toast(v === '1' ? 'Đã bật đèn theo nhạc' : 'Đã tắt đèn theo nhạc'); });
     });
     el.addEventListener('page:beforeremove', () => { if (cur) post('/api/led', { state: '' }); });
   }
@@ -866,14 +870,7 @@ function renderDevices() {
       <a href="#" class="button button-fill button-round" onclick="openDevPopup();return false;" style="display:inline-flex;padding:0 20px">Thêm thiết bị</a></div>`;
     return;
   }
-  // Lọc theo ô tìm (tên gọi, tên gốc, entity_id; không phân biệt dấu)
-  const q = boDau(devQuery);
-  const shown = q ? devices.filter(d => boDau(d.name + ' ' + d.original + ' ' + d.id).includes(q)) : devices;
-  if (!shown.length) {
-    root.innerHTML = `<div class="block muted" style="text-align:center;margin-top:15vh">Không có thiết bị nào khớp "${esc(devQuery)}"</div>`;
-    return;
-  }
-  root.innerHTML = groupBy(shown).map(([dom, list]) => {
+  root.innerHTML = groupBy(devices).map(([dom, list]) => {
     const [title, icon] = DOMAINS[dom] || [dom, 'circle'];
     return `<div class="block-title">${title} (${list.length})</div><div class="list list-strong list-dividers inset"><div class="tiles">` +
       list.map(d => `<div class="tile ${ON.includes(d.state) ? 'on' : ''}" data-id="${esc(d.id)}">
@@ -899,12 +896,7 @@ function renderDevices() {
     });
   });
 }
-let devQuery = '';
 const boDau = s => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/đ/g, 'd').replace(/Đ/g, 'D').toLowerCase();
-app.searchbar.create({
-  el: '#devSearchbar', customSearch: true,
-  on: { search(sb, q) { devQuery = q.trim(); renderDevices(); }, disable() { devQuery = ''; renderDevices(); } },
-});
 async function removeDevice(id) {
   devices = devices.filter(d => d.id !== id);
   renderDevices();
@@ -968,6 +960,7 @@ const devPopup = app.popup.create({ el: '#devPopup', on: { closed: () => { clear
 function openDevPopup() {
   $('devPick').innerHTML = '<div class="block muted">Đang tải danh sách từ Home Assistant…</div>';
   $('devSearch').value = '';
+  if (typeof devSearchbar !== 'undefined' && devSearchbar.enabled) devSearchbar.disable();
   devPopup.open();
   fetch('/api/ha/devices?all=1').then(r => r.json().then(j => { if (!r.ok) throw new Error(j.error || r.status); return j; }))
     .then(j => { allDevs = j.devices; pickSel = selFrom(allDevs.filter(d => d.enabled)); renderPick(); })
@@ -976,10 +969,10 @@ function openDevPopup() {
 async function flushPick() { if (saveTimer !== null) { saveTimer = null; await saveSelection(pickSel); } }
 function schedulePickSave() { clearTimeout(saveTimer); saveTimer = setTimeout(() => { saveTimer = null; saveSelection(pickSel); }, 800); }
 function renderPick() {
-  const q = $('devSearch').value.trim().toLowerCase();
+  const q = boDau($('devSearch').value.trim()); // không phân biệt dấu: "den" khớp "Đèn"
   const on = allDevs.filter(d => d.id in pickSel), off = allDevs.filter(d => !(d.id in pickSel));
   $('cntOn').textContent = on.length; $('cntOff').textContent = off.length;
-  let list = (pickTab === 'on' ? on : off).filter(d => !q || (d.original + ' ' + d.id + ' ' + (pickSel[d.id] || '')).toLowerCase().includes(q));
+  let list = (pickTab === 'on' ? on : off).filter(d => !q || boDau(d.original + ' ' + d.id + ' ' + (pickSel[d.id] || '')).includes(q));
   const total = list.length, LIMIT = 200;
   if (list.length > LIMIT) list = list.slice(0, LIMIT);
   $('devHint').textContent = pickTab === 'on'
@@ -1008,6 +1001,7 @@ document.querySelectorAll('[data-devtab]').forEach(b => b.addEventListener('clic
   renderPick();
 }));
 $('devSearch').addEventListener('input', () => renderPick());
+const devSearchbar = app.searchbar.create({ el: '#devSearchbar', customSearch: true, on: { disable() { renderPick(); } } });
 $('devAddBtn').addEventListener('click', e => { e.preventDefault(); openDevPopup(); });
 
 async function tapDevice(t) {
