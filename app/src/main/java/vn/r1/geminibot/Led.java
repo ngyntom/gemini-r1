@@ -24,6 +24,17 @@ final class Led {
     /** Bit 15..38 = 24 đèn của viền. */
     private static final String RING = "7fffff8000";
     private static final String PID = "/data/local/tmp/gr1_led.pid";
+    /** Có file này thì sao chổi tự dừng sau khung hình đang chạy (xem command()). */
+    private static final String STOPF = "/data/local/tmp/gr1_led.stop";
+    /**
+     * Dừng sao chổi: KHÔNG kill ngay - lệnh "lights_test show 501" đang chạy dở của nó vẫn chạy xong SAU lệnh tắt
+     * đèn của app, làm đèn trong đọng màu xanh lá (thử trên loa: bot "không nghe rõ lời" về idle mà đèn vẫn sáng).
+     * Báo bằng file STOPF rồi chờ tới khi script tự thoát và xoá PID; quá hạn (~2 s) mới kill. Thử trên loa:
+     * 150 vòng chờ chưa đủ một khung hình (2/3 lần phải kill), 117 vòng là đủ khi khung vừa xong.
+     */
+    private static final String STOP = "if [ -f " + PID + " ]; then echo > " + STOPF + "; i=0; while [ -f " + PID
+            + " ] && [ $i -lt 600 ]; do i=$((i+1)); cat /proc/uptime >/dev/null; done; kill $(cat " + PID
+            + " 2>/dev/null) 2>/dev/null; rm -f " + PID + " " + STOPF + "; fi; ";
     /**
      * Tắt đèn trong bằng "close" từng hiệu ứng. KHÔNG dùng "show 504": đó là hiệu ứng "luôn bật màu đen",
      * nó đè lên và che mọi màu bật sau (thử trên loa: 504 rồi 501 thì không sáng).
@@ -72,9 +83,8 @@ final class Led {
                     // đầu thành công chứ không từ lúc app chạy: vừa cài bằng adb thì adbd có thể bận ~1 phút.
                     long now = System.currentTimeMillis();
                     if (firstOk == 0 || ("off".equals(mode) && now - firstOk < 30000 && now - lastOff > 5000)) {
-                        String cmd = command("off").replace(INNER_OFF, INNER_ALL_OFF);
-                        if (firstOk == 0) cmd = INNER_RESET + "; " + cmd; // chỉ lần đầu: xoá màu đọng của app cũ
-                        String out = LocalAdb.shell(cmd + "\necho OK", 8000);
+                        // command("off") đã gồm ngắt điện chip đèn trong -> xoá cả màu đọng của app cũ
+                        String out = LocalAdb.shell(command("off").replace(INNER_OFF, INNER_ALL_OFF) + "\necho OK", 8000);
                         if (!out.contains("OK")) throw new Exception("lights_test lỗi: " + out.trim());
                         if (firstOk == 0) firstOk = now;
                         lastOff = now;
@@ -82,7 +92,7 @@ final class Led {
                     }
                     if (!mode.equals(shown)) {
                         // Xuống dòng, không dùng ";": lệnh "nghĩ" kết thúc bằng "&" và "& ;" là lỗi cú pháp sh
-                        String out = LocalAdb.shell(command(mode) + "\necho OK", 4000);
+                        String out = LocalAdb.shell(command(mode) + "\necho OK", 8000); // "off" có reset chip 1 s
                         if (!out.contains("OK")) throw new Exception("lights_test lỗi: " + out.trim());
                         shown = mode;
                         if (!lastError.isEmpty()) BotLog.i("Đèn LED hoạt động lại");
@@ -123,7 +133,7 @@ final class Led {
 
     /** Lệnh shell chuyển sang kiểu đèn mới; luôn dừng sao chổi cũ trước. */
     private static String command(String mode) {
-        String stop = "kill $(cat " + PID + " 2>/dev/null) 2>/dev/null; rm -f " + PID + "; ";
+        String stop = STOP;
         switch (mode) {
             // Viền TRƯỚC rồi mới hiệu ứng đèn trong: "set" CẢ VÒNG viền sau "show" sẽ huỷ hiệu ứng đèn trong (thử
             // trên loa: chỉ còn viền trắng); "set" từng đèn như sao chổi thì không huỷ. INNER_OFF (~150 ms) chạy
@@ -141,7 +151,9 @@ final class Led {
                 }
                 return stop + INNER_OFF + "; lights_test set " + RING + " ffffff";
             default:
-                return stop + INNER_OFF + "; lights_test set " + RING + " 0";
+                // Về rảnh: ngắt điện chip đèn trong 1 s rồi mới đóng hiệu ứng - chip đôi khi giữ lại màu cũ
+                // (xanh lá, xanh dương mờ) mà close không xoá được và còn bỏ qua lệnh mới (thử trên loa).
+                return stop + INNER_RESET + "; " + INNER_OFF + "; lights_test set " + RING + " 0";
         }
     }
 
@@ -151,7 +163,7 @@ final class Led {
      */
     private static File writeComet(Context ctx) throws Exception {
         String[] tail = {"ffffff", "606060", "181818", "0"};
-        StringBuilder sb = new StringBuilder("echo $$ > " + PID + "\nn=0\ng=0\nwhile [ $n -lt 200 ]; do\n");
+        StringBuilder sb = new StringBuilder("rm -f " + STOPF + "\necho $$ > " + PID + "\nn=0\ng=0\nwhile [ $n -lt 200 ]; do\n");
         for (int k = 0; k < 24; k++) {
             // Đèn trong nhịp xanh lá (~1 s sáng / 1 s tắt): loa không có hiệu ứng thở xanh lá
             if (k % 6 == 0) {
@@ -162,9 +174,10 @@ final class Led {
                 sb.append("lights_test set ").append(Long.toHexString(1L << (15 + led))).append(' ')
                   .append(tail[t]).append(t == 0 ? "\n" : "; ");
             }
+            sb.append("[ -f ").append(STOPF).append(" ] && break\n"); // app báo dừng: thoát sau khung này
         }
         sb.append("n=$((n+1))\ndone\nlights_test close 501\nlights_test set ").append(RING).append(" 0\nrm -f ")
-          .append(PID).append('\n');
+          .append(STOPF).append(' ').append(PID).append('\n');
         File dir = ctx.getExternalCacheDir();
         if (dir == null) throw new Exception("không có bộ nhớ ngoài");
         File f = new File(dir, "led_comet.sh");
