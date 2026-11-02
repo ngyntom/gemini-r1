@@ -15,7 +15,7 @@ public class Config {
     static final String[] KEYS = {"api_key", "model", "tts_model", "voice", "wake_engine",
             "mww_model", "mww_cutoff", "wake_word", "follow_up", "persona", "mic_gain",
             "tts_engine", "google_voice", "google_tts_key", "tts_rate", "led", "wake_sound", "wake_reply", "local_time",
-            "ha_url", "ha_token", "stt_engine", "live", "live_model", "live_idle"};
+            "ha_url", "ha_token", "stt_engine", "live", "live_model", "live_idle", "gcloud_sa"};
 
     public String apiKey;
     public String model;
@@ -59,6 +59,9 @@ public class Config {
     public String liveModel;
     /** Live: im lặng quá số giây này thì kết thúc, quay lại chờ từ đánh thức. */
     public int liveIdleSec;
+
+    /** File JSON service account Google Cloud (STT / TTS); rỗng = dùng API key. */
+    public String gcloudSa;
 
     public boolean haEnabled() {
         return !haUrl.isEmpty() && !haToken.isEmpty();
@@ -115,6 +118,7 @@ public class Config {
         c.localTime = !"0".equals(p.getString("local_time", "1").trim());
         c.haUrl = p.getString("ha_url", "").trim().replaceAll("/+$", "");
         c.haToken = p.getString("ha_token", "").trim();
+        c.gcloudSa = p.getString("gcloud_sa", "").trim();
         c.sttEngine = p.getString("stt_engine", "google").trim().toLowerCase();
         c.live = "1".equals(p.getString("live", "0").trim());
         c.liveModel = p.getString("live_model", "gemini-2.5-flash-native-audio-latest").trim();
@@ -156,6 +160,7 @@ public class Config {
                 .put("local_time", c.localTime ? "1" : "0")
                 .put("ha_url", c.haUrl)
                 .put("ha_token_set", !c.haToken.isEmpty())
+                .put("gcloud_sa_email", c.gcloudSa.isEmpty() ? "" : GoogleAuth.email(c.gcloudSa))
                 .put("stt_engine", c.sttEngine)
                 .put("live", c.live ? "1" : "0")
                 .put("live_model", c.liveModel)
@@ -168,7 +173,8 @@ public class Config {
         for (String k : KEYS) {
             if (!o.has(k)) continue;
             String v = o.optString(k, "").trim();
-            boolean secret = k.equals("api_key") || k.equals("google_tts_key") || k.equals("ha_token");
+            boolean secret = k.equals("api_key") || k.equals("google_tts_key") || k.equals("ha_token")
+                    || k.equals("gcloud_sa");
             if (secret && v.isEmpty()) continue;
             if (!k.equals("api_key") && secret && v.equals("-")) v = ""; // "-" = xoá key / token
             e.putString(k, v);

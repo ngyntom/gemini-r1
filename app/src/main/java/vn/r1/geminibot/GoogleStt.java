@@ -21,13 +21,24 @@ final class GoogleStt {
 
     private GoogleStt() {}
 
+    /** Thông tin đăng nhập đang dùng: service account (nếu có) hoặc API key. */
     static String key(Config cfg) {
+        if (!cfg.gcloudSa.isEmpty()) return cfg.gcloudSa;
         return cfg.googleTtsKey.isEmpty() ? cfg.apiKey : cfg.googleTtsKey;
     }
 
-    /** Có nên thử STT không (đã chọn Google và key chưa bị từ chối). */
+    /** Có nên thử STT không (đã chọn Google và thông tin đăng nhập chưa bị từ chối). */
     static boolean usable(Config cfg) {
         return "google".equals(cfg.sttEngine) && !key(cfg).equals(rejectedKey);
+    }
+
+    /** Gắn service account (Bearer token) hoặc API key vào yêu cầu tới Google Cloud. */
+    static void authorize(Config cfg, HttpURLConnection c, String apiKey) throws Exception {
+        if (!cfg.gcloudSa.isEmpty()) {
+            c.setRequestProperty("Authorization", "Bearer " + GoogleAuth.token(cfg.gcloudSa));
+        } else {
+            c.setRequestProperty("x-goog-api-key", apiKey);
+        }
     }
 
     /** Trả về câu nghe được ("" nếu không có lời). wav = WAV 16 kHz mono 16-bit. */
@@ -49,7 +60,7 @@ final class GoogleStt {
         c.setDoOutput(true);
         c.setRequestMethod("POST");
         c.setRequestProperty("Content-Type", "application/json; charset=utf-8");
-        c.setRequestProperty("x-goog-api-key", key);
+        authorize(cfg, c, key);
         try {
             OutputStream os = c.getOutputStream();
             os.write(body.toString().getBytes("UTF-8"));
@@ -58,8 +69,9 @@ final class GoogleStt {
             String resp = LocalAdb.readAll(code < 400 ? c.getInputStream() : c.getErrorStream());
             if (code == 401 || code == 403) {
                 rejectedKey = key;
-                throw new Exception("Google STT từ chối key (HTTP " + code + "), dùng Gemini nghe trực tiếp. "
-                        + "Cần key Google Cloud (AIza…) đã bật Cloud Speech-to-Text API: " + resp);
+                throw new Exception("Google STT từ chối " + (cfg.gcloudSa.isEmpty() ? "key" : "service account")
+                        + " (HTTP " + code + "), dùng Gemini nghe trực tiếp. Cần key Google Cloud (AIza…) hoặc "
+                        + "service account của project đã bật Cloud Speech-to-Text API và billing: " + resp);
             }
             if (code >= 400) throw new Exception("Google STT HTTP " + code + ": " + resp);
             JSONArray results = new JSONObject(resp).optJSONArray("results");

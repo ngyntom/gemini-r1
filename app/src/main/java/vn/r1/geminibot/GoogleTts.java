@@ -38,7 +38,7 @@ final class GoogleTts {
         c.setDoOutput(true);
         c.setRequestMethod("POST");
         c.setRequestProperty("Content-Type", "application/json; charset=utf-8");
-        c.setRequestProperty("x-goog-api-key", cfg.googleTtsKey.isEmpty() ? cfg.apiKey : cfg.googleTtsKey);
+        GoogleStt.authorize(cfg, c, cfg.googleTtsKey.isEmpty() ? cfg.apiKey : cfg.googleTtsKey);
         try {
             OutputStream os = c.getOutputStream();
             os.write(body.toString().getBytes("UTF-8"));

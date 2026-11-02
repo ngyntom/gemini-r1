@@ -191,8 +191,11 @@ final class GeminiLive {
                                     .put("service", new JSONObject().put("type", "STRING"))
                                     .put("entity_id", new JSONObject().put("type", "STRING"))
                                     .put("data_json", new JSONObject().put("type", "STRING")
-                                            .put("description", "tham số thêm dạng JSON, vd. {\"brightness_pct\":50}")))
-                            .put("required", new JSONArray().put("domain").put("service").put("entity_id"))));
+                                            .put("description", "tham số thêm dạng JSON, vd. {\"brightness_pct\":50}"))
+                                    .put("user_words", new JSONObject().put("type", "STRING")
+                                            .put("description", GeminiClient.USER_WORDS_DESC)))
+                            .put("required", new JSONArray().put("domain").put("service").put("entity_id")
+                                    .put("user_words"))));
         }
         return new JSONObject().put("setup", new JSONObject()
                 .put("model", "models/" + cfg.liveModel)
@@ -222,6 +225,7 @@ final class GeminiLive {
               .append(devices)
               .append("\nMuốn bật / tắt / chỉnh thiết bị thì gọi hàm ha_call với entity_id đúng trong danh sách, ")
               .append("chờ kết quả rồi mới nói đã làm xong; lỗi hoặc không tìm thấy thì nói rõ. ")
+              .append(GeminiClient.DEVICE_RULES).append(' ')
               .append("Hỏi trạng thái thì trả lời theo danh sách.");
         }
         return sb.toString();
@@ -291,7 +295,8 @@ final class GeminiLive {
                     try {
                         String dataJson = args.optString("data_json", "").trim();
                         result = HomeAssistant.call(cfg, deviceIds, args.optString("domain"), args.optString("service"),
-                                args.optString("entity_id"), dataJson.isEmpty() ? null : new JSONObject(dataJson));
+                                args.optString("entity_id"), dataJson.isEmpty() ? null : new JSONObject(dataJson),
+                                args.optString("user_words"));
                     } catch (Exception e) {
                         result = new JSONObject().put("ok", false).put("error", String.valueOf(e.getMessage()));
                     }

@@ -71,11 +71,50 @@ final class HomeAssistant {
         }
     }
 
+    /**
+     * Loại thiết bị theo lời nói -> các nhóm entity hợp lệ. Gemini từng nghe "tắt đèn phòng ba" mà tắt
+     * climate.may_lanh_phong_ba (không có đèn tên đó) -> chặn khi loại thiết bị không khớp.
+     */
+    private static final String[][] KIND = {
+            {"đèn", "light switch"},
+            {"quạt", "fan switch"},
+            {"máy lạnh", "climate"}, {"điều hoà", "climate"}, {"điều hòa", "climate"},
+            {"rèm", "cover"}, {"cửa cuốn", "cover"},
+            {"ổ cắm", "switch"},
+            {"tivi", "media_player switch"}, {"ti vi", "media_player switch"},
+            {"máy hút bụi", "vacuum"}, {"robot", "vacuum"},
+    };
+
+    /** Lỗi nếu lời nói chỉ rõ một loại thiết bị mà entity thuộc nhóm khác, ngược lại null. */
+    static String kindMismatch(String userWords, String entityId) {
+        if (userWords == null) return null;
+        String w = userWords.toLowerCase(java.util.Locale.ROOT);
+        for (String[] k : KIND) {
+            if (!w.contains(k[0])) continue;
+            Set<String> ok = new HashSet<>(Arrays.asList(k[1].split(" ")));
+            for (String id : entityId.split(",")) {
+                String d = id.trim().contains(".") ? id.trim().substring(0, id.trim().indexOf('.')) : "";
+                if (!ok.contains(d)) {
+                    return "Người dùng nói \"" + k[0] + "\" nhưng " + id.trim() + " không phải loại đó. "
+                            + "KHÔNG điều khiển thiết bị khác loại: nói với người dùng là không tìm thấy " + k[0]
+                            + " khớp và kể tên các " + k[0] + " có trong danh sách.";
+                }
+            }
+            return null;
+        }
+        return null;
+    }
+
     /** Gọi một lệnh, trả về mô tả kết quả để gửi lại cho Gemini. */
     static JSONObject call(Config cfg, Set<String> knownIds, String domain, String service,
-                           String entityId, JSONObject data) throws Exception {
+                           String entityId, JSONObject data, String userWords) throws Exception {
         if (!CONTROL.contains(domain)) {
             return new JSONObject().put("ok", false).put("error", "Không được phép gọi nhóm " + domain);
+        }
+        String mismatch = entityId == null ? null : kindMismatch(userWords, entityId);
+        if (mismatch != null) {
+            BotLog.w("Chặn lệnh Home Assistant sai loại: \"" + userWords + "\" -> " + entityId);
+            return new JSONObject().put("ok", false).put("error", mismatch);
         }
         if (!service.matches("[a-z_]+")) {
             return new JSONObject().put("ok", false).put("error", "Tên lệnh không hợp lệ: " + service);

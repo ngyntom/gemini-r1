@@ -134,8 +134,10 @@ public class GeminiClient {
                         .put("entity_id", new JSONObject().put("type", "STRING")
                                 .put("description", "entity_id trong danh sách; nhiều thiết bị thì cách nhau bằng dấu phẩy"))
                         .put("data_json", new JSONObject().put("type", "STRING")
-                                .put("description", "tham số thêm dạng JSON, vd. {\"brightness_pct\":50} hoặc {\"temperature\":26}; không có thì để {}")))
-                .put("required", new JSONArray().put("domain").put("service").put("entity_id"));
+                                .put("description", "tham số thêm dạng JSON, vd. {\"brightness_pct\":50} hoặc {\"temperature\":26}; không có thì để {}"))
+                        .put("user_words", new JSONObject().put("type", "STRING")
+                                .put("description", USER_WORDS_DESC)))
+                .put("required", new JSONArray().put("domain").put("service").put("entity_id").put("user_words"));
         body.put("tools", new JSONArray().put(new JSONObject().put("functionDeclarations", new JSONArray()
                 .put(new JSONObject().put("name", "ha_call")
                         .put("description", "Điều khiển một thiết bị trong nhà qua Home Assistant")
@@ -168,7 +170,8 @@ public class GeminiClient {
                 try {
                     String dataJson = args.optString("data_json", "").trim();
                     result = HomeAssistant.call(cfg, deviceIds, args.optString("domain"), args.optString("service"),
-                            args.optString("entity_id"), dataJson.isEmpty() ? null : new JSONObject(dataJson));
+                            args.optString("entity_id"), dataJson.isEmpty() ? null : new JSONObject(dataJson),
+                            args.optString("user_words"));
                 } catch (Exception e) {
                     result = new JSONObject().put("ok", false).put("error", String.valueOf(e.getMessage()));
                 }
@@ -268,6 +271,16 @@ public class GeminiClient {
             + "ngắn; khi được nhờ kể chuyện, đọc thơ hay giải thích chi tiết thì nói đầy đủ, mạch lạc (truyện "
             + "khoảng 200–350 từ), dùng câu văn tự nhiên để đọc thành tiếng.";
 
+    static final String USER_WORDS_DESC = "nguyên văn cụm từ người dùng dùng để gọi riêng thiết bị này, "
+            + "vd. \"đèn phòng ba\"; mỗi thiết bị khác loại thì gọi ha_call riêng";
+
+    /** Quy tắc chọn thiết bị (dùng chung cho Gemini thường và Gemini Live). */
+    static final String DEVICE_RULES = "Chỉ điều khiển đúng LOẠI thiết bị người dùng nói: \"đèn\" là light "
+            + "(hoặc switch tên có chữ đèn), \"quạt\" là fan, \"máy lạnh\" / \"điều hoà\" là climate, \"rèm\" là cover, "
+            + "\"ổ cắm\" là switch. Không có thiết bị khớp cả loại lẫn tên / phòng thì KHÔNG gọi ha_call và KHÔNG "
+            + "chọn thiết bị khác loại (vd. nói \"đèn phòng ba\" mà chỉ có máy lạnh phòng ba thì không được tắt máy lạnh): "
+            + "nói là không tìm thấy và kể vài thiết bị cùng loại gần nhất.";
+
     private static String systemPrompt(Config cfg, String devices) {
         StringBuilder sb = new StringBuilder(cfg.persona);
         sb.append("\n\n").append(CAPABILITIES);
@@ -285,6 +298,7 @@ public class GeminiClient {
               .append("\nKhi người dùng muốn bật / tắt / chỉnh thiết bị, gọi hàm ha_call với entity_id đúng ")
               .append("trong danh sách (chọn theo tên gần nhất với lời nói; \"tất cả đèn\" thì liệt kê các entity_id). ")
               .append("Hỏi trạng thái thì trả lời theo danh sách, không cần gọi ha_call. ")
+              .append(DEVICE_RULES).append(' ')
               .append("Mọi yêu cầu khác (trò chuyện, kể chuyện, hỏi đáp, đọc thơ…) không liên quan thiết bị: ")
               .append("trả lời bình thường như trên, chỉ cần gọi respond, KHÔNG từ chối. ")
               .append("Cuối cùng luôn gọi hàm respond với heard và reply; xác nhận điều khiển thì ngắn, ")

@@ -267,6 +267,14 @@
         <label>Live: im lặng bao nhiêu giây thì kết thúc</label>
         <input data-k="live_idle" type="number" min="5" max="300">
       </div>
+      <div style="grid-column: 1 / -1">
+        <label>Service account Google Cloud (file .json, cho STT & Cloud TTS) <span class="muted" id="saHint"></span></label>
+        <div class="row">
+          <input class="flex1" type="file" id="saFile" accept=".json,application/json">
+          <button onclick="saUpload()">Lưu file</button>
+          <button onclick="saClear()">Xoá</button>
+        </div>
+      </div>
     </div>
     <p class="muted" style="margin:10px 0 0">Google Cloud STT cần key Google Cloud (AIza…) của project đã bật
       "Cloud Speech-to-Text API" và billing (miễn phí 60 phút / tháng). Key bị từ chối thì bot tự quay về Gemini nghe trực tiếp.
@@ -364,10 +372,23 @@ function fillConfig(s) {
   $('keyHint').textContent = s.config.api_key_set ? '(đã đặt ' + s.config.api_key_hint + ')' : '(chưa đặt)';
   $('gkeyHint').textContent = s.config.google_tts_key_set ? '(đã đặt, gõ - để xoá)' : '';
   $('haHint').textContent = s.config.ha_token_set ? '(đã đặt, gõ - để xoá)' : '(chưa đặt)';
+  $('saHint').textContent = s.config.gcloud_sa_email ? '(đang dùng ' + s.config.gcloud_sa_email + ')' : '(chưa có – dùng API key)';
   $('rateLabel').textContent = '×' + (+$('rate').value).toFixed(2);
   fillModels(s);
   showEngine();
   showTts();
+}
+
+async function saUpload() {
+  const f = $('saFile').files[0]; if (!f) return toast('Chọn file .json trước');
+  let j; try { j = JSON.parse(await f.text()); } catch (e) { return toast('File không phải JSON'); }
+  if (j.type !== 'service_account' || !j.private_key) return toast('Không phải file service account');
+  await post('/api/config', { gcloud_sa: JSON.stringify(j) });
+  $('saFile').value = ''; loaded = false; await refresh(); toast('Đã lưu service account');
+}
+
+async function saClear() {
+  await post('/api/config', { gcloud_sa: '-' }); loaded = false; await refresh(); toast('Đã xoá service account');
 }
 
 async function haTest() {
