@@ -28,16 +28,18 @@ final class SysInfo {
     static JSONObject read(Context ctx) {
         JSONObject j = new JSONObject();
         try {
-            long total = 0, free = 0, cached = 0;
+            long total = 0, free = 0, cached = 0, buffers = 0;
             BufferedReader r = new BufferedReader(new FileReader("/proc/meminfo"));
             String l;
             while ((l = r.readLine()) != null) {
                 if (l.startsWith("MemTotal:")) total = kb(l);
                 else if (l.startsWith("MemFree:")) free = kb(l);
+                else if (l.startsWith("Buffers:")) buffers = kb(l);
                 else if (l.startsWith("Cached:")) cached = kb(l);
             }
             r.close();
-            j.put("ram_total_mb", total / 1024).put("ram_used_mb", (total - free - cached) / 1024);
+            // Buffers + Cached là bộ nhớ đệm, hệ thống lấy lại được khi cần -> không tính là đã dùng
+            j.put("ram_total_mb", total / 1024).put("ram_used_mb", (total - free - buffers - cached) / 1024);
         } catch (Exception ignored) {
         }
         try {
