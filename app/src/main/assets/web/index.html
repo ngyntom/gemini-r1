@@ -91,6 +91,7 @@
   .sys-bar span { display: block; height: 100%; background: var(--f7-theme-color); }
 
   .range-row { padding: 6px 16px 12px; }
+  .led-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(88px, 1fr)); gap: 8px; padding: 14px 16px; }
   .range-row input[type=range] { width: 100%; accent-color: var(--f7-theme-color); }
   .btn-row { display: flex; flex-wrap: wrap; gap: 8px; padding: 0 16px 14px; }
   .btn-row .button { width: auto; flex: 1 1 auto; }
@@ -211,17 +212,6 @@
               <a href="#" class="button button-tonal" id="btnMic"><i class="icon f7-icons" style="font-size:18px">play_fill</i>&nbsp;Nghe lại 5 giây mic</a>
             </div>
             <div style="padding:0 16px 14px"><audio id="micAudio" controls style="width:100%"></audio></div>
-          </div>
-
-          <div class="block-title">Thử đèn LED</div>
-          <div class="list list-strong list-dividers inset">
-            <div class="btn-row" style="padding-top:14px">
-              <a href="#" class="button button-tonal" data-led="listening">Nghe</a>
-              <a href="#" class="button button-tonal" data-led="thinking">Nghĩ</a>
-              <a href="#" class="button button-tonal" data-led="speaking">Nói</a>
-              <a href="#" class="button button-tonal" data-led="error">Lỗi</a>
-              <a href="#" class="button button-fill" data-led="">Theo bot</a>
-            </div>
           </div>
 
           <div class="block-title">Nhật ký</div>
@@ -387,6 +377,16 @@ function subpage(name, title, body) {
 }
 const hint = (set, extra) => set ? `<span class="muted">${extra || '(đã đặt, để trống = giữ nguyên, gõ - để xoá)'}</span>` : '<span class="muted">(chưa đặt)</span>';
 
+// Nút thử đèn (trang Đèn LED): giá trị gửi /api/led, "" = theo bot
+const LED_TESTS = [['', 'Theo bot'], ['listening', 'Nghe'], ['thinking', 'Nghĩ'], ['speaking', 'Nói'],
+  ['error', 'Lỗi'], ['paused', 'Tắt mic'], ['idle', 'Tắt hết']];
+function markLed(v) {
+  document.querySelectorAll('[data-led]').forEach(b => {
+    b.classList.toggle('button-fill', b.dataset.led === v);
+    b.classList.toggle('button-tonal', b.dataset.led !== v);
+  });
+}
+
 // 30 giọng có sẵn của Gemini TTS / Live (nam / nữ theo tài liệu của Google)
 const GEMINI_VOICES = [['Kore', 'nữ'], ['Puck', 'nam'], ['Charon', 'nam'], ['Aoede', 'nữ'], ['Leda', 'nữ'], ['Fenrir', 'nam'],
   ['Zephyr', 'nữ'], ['Orus', 'nam'], ['Achernar', 'nữ'], ['Achird', 'nam'], ['Algenib', 'nam'], ['Algieba', 'nam'],
@@ -476,8 +476,18 @@ const PAGES = {
 
   led: () => subpage('led', 'Đèn LED',
     list('', [
-      tog('led', 'Đèn theo trạng thái bot', 'Đánh thức: quét sáng viền · Nghe: thở xanh dương · Nghĩ: sao chổi + nhịp xanh lá · Nói: xanh lá · Lỗi: đỏ'),
-    ], 'Thử từng kiểu đèn ở tab Loa.')),
+      tog('led', 'Bật đèn LED', 'Đèn đổi theo trạng thái bot. Tắt = tắt hết đèn của loa (có tác dụng ngay).'),
+    ])
+    + `<div class="block-title">Thử đèn</div>
+      <div class="list list-strong inset"><div class="led-grid">
+        ${LED_TESTS.map(([v, t]) => `<a href="#" class="button button-tonal" data-led="${v}">${t}</a>`).join('')}
+      </div></div>
+      <div class="block-footer">Bấm một kiểu để giữ đèn ở kiểu đó; "Theo bot" để đèn đổi theo trạng thái bot. Rời trang này thì tự về "Theo bot".</div>`
+    + list('Ý nghĩa', [
+      ['Đánh thức', 'vệt sáng quét một vòng viền'], ['Nghe', 'viền trắng + đèn trong thở xanh dương'],
+      ['Nghĩ', 'sao chổi chạy vòng + nhịp xanh lá'], ['Nói', 'viền trắng + đèn trong xanh lá'],
+      ['Lỗi', 'đèn trong đỏ'], ['Tắt mic', 'đèn trong đỏ mờ'], ['Rảnh', 'tắt hết'],
+    ].map(([a, b]) => `<li class="item-content"><div class="item-inner"><div class="item-title">${a}</div><div class="item-after">${b}</div></div></li>`))),
 
   update: () => subpage('update', 'Cập nhật app',
     `<div class="list list-strong list-dividers inset"><ul>
@@ -531,6 +541,19 @@ function fillFields(el) {
 function initSubpage(page) {
   const el = page.el;
   fillFields(el);
+  if (page.name === 'led') {
+    let cur = S.led_test || '';
+    markLed(cur);
+    el.querySelectorAll('[data-led]').forEach(b => b.addEventListener('click', e => {
+      e.preventDefault(); cur = b.dataset.led; markLed(cur); post('/api/led', { state: cur });
+    }));
+    // Bật / tắt đèn có tác dụng ngay, không cần bấm Lưu
+    el.querySelector('[data-k="led"]').addEventListener('change', e => {
+      const v = e.target.checked ? '1' : '0';
+      post('/api/config', { led: v }).then(() => { S.config.led = v; toast(v === '1' ? 'Đã bật đèn' : 'Đã tắt đèn'); });
+    });
+    el.addEventListener('page:beforeremove', () => { if (cur) post('/api/led', { state: '' }); });
+  }
   const mm = el.querySelector('#mwwModel');
   if (mm) {
     const cur = S.config.mww_model, opts = [];
@@ -680,7 +703,6 @@ $('btnListen').addEventListener('click', listen);
 // ---------- Loa ----------
 $('btnReset').addEventListener('click', e => { e.preventDefault(); post('/api/reset').then(() => toast('Đã xoá trí nhớ hội thoại')); });
 $('btnMic').addEventListener('click', e => { e.preventDefault(); $('micAudio').src = '/api/mic.wav?t=' + Date.now(); $('micAudio').play(); });
-document.querySelectorAll('[data-led]').forEach(b => b.addEventListener('click', e => { e.preventDefault(); post('/api/led', { state: b.dataset.led }); }));
 ['runToggle', 'runToggle2'].forEach(id => $(id).addEventListener('change', e => post('/api/pause', { paused: !e.target.checked }).then(refresh)));
 ['vol', 'vol2'].forEach(id => {
   $(id).addEventListener('input', () => {

@@ -20,6 +20,8 @@ public class BotService extends Service {
     static final String TAG = "GeminiR1";
     private static final int TTS_RATE = 24000;
     private static final long WAKE_LISTEN_MS = 7000; // chờ câu hỏi sau tiếng bíp
+    /** Bot kết thúc câu trả lời bằng câu hỏi thì nghe câu đáp ít nhất chừng này giây. */
+    private static final int ASK_BACK_SEC = 8;
     /** Im lặng đầu câu đáp "Dạ?" cho ampli thức dậy (loa ngắt ampli khi rảnh, giống LEAD_MS của Tone). */
     private static final int CUE_LEAD_MS = 500;
 
@@ -110,7 +112,9 @@ public class BotService extends Service {
 
     /** Web UI vừa lưu cấu hình: tắt Gemini Live thì kết thúc ngay phiên Live đang chạy. */
     void configChanged() {
-        if (!Config.load(this).live) live.cancel();
+        Config cfg = Config.load(this);
+        Led.setEnabled(cfg.led); // vòng chính có thể đang chờ từ đánh thức rất lâu -> áp dụng ngay ở đây
+        if (!cfg.live) live.cancel();
     }
 
     /** Bấm nút lúc bot đang nói (cờ cutIn để vòng chính nghe câu hỏi mới ngay sau đó). */
@@ -147,6 +151,7 @@ public class BotService extends Service {
         String wakeEngine = null;
         boolean followUp = false;
         boolean barged = false; // vừa ngắt lời bot -> nghe câu hỏi mới ngay, không chờ từ đánh thức
+        boolean askedBack = false; // câu trả lời kết thúc bằng câu hỏi
         try {
             while (running) {
                 try {
@@ -179,10 +184,13 @@ public class BotService extends Service {
                     recorder.ensureOpen();
 
                     byte[] wav;
-                    if (followUp && cfg.followUpSec > 0) {
+                    // Bot vừa hỏi lại ("…bạn muốn nghe tin gì không?") thì luôn nghe câu đáp, kể cả khi tắt nghe tiếp
+                    int followSec = askedBack ? Math.max(cfg.followUpSec, ASK_BACK_SEC) : cfg.followUpSec;
+                    askedBack = false;
+                    if (followUp && followSec > 0) {
                         followUp = false;
                         BotLog.state = "listening";
-                        wav = recorder.recordUtterance(cfg.followUpSec * 1000L);
+                        wav = recorder.recordUtterance(followSec * 1000L);
                         if (wav == null) continue; // không ai nói tiếp -> quay lại chờ từ đánh thức
                     } else {
                         followUp = false;
@@ -294,6 +302,8 @@ public class BotService extends Service {
                     BotLog.i("Trả lời: " + a.reply);
                     barged = speakBargeIn(cfg, a.reply, wake);
                     followUp = !barged;
+                    askedBack = a.reply.trim().endsWith("?");
+                    if (askedBack && !barged) BotLog.i("Bot hỏi lại -> nghe câu đáp " + Math.max(cfg.followUpSec, ASK_BACK_SEC) + " s");
                 } catch (InterruptedException e) {
                     return;
                 } catch (Throwable e) {

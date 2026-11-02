@@ -237,7 +237,7 @@ class WebServer {
                 }
                 break;
             }
-            case "/api/led": // thử đèn: {state: listening|thinking|speaking|error|idle}, rỗng = theo bot
+            case "/api/led": // thử đèn: {state: listening|thinking|speaking|error|paused|idle}, rỗng = theo bot
                 Led.test = req.optString("state", "").isEmpty() ? null : req.optString("state");
                 break;
             case "/api/listen":
@@ -305,6 +305,7 @@ class WebServer {
                 .put("state", BotLog.state)
                 .put("version", bot.getPackageManager().getPackageInfo(bot.getPackageName(), 0).versionName)
                 .put("paused", bot.isPaused())
+                .put("led_test", Led.test == null ? "" : Led.test)
                 .put("wake_name", BotLog.wakeName)
                 .put("mic_level", BotLog.micLevel)
                 .put("wake_score", BotLog.wakeScore)
