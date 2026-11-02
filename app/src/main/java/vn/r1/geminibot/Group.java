@@ -395,7 +395,7 @@ final class Group {
                     int r = (Integer) m[2], ch = (Integer) m[3], role = (Integer) m[4];
                     short[] mono = toMono((byte[]) m[1], ch, role);
                     if (track == null || r != rate) open(r);
-                    // Ghi trước ~150 ms (đệm AudioTrack 250 ms, đủ chỗ để write() không bị chặn)
+                    // Ghi trước ~150 ms: trừ trễ ra loa còn ~110 ms chờ trong đệm AudioTrack (~125 ms)
                     long wait = playAt - System.nanoTime() - 150_000_000L;
                     if (wait > 0) Thread.sleep(wait / 1_000_000, (int) (wait % 1_000_000));
                     if (playAt < System.nanoTime() - 50_000_000L && written > 0 && !playing()) {
@@ -421,16 +421,22 @@ final class Group {
             if (track != null) track.release();
             rate = r;
             int min = AudioTrack.getMinBufferSize(r, AudioFormat.CHANNEL_OUT_MONO, AudioFormat.ENCODING_PCM_16BIT);
+            int bytes = Math.max(min, r / 8 * 2); // ~125 ms, vừa đủ cho lượng ghi trước (~110 ms)
             track = new AudioTrack(AudioManager.STREAM_MUSIC, r, AudioFormat.CHANNEL_OUT_MONO,
-                    AudioFormat.ENCODING_PCM_16BIT, Math.max(min, r / 4 * 2), AudioTrack.MODE_STREAM);
+                    AudioFormat.ENCODING_PCM_16BIT, bytes, AudioTrack.MODE_STREAM);
             written = 0;
             track.play();
+            // Android 5.1 chỉ bắt đầu phát một AudioTrack khi đệm được ghi ĐẦY một lần; ghi chưa đầy thì
+            // vị trí phát đứng yên ở 0 mãi (đúng lỗi nhóm loa im lặng ở bản 1.43 / 1.44). Ghi sẵn một đệm
+            // im lặng cho loa chạy, phần canh giờ trong write() tự khớp lại sau đó.
+            silence(bytes / 2);
+            inserted = 0;
             BotLog.i("Nhóm loa: phát " + name + " (" + r + " Hz)");
         }
 
         /** Trễ cố định từ lúc ghi vào loa phát hết đệm tới tai (ước lượng, giống nhau trên mọi R1). */
         private static final long OUT_LATENCY_NS = 40_000_000L;
-        private long dropped, inserted, lastLog;
+        private long dropped, inserted, lastLog, lastHead = -1, lastHeadAt;
         private long sumErr, nErr;
 
         /**
@@ -446,8 +452,17 @@ final class Group {
             long buffered = Math.max(0, written - head);
             long want = (playAt - now - OUT_LATENCY_NS) * rate / 1_000_000_000L;
             long err = buffered - want; // > 0: trễ, < 0: sớm (đơn vị mẫu)
+            // Vị trí phát đứng yên > 0,3 s mà vẫn còn dữ liệu = loa chưa chạy (đệm chưa đầy): ghi tiếp,
+            // đừng bỏ, kẻo kẹt im lặng mãi
+            if (head != lastHead) {
+                lastHead = head;
+                lastHeadAt = now;
+            }
+            boolean stuck = buffered > 0 && now - lastHeadAt > 300_000_000L;
             int start = 0;
-            if (want < 0 && buffered == 0) {
+            if (stuck) {
+                err = 0;
+            } else if (want < 0 && buffered == 0) {
                 start = (int) Math.min(-want, pcm.length); // loa trống và gói đã quá giờ: bỏ phần đã qua
             } else {
                 sumErr += err;
