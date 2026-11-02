@@ -30,6 +30,7 @@ public class BotService extends Service {
     private final Object speakLock = new Object();
     private volatile boolean running;
     private volatile boolean paused;
+    private volatile boolean cutIn;
     private Thread worker;
     private WebServer web;
     private PowerManager.WakeLock wakeLock;
@@ -107,6 +108,14 @@ public class BotService extends Service {
         recorder.trigger();
     }
 
+    /** Bấm nút lúc bot đang nói (cờ cutIn để vòng chính nghe câu hỏi mới ngay sau đó). */
+    void interruptSpeech() {
+        cutIn = true;
+        live.cutIn();
+        PcmPlayer.cancel();
+        BotLog.i("Ngắt lời bot (nút bấm)");
+    }
+
     void setPaused(boolean p) {
         paused = p;
         if (p) recorder.stop(); // thoát khỏi vòng chờ từ đánh thức ngay
@@ -132,6 +141,7 @@ public class BotService extends Service {
         WakeEngine wake = null;
         String wakeEngine = null;
         boolean followUp = false;
+        boolean barged = false; // vừa ngắt lời bot -> nghe câu hỏi mới ngay, không chờ từ đánh thức
         try {
             while (running) {
                 try {
@@ -173,7 +183,8 @@ public class BotService extends Service {
                         followUp = false;
                         wake.configure(cfg);
                         BotLog.state = "idle";
-                        String hit = wake.waitFor(recorder);
+                        String hit = barged ? "ngắt lời" : wake.waitFor(recorder);
+                        barged = false;
                         if (hit == null) {
                             Thread.sleep(50);
                             continue;
@@ -225,13 +236,8 @@ public class BotService extends Service {
                             BotLog.lastHeard = heard;
                             BotLog.lastReply = quick;
                             BotLog.i("Nghe (tại loa): " + heard + " -> " + quick);
-                            recorder.pause();
-                            try {
-                                speak(cfg, quick);
-                            } finally {
-                                recorder.resume();
-                            }
-                            followUp = true;
+                            barged = speakBargeIn(cfg, quick, wake);
+                            followUp = !barged;
                             continue;
                         }
                         if (!heard.isEmpty()) BotLog.i("Vosk nghe: " + heard + " (không phải hỏi giờ)");
@@ -256,13 +262,8 @@ public class BotService extends Service {
                                 BotLog.lastHeard = text;
                                 BotLog.lastReply = quick;
                                 BotLog.i("Trả lời tại loa: " + quick);
-                                recorder.pause();
-                                try {
-                                    speak(cfg, quick);
-                                } finally {
-                                    recorder.resume();
-                                }
-                                followUp = true;
+                                barged = speakBargeIn(cfg, quick, wake);
+                                followUp = !barged;
                                 continue;
                             }
                             a = gemini.askText(cfg, text);
@@ -283,13 +284,8 @@ public class BotService extends Service {
                     if (a.reply.isEmpty()) continue;
                     BotLog.lastReply = a.reply;
                     BotLog.i("Trả lời: " + a.reply);
-                    recorder.pause();
-                    try {
-                        speak(cfg, a.reply);
-                    } finally {
-                        recorder.resume();
-                    }
-                    followUp = true;
+                    barged = speakBargeIn(cfg, a.reply, wake);
+                    followUp = !barged;
                 } catch (InterruptedException e) {
                     return;
                 } catch (Throwable e) {
@@ -313,13 +309,56 @@ public class BotService extends Service {
         }
     }
 
+    /**
+     * Đọc câu trả lời của vòng chính. Bật "ngắt lời" thì mic vẫn mở và bộ nhận từ đánh thức vẫn chạy
+     * trong lúc đọc để người dùng gọi từ đánh thức cắt ngang; tắt thì tạm dừng mic như cũ (loa không
+     * khử tiếng vọng, mic thu lại giọng bot). Nút bấm ngắt được trong cả hai trường hợp (interruptSpeech).
+     * Trả về true khi bị ngắt -> vòng sau nghe câu hỏi mới ngay.
+     */
+    private boolean speakBargeIn(final Config cfg, final String say, WakeEngine wake) throws InterruptedException {
+        cutIn = false;
+        if (!cfg.bargeIn || wake == null) {
+            recorder.pause();
+            try {
+                speak(cfg, say);
+            } finally {
+                recorder.resume();
+            }
+            return cutIn;
+        }
+        final java.util.concurrent.atomic.AtomicBoolean done = new java.util.concurrent.atomic.AtomicBoolean();
+        Thread t = new Thread(() -> {
+            try {
+                speak(cfg, say);
+            } finally {
+                done.set(true);
+                recorder.trigger(); // cho waitFor() thoát khi đọc xong
+            }
+        }, "speak");
+        t.start();
+        String hit = null;
+        boolean finished = false;
+        try {
+            hit = wake.waitFor(recorder);
+            finished = done.get();
+        } finally {
+            if (!done.get()) PcmPlayer.cancel();
+            t.join();
+            recorder.takeTrigger(); // bỏ trigger luồng đọc để lại khi bị ngắt
+        }
+        if (hit == null) return false; // mic bị dừng (tạm dừng nghe / tắt app)
+        if (!finished && !cutIn) BotLog.i("Ngắt lời bot: " + ("web".equals(hit) ? "nút Nghe ngay" : hit));
+        return cutIn || !finished;
+    }
+
     private void speak(Config cfg, String say) {
         synchronized (speakLock) {
             String prev = BotLog.state;
             BotLog.state = "speaking";
             try {
+                int gen = PcmPlayer.generation(); // bị ngắt lúc đang tạo giọng thì không phát nữa
                 PcmPlayer.Pcm p = synth(cfg, say);
-                PcmPlayer.play(p.data, p.rate);
+                PcmPlayer.play(p.data, p.rate, gen);
             } catch (Throwable e) {
                 BotLog.e("TTS lỗi", e);
             } finally {

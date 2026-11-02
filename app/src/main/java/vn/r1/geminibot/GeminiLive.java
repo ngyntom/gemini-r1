@@ -48,19 +48,32 @@ final class GeminiLive {
             .build();
 
     private volatile boolean setupDone, closed, endRequested, userSpoke;
+    /** Bị ngắt bằng nút bấm: bỏ phần audio còn lại của lượt trả lời này. */
+    private volatile boolean skipTurn;
     private volatile String error;
     private volatile long lastActivity;
     private final StringBuilder heard = new StringBuilder();
     private final StringBuilder said = new StringBuilder();
-    private Player player;
+    private volatile Player player;
     private Set<String> deviceIds;
     private Config cfg;
     private WebSocket ws;
 
+    /**
+     * Nút bấm lúc loa đang nói: dừng ngay và bỏ phần còn lại của lượt trả lời, mic mở lại sau
+     * ECHO_GUARD_MS để nói câu mới. (Mic tắt lúc loa nói nên Gemini không tự nghe thấy bị ngắt lời.)
+     */
+    void cutIn() {
+        Player p = player;
+        if (p == null || !p.busy()) return;
+        skipTurn = true;
+        p.flush();
+    }
+
     /** Chạy một phiên trò chuyện, trả về khi phiên kết thúc. */
     void run(Config cfg, VoiceRecorder rec) throws InterruptedException {
         this.cfg = cfg;
-        setupDone = closed = endRequested = userSpoke = false;
+        setupDone = closed = endRequested = userSpoke = skipTurn = false;
         error = null;
         heard.setLength(0);
         said.setLength(0);
@@ -291,17 +304,23 @@ final class GeminiLive {
                         said.append(ot.optString("text"));
                     }
                 }
-                if (sc.optBoolean("interrupted")) player.flush();
+                if (sc.optBoolean("interrupted")) {
+                    player.flush();
+                    skipTurn = false;
+                }
                 JSONObject turn = sc.optJSONObject("modelTurn");
                 JSONArray parts = turn != null ? turn.optJSONArray("parts") : null;
-                for (int i = 0; parts != null && i < parts.length(); i++) {
+                for (int i = 0; parts != null && !skipTurn && i < parts.length(); i++) {
                     JSONObject data = parts.getJSONObject(i).optJSONObject("inlineData");
                     if (data == null) continue;
                     player.write(Base64.decode(data.getString("data"), Base64.DEFAULT));
                     userSpoke = false;
                     lastActivity = System.currentTimeMillis();
                 }
-                if (sc.optBoolean("turnComplete")) logTurn();
+                if (sc.optBoolean("turnComplete")) {
+                    skipTurn = false;
+                    logTurn();
+                }
             }
             JSONObject tc = m.optJSONObject("toolCall");
             if (tc != null) {
@@ -430,6 +449,7 @@ final class GeminiLive {
 
         /** Gemini báo bị ngắt lời: bỏ phần chưa phát. */
         synchronized void flush() {
+            if (stop) return; // phiên đã đóng, track đã release
             queue.clear();
             track.pause();
             track.flush();

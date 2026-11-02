@@ -443,7 +443,7 @@ const PAGES = {
       tog('live', 'Bật Gemini Live', 'Gọi từ đánh thức một lần rồi nói chuyện liên tục; nói "tạm biệt" để dừng'),
       pick('live_model', 'Model Live', MODELS_LIVE, 'Không có bản Live 3.5 để trò chuyện (3.5 chỉ có Live dịch / chép lời).'),
       inp('live_idle', 'Im lặng bao nhiêu giây thì kết thúc', { type: 'number', min: 5, max: 300 }),
-    ], 'Loa không khử được tiếng vọng nên không nói chen ngang được khi loa đang nói.')),
+    ], 'Loa không khử được tiếng vọng nên không nói chen ngang được khi loa đang nói; bấm nút trên loa để ngắt lời.')),
 
   ha: () => subpage('ha', 'Home Assistant',
     list('', [
@@ -464,6 +464,7 @@ const PAGES = {
       sel('wake_sound', 'Âm báo', [['chime', 'Ding-dong'], ['voice', 'Giọng đáp (câu bên dưới)'], ['none', 'Không']]),
       inp('wake_reply', 'Câu đáp khi gọi', { ph: 'Dạ?' }),
       inp('follow_up', 'Nghe tiếp sau khi trả lời (giây, 0 = tắt)', { type: 'number', min: 0, max: 30 }),
+      tog('barge_in', 'Gọi từ đánh thức để ngắt lời', 'Lúc bot đang nói vẫn nghe từ đánh thức (nói to, gần loa). Bấm nút trên loa luôn ngắt được.'),
     ])
     + list('Micro', [
       rng('mic_gain', 'Khuếch đại micro', 0.5, 16, 0.5, 'x', 'Mic R1 thu nhỏ; đang dùng khoảng 4.'),

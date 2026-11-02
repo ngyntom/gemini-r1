@@ -9,7 +9,8 @@ import java.io.File;
 import java.io.FileOutputStream;
 
 /**
- * Nút bấm trên R1 (rk29-keypad, /dev/input/event0, mã 0xc3 = PHICOMM_OK): bấm một lần để tắt / mở mic.
+ * Nút bấm trên R1 (rk29-keypad, /dev/input/event0, mã 0xc3 = PHICOMM_OK): bấm một lần để tắt / mở mic;
+ * bot đang nói thì bấm để ngắt lời.
  *
  * SELinux chặn app đọc /dev/input (untrusted_app), nên chạy một script nền bằng shell của adbd
  * (LocalAdb): "getevent -c 1" đợi từng sự kiện, thấy nút được nhấn xuống thì "am broadcast" về app.
@@ -29,6 +30,10 @@ final class Button {
         bot.registerReceiver(new BroadcastReceiver() {
             @Override
             public void onReceive(Context c, Intent i) {
+                if ("speaking".equals(BotLog.state)) { // đang nói -> ngắt lời, không tắt mic
+                    bot.interruptSpeech();
+                    return;
+                }
                 boolean mute = !bot.isPaused();
                 bot.setPaused(mute);
                 BotLog.i(mute ? "Nút bấm: tắt mic" : "Nút bấm: mở mic");
@@ -45,7 +50,7 @@ final class Button {
                             + sh.getAbsolutePath() + " </dev/null >/dev/null 2>&1 & echo $! > " + PID
                             + "\necho OK", 8000);
                     if (!out.contains("OK")) throw new Exception(out.trim());
-                    BotLog.i("Nút bấm: bấm một lần để tắt / mở mic");
+                    BotLog.i("Nút bấm: bấm một lần để tắt / mở mic, đang nói thì ngắt lời");
                     return;
                 } catch (Exception e) {
                     // adbd bận (máy tính đang nối adb) -> thử lại sau

@@ -15,7 +15,7 @@ public class Config {
     static final String[] KEYS = {"api_key", "model", "tts_model", "voice", "wake_engine",
             "mww_model", "mww_cutoff", "wake_word", "follow_up", "persona", "mic_gain",
             "tts_engine", "google_voice", "google_tts_key", "tts_rate", "led", "wake_sound", "wake_reply", "local_time",
-            "ha_url", "ha_token", "stt_engine", "live", "live_model", "live_idle", "gcloud_sa", "search", "city"};
+            "ha_url", "ha_token", "stt_engine", "live", "live_model", "live_idle", "gcloud_sa", "search", "city", "barge_in"};
 
     public String apiKey;
     public String model;
@@ -31,6 +31,8 @@ public class Config {
     public String wakeWord;
     /** Số giây nghe tiếp câu sau mà không cần gọi lại từ đánh thức (0 = tắt). */
     public int followUpSec;
+    /** Lúc bot đang nói vẫn nghe từ đánh thức để ngắt lời (mic thu cả tiếng loa, cần nói to hơn). */
+    public boolean bargeIn;
     public String persona;
     /** Hệ số khuếch đại micro (1 = giữ nguyên), cho mic thu nhỏ. */
     public float micGain;
@@ -107,8 +109,9 @@ public class Config {
         } catch (NumberFormatException e) {
             c.followUpSec = 6;
         }
+        c.bargeIn = !"0".equals(p.getString("barge_in", "1").trim());
         try {
-            c.micGain = Math.max(0.1f, Math.min(32f, Float.parseFloat(p.getString("mic_gain", "1").trim())));
+            c.micGain =Math.max(0.1f, Math.min(32f, Float.parseFloat(p.getString("mic_gain", "1").trim())));
         } catch (NumberFormatException e) {
             c.micGain = 1;
         }
@@ -165,6 +168,7 @@ public class Config {
                 .put("mww_cutoff", String.valueOf(c.mwwCutoff))
                 .put("wake_word", c.wakeWord)
                 .put("follow_up", String.valueOf(c.followUpSec))
+                .put("barge_in", c.bargeIn ? "1" : "0")
                 .put("persona", c.persona)
                 .put("mic_gain", String.valueOf(c.micGain))
                 .put("tts_engine", c.ttsEngine)
