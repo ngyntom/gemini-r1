@@ -79,10 +79,14 @@ final class MusicApi {
                 case "volume":
                     json(s, new JSONObject().put("volume", m.volume()));
                     return true;
-                case "thiet_bi": // loa không cast sang thiết bị Home Assistant: chỉ có "loa này"
-                    json(s, new JSONObject().put("ha", new JSONArray())
-                            .put("noi_phat", new JSONObject().put("loai", "pi")).put("loi", JSONObject.NULL));
+                case "thiet_bi": { // mục "Thiết bị trong nhà" của bảng chọn nơi phát = nhóm loa + từng loa R1 khác
+                    String t = Group.get(ctx).target();
+                    json(s, new JSONObject().put("ha", Group.get(ctx).targets())
+                            .put("noi_phat", t == null ? new JSONObject().put("loai", "pi")
+                                    : new JSONObject().put("loai", "ha").put("entity", t))
+                            .put("loi", JSONObject.NULL));
                     return true;
+                }
                 case "related": {
                     String id = q(query, "id");
                     try {
@@ -218,9 +222,14 @@ final class MusicApi {
                 json(s, ok.put("volume", vol));
                 return true;
             }
-            case "noi_phat":
-                json(s, ok.put("noi_phat", new JSONObject().put("loai", "pi")));
+            case "noi_phat": { // {loai: "pi"} = loa này | {loai: "ha", entity: "nhom" | "loa:<ip>"}
+                String t = "ha".equals(req.optString("loai")) ? req.optString("entity") : null;
+                m.setOutput(t);
+                t = Group.get(ctx).target();
+                json(s, ok.put("noi_phat", t == null ? new JSONObject().put("loai", "pi")
+                        : new JSONObject().put("loai", "ha").put("entity", t)));
                 return true;
+            }
             case "prefetch":
                 json(s, ok);
                 return true;

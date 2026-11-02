@@ -176,6 +176,16 @@ class WebServer {
             }
             return;
         }
+        // Nhóm loa: loa khác hỏi tên / phiên bản (lúc tìm loa), và tìm các loa R1 khác trong mạng
+        if (method.equals("GET") && path.equals("/api/group/info")) {
+            sendJson(s, 200, new JSONObject().put("ten", Group.deviceName())
+                    .put("version", bot.getPackageManager().getPackageInfo(bot.getPackageName(), 0).versionName));
+            return;
+        }
+        if (method.equals("GET") && path.equals("/api/group/scan")) {
+            sendJson(s, 200, new JSONObject().put("loa", Group.scan()));
+            return;
+        }
         if (method.equals("GET") && path.equals("/api/wifi/scan")) {
             sendJson(s, 200, new JSONObject().put("networks", Wifi.scan(bot)));
             return;

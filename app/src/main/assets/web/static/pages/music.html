@@ -579,7 +579,7 @@ export default (props, { $f7, $on }) => {
     }
     return d;
   }
-  let noiPhatTen = 'Loa Pi';     // nơi Pi đang phát ra: "Loa Pi" hoặc tên thiết bị cast (Mi Box...)
+  let noiPhatTen = 'Loa này';     // nơi Pi đang phát ra: "Loa này" hoặc tên thiết bị cast (Mi Box...)
   let noiPhatEntity = '';
   let dangChuyenSangPi = null;
   let giuChoMini = false;   // {id,title,duration,elapsed,han} lúc đang chuyển Máy này -> Pi
@@ -589,7 +589,7 @@ export default (props, { $f7, $on }) => {
 
   function nhoTrangThaiPi(data) {
     const truoc = trangThaiPiCuoi;
-    noiPhatTen = data.noi_phat || 'Loa Pi';
+    noiPhatTen = data.noi_phat || 'Loa này';
     nhanTronTuPi(data.tron);
     trangThaiPiCuoi = data;
     piDongBoLuc = Date.now();
@@ -755,7 +755,7 @@ export default (props, { $f7, $on }) => {
       vung.innerHTML =
         (bai ? '<div class="mmb-nhom">Đang phát</div><div class="mmb-dau"><span class="mmb-anh" style="background-image:url(\'https://i.ytimg.com/vi/' + encodeURIComponent(bai.id) + '/hqdefault.jpg\')"></span>' +
           '<div class="mmb-chu"><div class="mmb-ten">' + esc(bai.title) + '</div><div class="mmb-phu">' + esc(bai.channel || '') + '</div></div></div>' : '') +
-        '<div class="mmb-ds">' + muc('may', 'device_phone_portrait', 'Thiết bị này') + muc('pi', 'hifispeaker_fill', 'Loa Pi') +
+        '<div class="mmb-ds">' + muc('may', 'device_phone_portrait', 'Thiết bị này') + muc('pi', 'hifispeaker_fill', 'Loa này') +
           // Có sẵn trong máy, không cần Pi/HA (dùng được cả khi đi nhà khác):
           (CO_AIRPLAY ? muc('airplay', 'antenna_radiowaves_left_right', 'AirPlay và Bluetooth', ganDay) : '') +
           (CO_CAST_TRINH_DUYET ? muc('cast_trinh_duyet', 'tv', 'Cast từ trình duyệt', ganDay) : '') + '</div>' +
@@ -813,7 +813,7 @@ export default (props, { $f7, $on }) => {
     rungNhe();
     if (hd === 'may') { if (cheDoPhat !== 'may') chonCheDoPhat('may', true); return; }
     const body = hd === 'pi' ? { loai: 'pi' } : { loai: 'ha', entity: hd.slice(3), ten };
-    const tenMoi = hd === 'pi' ? 'Loa Pi' : ten;
+    const tenMoi = hd === 'pi' ? 'Loa này' : ten;
     // Đang phát ở Pi/thiết bị khác -> giữ khung phát ("Đang chuyển sang ...")
     // trong lúc Pi dừng nơi cũ + bắt đầu nơi mới, không chớp tắt.
     if (cheDoPhat !== 'may' && baiKhungPhat && musicState !== 'stopped') {
@@ -824,7 +824,7 @@ export default (props, { $f7, $on }) => {
     try {
       const r = await api('/api/music/noi_phat', { method: 'POST', body: JSON.stringify(body) });
       noiPhatEntity = (r.noi_phat || {}).entity || '';
-      noiPhatTen = hd === 'pi' ? 'Loa Pi' : ten;
+      noiPhatTen = hd === 'pi' ? 'Loa này' : ten;
     } catch (e) { baoLoi(e); return; }
     if (cheDoPhat === 'may') chonCheDoPhat('pi', true);      // Máy này -> nơi mới: chuyển tiếp đúng bài, đúng giây
     else { chonCheDoPhat('pi', false); $f7.toast.show({ text: 'Phát trên: ' + noiPhatTen, closeTimeout: 1500 }); loadMusicStatus(); }
@@ -1034,7 +1034,7 @@ export default (props, { $f7, $on }) => {
     api('/api/music/play_item', {
       method: 'POST',
       body: JSON.stringify({ query: tenHangChoMay || 'Máy này', index: i, entries: ds, bat_dau_tu: viTri, thong_bao: false, goi_y: hangChoGoiY, may_id: MAY_ID }),
-    }).then(() => setTimeout(loadMusicStatus, 4000)).catch((e) => baoLoi(e, 'Lỗi chuyển sang Loa Pi: '));
+    }).then(() => setTimeout(loadMusicStatus, 4000)).catch((e) => baoLoi(e, 'Lỗi chuyển sang Loa này: '));
   }
 
   // ---------- Khung phát (#music-player): ẨN khi không có nhạc; tên bài, ảnh
@@ -1074,7 +1074,7 @@ export default (props, { $f7, $on }) => {
     baiKhungPhat = data.id ? { id: data.id, title: data.title, duration: data.duration, channel: bai.channel || '' } : null;
     document.getElementById('music-now-playing').textContent = data.title || '';
     document.getElementById('music-player-phu').textContent =
-      [nhan.replace(/:\s*$/, ''), data.dangChuyen ? '' : (data.trenMay ? (data.tenMay || 'Máy này') : (data.noi_phat || 'Loa Pi')), bai.channel]
+      [nhan.replace(/:\s*$/, ''), data.dangChuyen ? '' : (data.trenMay ? (data.tenMay || 'Máy này') : (data.noi_phat || 'Loa này')), bai.channel]
         .filter(Boolean).join(' · ');
     const img = document.getElementById('music-player-anh');
     const src = data.id ? 'https://i.ytimg.com/vi/' + encodeURIComponent(data.id) + '/mqdefault.jpg' : '';
@@ -1097,13 +1097,13 @@ export default (props, { $f7, $on }) => {
   }
 
   function apDungTrangThaiNhac(data) {
-    // Đang chuyển "Máy này" -> Loa Pi: Pi còn "stopped" vài giây lúc lấy bài -
+    // Đang chuyển "Máy này" -> Loa này: Pi còn "stopped" vài giây lúc lấy bài -
     // hiện tạm đúng bài đó thay vì ẩn khung. Pi phát rồi (hoặc quá hạn) thì bỏ.
     // Đổi thiết bị (Loa Pi <-> Mi Box...) cũng vậy: chỉ bỏ khi NƠI MỚI đã phát
     // (thiết bị cũ còn báo "đang phát" vài giây không tính) - trước đây khung
     // phát biến mất lúc đổi, phải bấm phát lại (phản ánh thật).
     if (dangChuyenSangPi) {
-      const daToiNoiMoi = !dangChuyenSangPi.noi || (data.noi_phat || 'Loa Pi') === dangChuyenSangPi.noi;
+      const daToiNoiMoi = !dangChuyenSangPi.noi || (data.noi_phat || 'Loa này') === dangChuyenSangPi.noi;
       if (data.state !== 'stopped' && !data.trenMay && daToiNoiMoi && !data.dangTai) dangChuyenSangPi = null;
       else if (Date.now() > dangChuyenSangPi.han) dangChuyenSangPi = null;
       else if (data.state === 'stopped' || !daToiNoiMoi) {
@@ -1118,7 +1118,7 @@ export default (props, { $f7, $on }) => {
       giuChoMini = false;
       window.dispatchEvent(new CustomEvent('nhac-tren-may', { detail: { state: 'stopped' } }));
     }
-    const nhan = data.dangChuyen ? 'Đang chuyển sang ' + (data.noi || 'Loa Pi') + ': '
+    const nhan = data.dangChuyen ? 'Đang chuyển sang ' + (data.noi || 'Loa này') + ': '
       : data.dangTai ? 'Đang tải: '
       : ({ playing: 'Đang phát: ', paused: 'Đã tạm dừng: ', stopped: '' }[data.state] || '');
     capNhatKhungPhat(data, nhan);

@@ -25,7 +25,7 @@
     #sidebar .brand { font-weight: 600; font-size: 17px; padding: 10px 10px 14px;
                       border-bottom: 1px solid var(--f7-list-outline-border-color, rgba(0,0,0,.12)); margin-bottom: 10px; }
     .views.tabs { margin-left: var(--sidebar-w); width: calc(100% - var(--sidebar-w)); }
-    #tabbar { display: none !important; }
+    #mobile-tabbar { display: none !important; }
     .page-content { --chat-bar-bottom: 0px; }
   }
   #sidebar .menu-list li { margin-bottom: 4px; }
@@ -130,7 +130,7 @@
   </div>
 
   <div class="views tabs">
-    <div class="toolbar tabbar tabbar-icons toolbar-bottom" id="tabbar">
+    <div class="toolbar tabbar tabbar-icons toolbar-bottom" id="mobile-tabbar">
       <div class="toolbar-inner">
         <div class="toolbar-pane">
           <a href="#view-chat" class="tab-link tab-link-active"><i class="icon f7-icons">chat_bubble_2_fill</i><span class="tabbar-label">Chat</span></a>
@@ -209,7 +209,9 @@
               <li class="item-content"><div class="item-media"><i class="icon f7-icons">airplayaudio</i></div>
                 <div class="item-inner"><div class="item-title">AirPlay + DLNA<div class="item-footer" id="airplaySub">Phát nhạc từ iPhone / máy tính / app nhiều loa</div></div>
                   <div class="item-after"><label class="toggle"><input type="checkbox" id="airplayToggle"><span class="toggle-icon"></span></label></div></div></li>
-              <li class="item-content"><div class="item-media"><i class="icon f7-icons">bluetooth</i></div>
+              <li class="item-content"><div class="item-media"><!-- f7-icons không có biểu tượng Bluetooth: vẽ bằng SVG, cùng màu / cỡ với icon khác -->
+                <svg class="icon" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                  stroke-linecap="round" stroke-linejoin="round"><path d="M6.5 6.5l11 11L12 23V1l5.5 5.5-11 11"/></svg></div>
                 <div class="item-inner"><div class="item-title">Bluetooth</div>
                   <div class="item-after"><label class="toggle"><input type="checkbox" id="btToggle"><span class="toggle-icon"></span></label></div></div></li>
               <li class="item-content"><div class="item-media"><i class="icon f7-icons">speaker_3_fill</i></div>
@@ -242,9 +244,19 @@
         <div class="navbar"><div class="navbar-bg"></div><div class="navbar-inner">
           <div class="title">Thiết bị</div>
           <div class="right">
+            <a href="#" class="link icon-only searchbar-enable" data-searchbar="#devSearchbar" title="Tìm"><i class="icon f7-icons">search</i></a>
             <a href="#" class="link icon-only" id="devEditBtn" title="Sửa: bỏ thiết bị, đổi tên"><i class="icon f7-icons" id="devEditIcon">pencil</i></a>
             <a href="#" class="link icon-only" id="devAddBtn" title="Thêm/bớt thiết bị"><i class="icon f7-icons">plus</i></a>
           </div>
+          <!-- Như Pi: bấm kính lúp mới mở thanh tìm phủ lên navbar (searchbar-expandable) -->
+          <form class="searchbar searchbar-expandable" id="devSearchbar">
+            <div class="searchbar-inner">
+              <div class="searchbar-input-wrap">
+                <input type="search" placeholder="Tìm thiết bị..."><i class="searchbar-icon"></i><span class="input-clear-button"></span>
+              </div>
+              <span class="searchbar-disable-button">Huỷ</span>
+            </div>
+          </form>
         </div></div>
         <div class="page-content"><div class="page-inner" id="devices">
           <div class="block muted">Đang tải…</div>
@@ -285,6 +297,8 @@
                 <div class="item-inner"><div class="item-title">Từ đánh thức & micro</div><div class="item-subtitle">Model, ngưỡng, âm báo, độ nhạy mic</div></div></a></li>
               <li><a href="/led/" class="item-link item-content"><div class="item-media"><i class="icon f7-icons" style="color:#2f80ed">lightbulb_fill</i></div>
                 <div class="item-inner"><div class="item-title">Đèn LED</div><div class="item-subtitle">Bật/tắt đèn theo trạng thái</div></div></a></li>
+              <li><a href="/group/" class="item-link item-content"><div class="item-media"><i class="icon f7-icons" style="color:#2f80ed">hifispeaker_2_fill</i></div>
+                <div class="item-inner"><div class="item-title">Nhóm loa</div><div class="item-subtitle">Phát nhạc đồng bộ nhiều loa, stereo</div></div></a></li>
             </ul>
           </div>
           <div class="list list-strong list-dividers inset media-list">
@@ -529,6 +543,16 @@ const PAGES = {
       ['Lỗi', 'đèn trong đỏ'], ['Tắt mic', 'đèn trong đỏ mờ'], ['Rảnh', 'tắt hết'],
     ].map(([a, b]) => `<li class="item-content"><div class="item-inner"><div class="item-title">${a}</div><div class="item-after">${b}</div></div></li>`))),
 
+  group: () => subpage('group', 'Nhóm loa',
+    `<div class="block-title">Loa trong nhóm</div>
+      <div class="list list-strong list-dividers inset"><ul id="grpList"><li class="item-content"><div class="item-inner muted">Đang tìm loa R1 trong mạng…</div></li></ul></div>
+      <div class="block-footer">Loa R1 khác chạy app Gemini R1 trong cùng mạng. Chọn rồi bấm Lưu (đĩa mềm ở trên).</div>`
+    + list('', [
+      inp('group_members', 'IP các loa (cách nhau bằng dấu phẩy)', { ph: '192.168.2.98' }),
+      tog('group_stereo', 'Stereo', 'Loa này phát kênh trái, loa đầu tiên trong danh sách phát kênh phải'),
+    ], 'Phát theo nhóm: trang Nhạc → biểu tượng chọn nơi phát → "Nhóm loa" (hoặc chỉ một loa khác). '
+      + 'Nhạc ra cùng lúc trên mọi loa; gọi từ đánh thức ở loa nào thì loa đó tạm im.')),
+
   update: () => subpage('update', 'Cập nhật app',
     `<div class="list list-strong list-dividers inset"><ul>
       <li class="item-content"><div class="item-inner"><div class="item-title">Phiên bản đang chạy</div><div class="item-after">v${esc(S.version)}</div></div></li>
@@ -606,6 +630,24 @@ function fillFields(el) {
 function initSubpage(page) {
   const el = page.el;
   fillFields(el);
+  if (page.name === 'group') {
+    // Tìm loa R1 khác (loa quét mạng /24, ~5 s); tích chọn = sửa ô IP bên dưới
+    const ipBox = el.querySelector('[data-k="group_members"]');
+    const ips = () => ipBox.value.split(',').map(s => s.trim()).filter(Boolean);
+    fetch('/api/group/scan').then(r => r.json()).then(j => {
+      const loa = j.loa || [];
+      const ul = el.querySelector('#grpList');
+      if (!loa.length) { ul.innerHTML = '<li class="item-content"><div class="item-inner muted">Không thấy loa R1 nào khác (cần bản 1.42 trở lên)</div></li>'; return; }
+      ul.innerHTML = loa.map(l => `<li><label class="item-checkbox item-content"><input type="checkbox" value="${esc(l.ip)}" ${ips().includes(l.ip) ? 'checked' : ''}>
+        <i class="icon icon-checkbox"></i><div class="item-inner"><div class="item-title">${esc(l.ten || 'Loa R1')}
+        <div class="item-footer">${esc(l.ip)} · v${esc(l.version)}</div></div></div></label></li>`).join('');
+      ul.querySelectorAll('input').forEach(cb => cb.addEventListener('change', () => {
+        const cur = ips().filter(ip => ip !== cb.value);
+        if (cb.checked) cur.push(cb.value);
+        ipBox.value = cur.join(', ');
+      }));
+    }).catch(e => { el.querySelector('#grpList').innerHTML = '<li class="item-content"><div class="item-inner muted">Lỗi tìm loa: ' + esc(e.message) + '</div></li>'; });
+  }
   if (page.name === 'led') {
     let cur = S.led_test || '';
     markLed(cur);
@@ -824,7 +866,14 @@ function renderDevices() {
       <a href="#" class="button button-fill button-round" onclick="openDevPopup();return false;" style="display:inline-flex;padding:0 20px">Thêm thiết bị</a></div>`;
     return;
   }
-  root.innerHTML = groupBy(devices).map(([dom, list]) => {
+  // Lọc theo ô tìm (tên gọi, tên gốc, entity_id; không phân biệt dấu)
+  const q = boDau(devQuery);
+  const shown = q ? devices.filter(d => boDau(d.name + ' ' + d.original + ' ' + d.id).includes(q)) : devices;
+  if (!shown.length) {
+    root.innerHTML = `<div class="block muted" style="text-align:center;margin-top:15vh">Không có thiết bị nào khớp "${esc(devQuery)}"</div>`;
+    return;
+  }
+  root.innerHTML = groupBy(shown).map(([dom, list]) => {
     const [title, icon] = DOMAINS[dom] || [dom, 'circle'];
     return `<div class="block-title">${title} (${list.length})</div><div class="list list-strong list-dividers inset"><div class="tiles">` +
       list.map(d => `<div class="tile ${ON.includes(d.state) ? 'on' : ''}" data-id="${esc(d.id)}">
@@ -832,13 +881,30 @@ function renderDevices() {
         <a href="#" class="t-del" title="Bỏ khỏi bot"><i class="icon f7-icons">xmark</i></a>
         <i class="icon f7-icons">${icon}</i>
         <div><div class="t-name">${esc(d.name)}</div><div class="t-state">${esc(stateText(d))}</div></div></div>`).join('') + '</div></div>';
-  }).join('') + (devEdit ? '<div class="block-footer">Chạm vào ô để đổi tên gọi khác, ✕ để bỏ khỏi bot. Bấm ✓ ở trên khi xong.</div>' : '');
-  root.querySelectorAll('.tile').forEach(t => t.addEventListener('click', e => {
-    if (e.target.closest('.t-del')) { e.preventDefault(); removeDevice(t.dataset.id); }
-    else if (devEdit) renameDevice(t.dataset.id);
-    else tapDevice(t);
-  }));
+  }).join('') + (devEdit ? '<div class="block-footer">Chạm vào ô để đổi tên gọi khác, ✕ để bỏ khỏi bot. Bấm ✓ ở trên khi xong.</div>'
+    : '<div class="block-footer">Giữ lâu một ô để đổi tên gọi khác.</div>');
+  root.querySelectorAll('.tile').forEach(t => {
+    // Như Pi: giữ lâu (~0,5 s) trên một ô -> đổi tên gọi; nuốt luôn cú click ngay sau để không bật/tắt nhầm
+    let hold = null, held = false;
+    const cancel = () => { clearTimeout(hold); hold = null; };
+    t.addEventListener('pointerdown', () => { held = false; cancel();
+      hold = setTimeout(() => { held = true; hold = null; renameDevice(t.dataset.id); }, 500); });
+    ['pointerup', 'pointerleave', 'pointercancel'].forEach(ev => t.addEventListener(ev, cancel));
+    t.addEventListener('contextmenu', e => e.preventDefault());
+    t.addEventListener('click', e => {
+      if (held) { e.preventDefault(); held = false; return; }
+      if (e.target.closest('.t-del')) { e.preventDefault(); removeDevice(t.dataset.id); }
+      else if (devEdit) renameDevice(t.dataset.id);
+      else tapDevice(t);
+    });
+  });
 }
+let devQuery = '';
+const boDau = s => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/đ/g, 'd').replace(/Đ/g, 'D').toLowerCase();
+app.searchbar.create({
+  el: '#devSearchbar', customSearch: true,
+  on: { search(sb, q) { devQuery = q.trim(); renderDevices(); }, disable() { devQuery = ''; renderDevices(); } },
+});
 async function removeDevice(id) {
   devices = devices.filter(d => d.id !== id);
   renderDevices();

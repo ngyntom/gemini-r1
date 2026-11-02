@@ -11,7 +11,14 @@ import com.google.android.exoplayer2.ExoPlayer;
 import com.google.android.exoplayer2.MediaItem;
 import com.google.android.exoplayer2.PlaybackException;
 import com.google.android.exoplayer2.Player;
+import com.google.android.exoplayer2.Renderer;
+import com.google.android.exoplayer2.RenderersFactory;
 import com.google.android.exoplayer2.audio.AudioAttributes;
+import com.google.android.exoplayer2.audio.AudioProcessor;
+import com.google.android.exoplayer2.audio.DefaultAudioSink;
+import com.google.android.exoplayer2.audio.MediaCodecAudioRenderer;
+import com.google.android.exoplayer2.audio.TeeAudioProcessor;
+import com.google.android.exoplayer2.mediacodec.MediaCodecSelector;
 import com.google.android.exoplayer2.source.ProgressiveMediaSource;
 import com.google.android.exoplayer2.upstream.DefaultHttpDataSource;
 
@@ -22,6 +29,7 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.InputStream;
+import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
@@ -69,7 +77,25 @@ final class Music {
         t.start();
         h = new Handler(t.getLooper());
         h.post(() -> {
-            player = new ExoPlayer.Builder(ctx).setLooper(h.getLooper()).build();
+            // PCM sau giải mã chép ra cho nhóm loa (Group) trước khi vào AudioTrack của ExoPlayer
+            final Group group = Group.get(ctx);
+            TeeAudioProcessor tee = new TeeAudioProcessor(new TeeAudioProcessor.AudioBufferSink() {
+                @Override
+                public void flush(int sampleRateHz, int channelCount, int encoding) {
+                    group.onFlush(encoding == C.ENCODING_PCM_16BIT ? sampleRateHz : 0, channelCount, encoding);
+                }
+
+                @Override
+                public void handleBuffer(ByteBuffer buffer) {
+                    group.onPcm(buffer);
+                }
+            });
+            @SuppressWarnings("deprecation")
+            final DefaultAudioSink sink = new DefaultAudioSink.Builder()
+                    .setAudioProcessors(new AudioProcessor[]{tee}).build();
+            RenderersFactory rf = (handler, video, audio, text, meta) -> new Renderer[]{
+                    new MediaCodecAudioRenderer(ctx, MediaCodecSelector.DEFAULT, handler, audio, sink)};
+            player = new ExoPlayer.Builder(ctx, rf).setLooper(h.getLooper()).build();
             player.setAudioAttributes(new AudioAttributes.Builder().setUsage(C.USAGE_MEDIA)
                     .setContentType(C.AUDIO_CONTENT_TYPE_MUSIC).build(), false);
             player.addListener(new Player.Listener() {
@@ -114,6 +140,8 @@ final class Music {
         if (duration > 0) o.put("duration", duration);
         else o.put("duration", JSONObject.NULL);
         if (quality != null) o.put("chat_luong", quality);
+        String out = Group.get(ctx).targetName();
+        if (out != null) o.put("noi_phat", out).put("cast", true);
         return o;
     }
 
@@ -181,6 +209,7 @@ final class Music {
                     player.setMediaSource(new ProgressiveMediaSource.Factory(ds)
                             .createMediaSource(MediaItem.fromUri(Uri.parse(a.url))));
                     player.prepare();
+                    applyOutput();
                     if (startSec > 0) player.seekTo((long) (startSec * 1000));
                     player.setPlayWhenReady(!heldForBot && "playing".equals(state));
                 });
@@ -310,7 +339,19 @@ final class Music {
         state = "stopped";
         heldForBot = false;
         h.post(() -> player.stop());
+        Group.get(ctx).onStop();
         return was ? "Đã dừng nhạc." : "Không có nhạc đang phát.";
+    }
+
+    /** Nơi phát (bảng chọn của trang Nhạc): null = loa này, "nhom" / "loa:<ip>" = qua nhóm loa. */
+    void setOutput(String target) {
+        Group.get(ctx).setTarget(target);
+        h.post(this::applyOutput);
+    }
+
+    /** Phát qua nhóm thì ExoPlayer tắt tiếng: loa này cũng phát qua đường đồng bộ như các loa khác. */
+    private void applyOutput() {
+        if (player != null) player.setVolume(Group.get(ctx).active() ? 0f : 1f);
     }
 
     /**
@@ -318,6 +359,7 @@ final class Music {
      * xong thì phát tiếp. Nhạc người dùng tự tạm dừng thì không tự phát lại.
      */
     synchronized void holdForBot(boolean hold) {
+        Group.duck(hold); // loa này đang phát nhạc nhóm của loa khác: im tạm
         if (hold && "playing".equals(state) && !heldForBot) {
             heldForBot = true;
             h.post(() -> player.setPlayWhenReady(false));

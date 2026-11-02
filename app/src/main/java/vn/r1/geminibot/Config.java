@@ -15,7 +15,7 @@ public class Config {
     static final String[] KEYS = {"api_key", "model", "tts_model", "voice", "wake_engine",
             "mww_model", "mww_cutoff", "wake_word", "follow_up", "persona", "mic_gain",
             "tts_engine", "google_voice", "google_tts_key", "tts_rate", "led", "wake_sound", "wake_reply", "local_time",
-            "ha_url", "ha_token", "stt_engine", "live", "live_model", "live_idle", "gcloud_sa", "search", "city", "barge_in", "bot_self", "user_call"};
+            "ha_url", "ha_token", "stt_engine", "live", "live_model", "live_idle", "gcloud_sa", "search", "city", "barge_in", "bot_self", "user_call", "group_members", "group_stereo"};
 
     public String apiKey;
     public String model;
@@ -37,6 +37,9 @@ public class Config {
     /** Xưng hô: bot tự xưng (vd. "em") và gọi người dùng (vd. "anh"); rỗng = để Gemini tự chọn. */
     public String botSelf;
     public String userCall;
+    /** Nhóm loa phát đồng bộ: IP các loa R1 khác (cách nhau bằng dấu phẩy) và chế độ stereo. */
+    public String groupMembers;
+    public boolean groupStereo;
     /** Hệ số khuếch đại micro (1 = giữ nguyên), cho mic thu nhỏ. */
     public float micGain;
     /** "gfree" (Google Dịch, miễn phí), "google" (Cloud TTS, cần key Cloud) hoặc "gemini". */
@@ -167,6 +170,8 @@ public class Config {
                         + "emoji hay ký hiệu vì câu trả lời sẽ được đọc thành tiếng.");
         c.botSelf = p.getString("bot_self", "").trim();
         c.userCall = p.getString("user_call", "").trim();
+        c.groupMembers = p.getString("group_members", "").trim();
+        c.groupStereo = "1".equals(p.getString("group_stereo", "0").trim());
         c.search = !"0".equals(p.getString("search", "1").trim());
         c.city = p.getString("city", "Hà Nội").trim();
         return c;
@@ -190,6 +195,8 @@ public class Config {
                 .put("persona", c.persona)
                 .put("bot_self", c.botSelf)
                 .put("user_call", c.userCall)
+                .put("group_members", c.groupMembers)
+                .put("group_stereo", c.groupStereo ? "1" : "0")
                 .put("mic_gain", String.valueOf(c.micGain))
                 .put("tts_engine", c.ttsEngine)
                 .put("google_voice", c.googleVoice)
