@@ -20,6 +20,8 @@ public class BotService extends Service {
     static final String TAG = "GeminiR1";
     private static final int TTS_RATE = 24000;
     private static final long WAKE_LISTEN_MS = 7000; // chờ câu hỏi sau tiếng bíp
+    /** Im lặng đầu câu đáp "Dạ?" cho ampli thức dậy (loa ngắt ampli khi rảnh, giống LEAD_MS của Tone). */
+    private static final int CUE_LEAD_MS = 500;
 
     private final GeminiClient gemini = new GeminiClient();
     private final GeminiLive live = new GeminiLive();
@@ -180,22 +182,27 @@ public class BotService extends Service {
                         // "web" = nút "Nghe ngay" trên Web UI, không phải nghe thấy từ khóa nên không quét.
                         if (!"web".equals(hit)) Led.wake();
                         BotLog.state = "listening";
-                        if ("voice".equals(cfg.wakeSound)) {
+                        // Gemini Live luôn dùng câu đáp thay cho ding-dong (trừ khi đặt im lặng): mic tắt
+                        // hẳn lúc bot nói "Dạ?" nên không phải bỏ đoạn ding-dong, nghe "Dạ?" xong nói ngay
+                        // là được đầy đủ chữ — nói đè lên ding-dong thì âm đầu rơi vào đoạn bị bỏ
+                        // (xem cueGuardFrames trong GeminiLive).
+                        final String cue = cfg.live && !"none".equals(cfg.wakeSound) ? "voice" : cfg.wakeSound;
+                        if ("voice".equals(cue)) {
                             // Câu đáp dài -> phát xong rồi mới thu, bỏ phần mic đã thu lúc phát
                             recorder.pause();
                             try {
-                                playWakeCue(cfg);
+                                playWakeCue(cfg, cue);
                             } finally {
                                 recorder.resume();
                             }
-                        } else {
+                        } else if (!"none".equals(cue)) {
                             // Ding-dong (0.37 s) phát song song, mic vẫn thu: người hay nói liền
                             // "Okay Nabu, mấy giờ rồi" nên tắt mic lúc này sẽ mất đầu câu hỏi.
                             // Tiếng ding-dong ngắn hơn MIN_SPEECH_FRAMES nên không bị tính là câu nói.
                             final Config c = cfg;
                             new Thread(() -> {
                                 try {
-                                    playWakeCue(c);
+                                    playWakeCue(c, cue);
                                 } catch (InterruptedException ignored) {
                                 }
                             }, "wake-cue").start();
@@ -324,12 +331,19 @@ public class BotService extends Service {
     private PcmPlayer.Pcm cueVoice;
 
     /** chime = "ding-dong", voice = đọc câu đáp (vd. "Dạ?") một lần rồi giữ lại, none = im lặng. */
-    private void playWakeCue(Config cfg) throws InterruptedException {
-        if ("none".equals(cfg.wakeSound)) return;
-        if ("voice".equals(cfg.wakeSound)) {
+    private void playWakeCue(Config cfg, String cue) throws InterruptedException {
+        if ("none".equals(cue)) return;
+        if ("voice".equals(cue)) {
             try {
                 if (cueVoice == null || !cfg.wakeReply.equals(cueText)) {
-                    cueVoice = synth(cfg, cfg.wakeReply);
+                    PcmPlayer.Pcm p = synth(cfg, cfg.wakeReply);
+                    // Đệm im lặng đầu cho ampli thức dậy: Tone.java tự có sẵn cho ding-dong,
+                    // câu TTS thì không -> không đệm là mất tiếng "D..." đầu lúc loa ngủ lâu
+                    byte[] silence = new byte[p.rate * 2 * CUE_LEAD_MS / 1000];
+                    byte[] withLead = new byte[silence.length + p.data.length];
+                    System.arraycopy(silence, 0, withLead, 0, silence.length);
+                    System.arraycopy(p.data, 0, withLead, silence.length, p.data.length);
+                    cueVoice = new PcmPlayer.Pcm(withLead, p.rate);
                     cueText = cfg.wakeReply;
                 }
                 PcmPlayer.play(cueVoice.data, cueVoice.rate);

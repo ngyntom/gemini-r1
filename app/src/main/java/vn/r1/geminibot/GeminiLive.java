@@ -181,10 +181,12 @@ final class GeminiLive {
      * Bỏ bao nhiêu frame 30 ms đầu cho khỏi tiếng ding-dong lúc mới vào phiên. Đếm theo SỐ FRAME đọc
      * được chứ không theo giờ đồng hồ: lúc vòng lặp bắt đầu, mic còn đọng đoạn thu trong lúc kết nối
      * WebSocket (chứa ding-dong lẫn đầu câu nói) nên cờ giờ tắt nhầm cả âm đầu câu ("em học lớp mấy"
-     * bị mất chữ "em" thành "en học lớp mấy"). Chime dài ~0,87 s (0,5 s đợi ampli + 0,37 s nhạc);
-     * chế độ voice đã tắt mic lúc phát câu đáp nên chỉ cần đệm ngắn cho mic khởi động lại.
+     * bị mất chữ "em" thành "en học lớp mấy"). Live luôn phát câu đáp "Dạ?" (BotService đổi cue sang
+     * voice trừ khi đặt none) và mic tắt hẳn lúc phát nên chỉ cần đệm ngắn cho mic khởi động lại;
+     * chime dài ~0,87 s (0,5 s đợi ampli + 0,37 s nhạc).
      */
     private static int cueGuardFrames(Config cfg) {
+        if (cfg.live) return "none".equals(cfg.wakeSound) ? 3 : 5;
         if ("chime".equals(cfg.wakeSound)) return 32; // ~0,96 s
         return "voice".equals(cfg.wakeSound) ? 5 : 3;
     }
