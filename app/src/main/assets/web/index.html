@@ -531,6 +531,7 @@ const PAGES = {
     list('', [
       tog('led', 'Bật đèn LED', 'Đèn đổi theo trạng thái bot. Tắt = tắt hết đèn của loa (có tác dụng ngay).'),
       tog('music_led', 'Đèn theo nhạc', 'Đang phát nhạc thì viền sáng nhiều / ít theo độ to của nhạc (cả nhạc nhóm loa).'),
+      tog('music_led_inner', 'Đèn trong theo nhạc', 'Đèn nhỏ ở giữa đổi màu theo độ to: xanh dương → xanh ngọc → xanh lá → hồng tím.'),
     ])
     + `<div class="block-title">Thử đèn</div>
       <div class="list list-strong inset"><div class="led-grid">
@@ -659,10 +660,12 @@ function initSubpage(page) {
       const v = e.target.checked ? '1' : '0';
       post('/api/config', { led: v }).then(() => { S.config.led = v; toast(v === '1' ? 'Đã bật đèn' : 'Đã tắt đèn'); });
     });
-    el.querySelector('[data-k="music_led"]').addEventListener('change', e => {
-      const v = e.target.checked ? '1' : '0';
-      post('/api/config', { music_led: v }).then(() => { S.config.music_led = v; toast(v === '1' ? 'Đã bật đèn theo nhạc' : 'Đã tắt đèn theo nhạc'); });
-    });
+    // Bật / tắt có tác dụng ngay, không cần bấm Lưu
+    [['music_led', 'đèn theo nhạc'], ['music_led_inner', 'đèn trong theo nhạc']].forEach(([k, ten]) =>
+      el.querySelector(`[data-k="${k}"]`).addEventListener('change', e => {
+        const v = e.target.checked ? '1' : '0';
+        post('/api/config', { [k]: v }).then(() => { S.config[k] = v; toast((v === '1' ? 'Đã bật ' : 'Đã tắt ') + ten); });
+      }));
     el.addEventListener('page:beforeremove', () => { if (cur) post('/api/led', { state: '' }); });
   }
   const mm = el.querySelector('#mwwModel');

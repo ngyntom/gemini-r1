@@ -15,7 +15,7 @@ public class Config {
     static final String[] KEYS = {"api_key", "model", "tts_model", "voice", "wake_engine",
             "mww_model", "mww_cutoff", "wake_word", "follow_up", "persona", "mic_gain",
             "tts_engine", "google_voice", "google_tts_key", "tts_rate", "led", "wake_sound", "wake_reply", "local_time",
-            "ha_url", "ha_token", "stt_engine", "live", "live_model", "live_idle", "gcloud_sa", "search", "city", "barge_in", "bot_self", "user_call", "group_members", "group_stereo", "music_led"};
+            "ha_url", "ha_token", "stt_engine", "live", "live_model", "live_idle", "gcloud_sa", "search", "city", "barge_in", "bot_self", "user_call", "group_members", "group_stereo", "music_led", "music_led_inner"};
 
     public String apiKey;
     public String model;
@@ -42,6 +42,8 @@ public class Config {
     public boolean groupStereo;
     /** Đèn viền nháy theo nhạc khi đang phát nhạc. */
     public boolean musicLed;
+    /** Đèn trong đổi màu theo nhạc (cùng với viền). */
+    public boolean musicLedInner;
     /** Hệ số khuếch đại micro (1 = giữ nguyên), cho mic thu nhỏ. */
     public float micGain;
     /** "gfree" (Google Dịch, miễn phí), "google" (Cloud TTS, cần key Cloud) hoặc "gemini". */
@@ -175,6 +177,7 @@ public class Config {
         c.groupMembers = p.getString("group_members", "").trim();
         c.groupStereo = "1".equals(p.getString("group_stereo", "0").trim());
         c.musicLed = !"0".equals(p.getString("music_led", "1").trim());
+        c.musicLedInner = !"0".equals(p.getString("music_led_inner", "1").trim());
         c.search = !"0".equals(p.getString("search", "1").trim());
         c.city = p.getString("city", "Hà Nội").trim();
         return c;
@@ -201,6 +204,7 @@ public class Config {
                 .put("group_members", c.groupMembers)
                 .put("group_stereo", c.groupStereo ? "1" : "0")
                 .put("music_led", c.musicLed ? "1" : "0")
+                .put("music_led_inner", c.musicLedInner ? "1" : "0")
                 .put("mic_gain", String.valueOf(c.micGain))
                 .put("tts_engine", c.ttsEngine)
                 .put("google_voice", c.googleVoice)

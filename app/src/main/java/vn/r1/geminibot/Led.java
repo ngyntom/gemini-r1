@@ -98,8 +98,15 @@ final class Led {
     /** Đèn theo nhạc (Cài đặt → Đèn LED), xem MusicLight. */
     private static volatile boolean musicEnabled = true;
 
-    static void setMusicEnabled(boolean on) {
+    /** Đèn trong đổi màu theo nhạc (cùng lúc với viền). */
+    private static volatile boolean musicInner = true;
+
+    static void setMusicEnabled(boolean on, boolean inner) {
         musicEnabled = on;
+        if (inner != musicInner) {
+            musicInner = inner;
+            if ("music".equals(shown)) shown = ""; // đang chạy hiệu ứng nhạc: chạy lại với tuỳ chọn mới
+        }
     }
     /** Thời điểm nghe thấy từ đánh thức (wake()); lần vào "listening" kế tiếp trong ~2,5 s sẽ quét sáng viền. */
     private static volatile long wakeAt;
@@ -223,7 +230,8 @@ final class Led {
             case "music":
                 if (music != null) {
                     return stop + INNER_OFF + "; " + RING_OFF + "; rm -f " + STOPF + "; trap '' HUP; sh "
-                            + music.getAbsolutePath() + " </dev/null >/dev/null 2>&1 & echo $! > " + PID;
+                            + music.getAbsolutePath() + " " + (musicInner ? 1 : 0)
+                            + " </dev/null >/dev/null 2>&1 & echo $! > " + PID;
                 }
                 return stop + INNER_OFF + "; " + RING_OFF;
             case "thinking":
@@ -310,8 +318,20 @@ final class Led {
             for (int i = n; i < order.length; i++) off.append(' ').append(order[i]);
             sb.append("      ").append(n).append(") ").append(blackAll(RING_COLOR, (order.length - n) + off.toString())).append(" ;;\n");
         }
-        sb.append("    esac\n    p=$l\n  fi\n  sleep 0.2\ndone\n")
+        sb.append("    esac\n    p=$l\n  fi\n");
+        // Đèn trong (tham số $1 = 1): đổi màu theo nấc to (xanh dương / xanh ngọc / xanh lá / hồng tím),
+        // chỉ ghi khi sang nấc khác - đèn trong là file driver riêng, thêm tối đa 1 lệnh mỗi vòng
+        sb.append("  if [ \"$1\" = 1 ] && [ -n \"$l\" ]; then\n")
+          .append("    if [ \"$l\" -le 6 ]; then b=1; elif [ \"$l\" -le 12 ]; then b=2; elif [ \"$l\" -le 18 ]; then b=3; else b=4; fi\n")
+          .append("    if [ \"$b\" != \"$c\" ]; then\n      case $b in\n")
+          .append("        1) ").append(setColor(INNER_COLOR, INNER_IDS, "0030ff")).append(" ;;\n")
+          .append("        2) ").append(setColor(INNER_COLOR, INNER_IDS, "00b0ff")).append(" ;;\n")
+          .append("        3) ").append(setColor(INNER_COLOR, INNER_IDS, "00ff30")).append(" ;;\n")
+          .append("        4) ").append(setColor(INNER_COLOR, INNER_IDS, "ff00b0")).append(" ;;\n")
+          .append("      esac\n      c=$b\n    fi\n  fi\n");
+        sb.append("  sleep 0.2\ndone\n")
           .append(RING_OFF).append('\n')
+          .append(blackAll(INNER_COLOR, INNER_IDS)).append('\n')
           .append("rm -f ").append(STOPF).append(' ').append(PID).append('\n');
         return writeScript(ctx, "led_music.sh", sb.toString());
     }
