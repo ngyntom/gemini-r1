@@ -164,6 +164,10 @@ class WebServer {
             }
             return;
         }
+        if (method.equals("GET") && path.equals("/api/wifi/scan")) {
+            sendJson(s, 200, new JSONObject().put("networks", Wifi.scan(bot)));
+            return;
+        }
         if (method.equals("GET") && path.equals("/favicon.ico")) {
             send(s, 204, "image/x-icon", new byte[0]); // trình duyệt tự xin, trước đây trả 404
             return;
@@ -240,6 +244,15 @@ class WebServer {
             case "/api/led": // thử đèn: {state: listening|thinking|speaking|error|paused|idle}, rỗng = theo bot
                 Led.test = req.optString("state", "").isEmpty() ? null : req.optString("state");
                 break;
+            case "/api/wifi/connect": { // {ssid, password, secure}: đổi mạng, không vào được thì tự quay lại mạng cũ
+                String ssid = req.optString("ssid", "").trim();
+                if (ssid.isEmpty()) {
+                    sendJson(s, 400, new JSONObject().put("error", "Thiếu tên mạng"));
+                    return;
+                }
+                Wifi.connectAsync(bot, ssid, req.optString("password", ""), req.optString("secure", "WPA"));
+                break;
+            }
             case "/api/listen":
                 bot.triggerListen();
                 break;
@@ -306,6 +319,8 @@ class WebServer {
                 .put("version", bot.getPackageManager().getPackageInfo(bot.getPackageName(), 0).versionName)
                 .put("paused", bot.isPaused())
                 .put("led_test", Led.test == null ? "" : Led.test)
+                .put("wifi_switch", Wifi.switchState)
+                .put("wifi_switch_msg", Wifi.switchMessage)
                 .put("wake_name", BotLog.wakeName)
                 .put("mic_level", BotLog.micLevel)
                 .put("wake_score", BotLog.wakeScore)

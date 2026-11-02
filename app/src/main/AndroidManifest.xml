@@ -5,6 +5,8 @@
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <!-- Tên Wi-Fi, cường độ sóng, IP cho phần thông tin hệ thống trên Web UI -->
     <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
+    <!-- Quét / đổi mạng Wi-Fi từ Web UI -->
+    <uses-permission android:name="android.permission.CHANGE_WIFI_STATE" />
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
