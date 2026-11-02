@@ -126,9 +126,47 @@ public class BotService extends Service {
     }
 
     void setPaused(boolean p) {
+        boolean changed = paused != p;
         paused = p;
         if (p) recorder.stop(); // thoát khỏi vòng chờ từ đánh thức ngay
         BotLog.i(p ? "Tạm dừng nghe (nhả micro)" : "Tiếp tục nghe");
+        if (changed) announce(p ? "Đã tắt mic" : "Đã bật mic");
+    }
+
+    /** Câu báo ngắn đã tạo giọng (theo nội dung + bộ đọc), để bấm nút là nói ngay, không chờ mạng. */
+    private final java.util.Map<String, PcmPlayer.Pcm> announceCache = new java.util.HashMap<>();
+
+    /** Đọc câu báo ngắn (tắt / bật mic…) ở luồng riêng; lỗi tạo giọng thì chỉ ghi log. */
+    void announce(final String text) {
+        new Thread(() -> {
+            Config cfg = Config.load(this);
+            String key = cfg.ttsEngine + "|" + cfg.voice + "|" + cfg.googleVoice + "|" + text;
+            try {
+                PcmPlayer.Pcm p;
+                synchronized (announceCache) {
+                    p = announceCache.get(key);
+                }
+                if (p == null) {
+                    p = synth(cfg, text);
+                    synchronized (announceCache) {
+                        announceCache.put(key, p);
+                    }
+                }
+                synchronized (speakLock) {
+                    PcmPlayer.play(withLead(p), p.rate);
+                }
+            } catch (Exception e) {
+                BotLog.w("Không đọc được \"" + text + "\": " + e.getMessage());
+            }
+        }, "announce").start();
+    }
+
+    /** Đệm im lặng đầu cho ampli thức dậy (loa ngắt ampli khi rảnh, mất tiếng đầu câu). */
+    private static byte[] withLead(PcmPlayer.Pcm p) {
+        byte[] silence = new byte[p.rate * 2 * CUE_LEAD_MS / 1000];
+        byte[] out = new byte[silence.length + p.data.length];
+        System.arraycopy(p.data, 0, out, silence.length, p.data.length);
+        return out;
     }
 
     byte[] recentMicWav() {
