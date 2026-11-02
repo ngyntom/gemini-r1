@@ -15,7 +15,7 @@ public class Config {
     static final String[] KEYS = {"api_key", "model", "tts_model", "voice", "wake_engine",
             "mww_model", "mww_cutoff", "wake_word", "follow_up", "persona", "mic_gain",
             "tts_engine", "google_voice", "google_tts_key", "tts_rate", "led", "wake_sound", "wake_reply", "local_time",
-            "ha_url", "ha_token", "stt_engine", "live", "live_model", "live_idle", "gcloud_sa", "search", "city", "barge_in"};
+            "ha_url", "ha_token", "stt_engine", "live", "live_model", "live_idle", "gcloud_sa", "search", "city", "barge_in", "bot_self", "user_call"};
 
     public String apiKey;
     public String model;
@@ -34,6 +34,9 @@ public class Config {
     /** Lúc bot đang nói vẫn nghe từ đánh thức để ngắt lời (mic thu cả tiếng loa, cần nói to hơn). */
     public boolean bargeIn;
     public String persona;
+    /** Xưng hô: bot tự xưng (vd. "em") và gọi người dùng (vd. "anh"); rỗng = để Gemini tự chọn. */
+    public String botSelf;
+    public String userCall;
     /** Hệ số khuếch đại micro (1 = giữ nguyên), cho mic thu nhỏ. */
     public float micGain;
     /** "gfree" (Google Dịch, miễn phí), "google" (Cloud TTS, cần key Cloud) hoặc "gemini". */
@@ -74,6 +77,19 @@ public class Config {
      * Rỗng = chưa chọn, dùng mọi thiết bị điều khiển được như trước.
      */
     public JSONObject haDevices;
+
+    /** Persona kèm dòng xưng hô (nếu đã đặt) - dùng làm system prompt cho cả Gemini thường và Live. */
+    public String personaPrompt() {
+        if (botSelf.isEmpty() && userCall.isEmpty()) return persona;
+        StringBuilder sb = new StringBuilder(persona).append("\n\nXưng hô khi nói tiếng Việt:");
+        if (!botSelf.isEmpty()) sb.append(" tự xưng là \"").append(botSelf).append("\";");
+        if (!userCall.isEmpty()) sb.append(" gọi người dùng là \"").append(userCall).append("\";");
+        sb.append(" luôn giữ đúng cách xưng hô này trong mọi câu trả lời");
+        if (!botSelf.isEmpty() && !userCall.isEmpty()) {
+            sb.append(" (vd. \"Dạ, ").append(botSelf).append(" chào ").append(userCall).append("\")");
+        }
+        return sb.append('.').toString();
+    }
 
     public boolean haEnabled() {
         return !haUrl.isEmpty() && !haToken.isEmpty();
@@ -149,6 +165,8 @@ public class Config {
                 "Bạn là trợ lý giọng nói trên loa thông minh. Trả lời ngắn gọn, tự nhiên, "
                         + "bằng ngôn ngữ người dùng nói (mặc định tiếng Việt). Không dùng markdown, "
                         + "emoji hay ký hiệu vì câu trả lời sẽ được đọc thành tiếng.");
+        c.botSelf = p.getString("bot_self", "").trim();
+        c.userCall = p.getString("user_call", "").trim();
         c.search = !"0".equals(p.getString("search", "1").trim());
         c.city = p.getString("city", "Hà Nội").trim();
         return c;
@@ -170,6 +188,8 @@ public class Config {
                 .put("follow_up", String.valueOf(c.followUpSec))
                 .put("barge_in", c.bargeIn ? "1" : "0")
                 .put("persona", c.persona)
+                .put("bot_self", c.botSelf)
+                .put("user_call", c.userCall)
                 .put("mic_gain", String.valueOf(c.micGain))
                 .put("tts_engine", c.ttsEngine)
                 .put("google_voice", c.googleVoice)

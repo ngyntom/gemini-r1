@@ -413,7 +413,11 @@ const PAGES = {
       tog('search', 'Tìm kiếm web khi cần', 'Giá vàng, xổ số, thời tiết, tin tức… (dùng được cả trong Gemini Live)'),
       inp('city', 'Thành phố của bạn', { ph: 'vd. Hà Nội — hỏi thời tiết ở đây' }),
       area('persona', 'Tính cách / chỉ dẫn'),
-    ])),
+    ])
+    + list('Xưng hô', [
+      inp('bot_self', 'Bot tự xưng là', { ph: 'vd. em, cháu, con, mình (trống = tự chọn)' }),
+      inp('user_call', 'Bot gọi bạn là', { ph: 'vd. anh, chị, ông, bà, anh Thành (trống = bạn)' }),
+    ], 'Dùng cho cả Gemini thường và Live. Vd. "em" + "anh" → "Dạ, em chào anh".')),
 
   voice: () => subpage('voice', 'Giọng đọc',
     list('Bộ đọc', [

@@ -391,7 +391,7 @@ public class GeminiClient {
             + "nói là không tìm thấy và kể vài thiết bị cùng loại gần nhất.";
 
     private static String systemPrompt(Config cfg, String devices) {
-        StringBuilder sb = new StringBuilder(cfg.persona);
+        StringBuilder sb = new StringBuilder(cfg.personaPrompt());
         sb.append("\n\n").append(CAPABILITIES);
         sb.append("\n\nThời gian hiện tại (giờ Việt Nam): ").append(LocalAnswer.nowForPrompt())
           .append(". Khi được hỏi giờ / ngày, luôn dùng thời gian này, không lặp lại giờ trong các câu trả lời trước.");
@@ -427,7 +427,7 @@ public class GeminiClient {
 
     /** Dành cho lượt hỏi kèm tìm kiếm web (askSearch): không JSON mode nên không kèm hợp đồng heard/reply. */
     private static String searchPrompt(Config cfg) {
-        StringBuilder sb = new StringBuilder(cfg.persona).append("\n\n").append(CAPABILITIES);
+        StringBuilder sb = new StringBuilder(cfg.personaPrompt()).append("\n\n").append(CAPABILITIES);
         sb.append("\n\nThời gian hiện tại (giờ Việt Nam): ").append(LocalAnswer.nowForPrompt())
           .append(". Khi được hỏi giờ / ngày, luôn dùng thời gian này.");
         if (!cfg.city.isEmpty()) {

@@ -267,7 +267,7 @@ final class GeminiLive {
     }
 
     private String prompt(String devices) {
-        StringBuilder sb = new StringBuilder(cfg.persona)
+        StringBuilder sb = new StringBuilder(cfg.personaPrompt())
                 .append("\n\n").append(GeminiClient.CAPABILITIES)
                 .append("\n\nBạn đang trò chuyện bằng giọng nói qua một chiếc loa. Luôn nói tiếng Việt (trừ khi ")
                 .append("người dùng nói ngôn ngữ khác), câu ngắn, tự nhiên. Thời gian hiện tại (giờ Việt Nam): ")
