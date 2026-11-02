@@ -54,18 +54,21 @@ final class Led {
         } catch (Exception e) {
             BotLog.w("Không tạo được hiệu ứng sao chổi: " + e.getMessage());
         }
-        final long started = System.currentTimeMillis();
         Thread t = new Thread(() -> {
-            long lastOff = 0;
+            long firstOk = 0, lastOff = 0;
             while (true) {
                 try {
                     String st = test != null ? test : BotLog.state;
                     String mode = enabled || test != null ? mode(st) : "off";
-                    // 30 s đầu: hiệu ứng khởi động của loa có thể bật đèn sau khi app đã tắt -> tắt lại vài lần
+                    // Tắt hết đèn (cả hiệu ứng còn sót từ lần chạy trước) ngay lần đầu adbd nhận lệnh, rồi lặp lại
+                    // vài lần trong 30 s sau đó vì hiệu ứng khởi động của loa có thể bật đèn muộn. Tính từ lần
+                    // đầu thành công chứ không từ lúc app chạy: vừa cài bằng adb thì adbd có thể bận ~1 phút.
                     long now = System.currentTimeMillis();
-                    if ("off".equals(mode) && now - started < 30000 && now - lastOff > 5000) {
+                    if (firstOk == 0 || ("off".equals(mode) && now - firstOk < 30000 && now - lastOff > 5000)) {
+                        String out = LocalAdb.shell(command("off").replace(INNER_OFF, INNER_ALL_OFF) + "\necho OK", 6000);
+                        if (!out.contains("OK")) throw new Exception("lights_test lỗi: " + out.trim());
+                        if (firstOk == 0) firstOk = now;
                         lastOff = now;
-                        LocalAdb.shell(command("off").replace(INNER_OFF, INNER_ALL_OFF) + "\necho OK", 6000);
                         shown = "off";
                     }
                     if (!mode.equals(shown)) {
