@@ -70,8 +70,10 @@ final class MusicLight {
         lastFeed = System.nanoTime();
         peak = Math.max(rms, peak * 0.9995);          // co dần về mức to của đoạn đang nghe
         if (peak < 1500) peak = 1500;
-        smooth = rms > smooth ? rms : smooth * 0.7 + rms * 0.3; // lên nhanh, xuống từ từ
+        // Lên nhanh, xuống từ từ (~0,3 s mỗi gói ~23 ms): bản trước tụt về 0 giữa các nhịp, đèn chớp tắt
+        smooth = rms > smooth ? smooth * 0.4 + rms * 0.6 : smooth * 0.93 + rms * 0.07;
         int level = (int) Math.round(Math.min(1.0, smooth / peak) * RING);
+        if (level < 1) level = 1; // đang có nhạc: luôn còn ít nhất 1 đèn
         if (pending.size() > 200) pending.pollFirst();
         pending.addLast(new long[]{at, level});
     }

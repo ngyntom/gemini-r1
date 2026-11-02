@@ -395,8 +395,9 @@ final class Group {
                     int r = (Integer) m[2], ch = (Integer) m[3], role = (Integer) m[4];
                     short[] mono = toMono((byte[]) m[1], ch, role);
                     if (track == null || r != rate) open(r);
-                    // Ghi trước ~150 ms: trừ trễ ra loa còn ~110 ms chờ trong đệm AudioTrack (~125 ms)
-                    long wait = playAt - System.nanoTime() - 150_000_000L;
+                    // Ghi trước ~280 ms: trừ trễ ra loa còn ~240 ms chờ trong đệm AudioTrack (~250 ms) - đủ dày
+                    // để CPU loa bận một lúc (giải mã, Wi-Fi) không làm hụt dữ liệu, giật tiếng
+                    long wait = playAt - System.nanoTime() - 280_000_000L;
                     if (wait > 0) Thread.sleep(wait / 1_000_000, (int) (wait % 1_000_000));
                     if (playAt < System.nanoTime() - 50_000_000L && written > 0 && !playing()) {
                         continue; // quá trễ (loa vừa bận), bỏ gói
@@ -421,7 +422,7 @@ final class Group {
             if (track != null) track.release();
             rate = r;
             int min = AudioTrack.getMinBufferSize(r, AudioFormat.CHANNEL_OUT_MONO, AudioFormat.ENCODING_PCM_16BIT);
-            int bytes = Math.max(min, r / 8 * 2); // ~125 ms, vừa đủ cho lượng ghi trước (~110 ms)
+            int bytes = Math.max(min, r / 4 * 2); // ~250 ms, vừa đủ cho lượng ghi trước (~240 ms)
             track = new AudioTrack(AudioManager.STREAM_MUSIC, r, AudioFormat.CHANNEL_OUT_MONO,
                     AudioFormat.ENCODING_PCM_16BIT, bytes, AudioTrack.MODE_STREAM);
             written = 0;
@@ -436,7 +437,7 @@ final class Group {
 
         /** Trễ cố định từ lúc ghi vào loa phát hết đệm tới tai (ước lượng, giống nhau trên mọi R1). */
         private static final long OUT_LATENCY_NS = 40_000_000L;
-        private long dropped, inserted, lastLog, lastHead = -1, lastHeadAt;
+        private long dropped, inserted, lastLog, lastHead = -1, lastHeadAt, errAvg = Long.MIN_VALUE;
         private long sumErr, nErr;
 
         /**
@@ -467,17 +468,23 @@ final class Group {
             } else {
                 sumErr += err;
                 nErr++;
-                long big = rate / 33;     // 30 ms: sửa ngay
-                long small = rate / 1000; // 1 ms mỗi gói: sửa dần cho khỏi nghe thấy
-                long dead = rate / 100;   // 10 ms: vị trí phát của AudioTrack chỉ nhảy theo từng chu kỳ
+                // Vị trí phát AudioTrack nhảy theo từng chu kỳ 10-20 ms -> err dao động; chỉnh theo trung bình
+                // ~2 s. Bản trước chỉnh theo từng lần đo, chèn 1 ms im lặng / cắt 1 ms: nghe lách tách.
+                errAvg = errAvg == Long.MIN_VALUE ? err : errAvg + (err - errAvg) / 64;
+                long big = rate / 20;  // 50 ms: lệch thật (mạng nghẽn, vừa hụt dữ liệu) -> sửa ngay
+                long dead = rate / 125; // 8 ms
                 if (err > big) {
                     start = (int) Math.min(err, pcm.length);
+                    errAvg = Long.MIN_VALUE;
                 } else if (err < -big) {
                     silence((int) Math.min(-err, rate / 2));
-                } else if (err > dead) {
-                    start = (int) Math.min(small, pcm.length);
-                } else if (err < -dead) {
-                    silence((int) small);
+                    errAvg = Long.MIN_VALUE;
+                } else if (errAvg > dead) {
+                    start = Math.min(2, pcm.length); // bỏ 2 mẫu (0,05 ms): tai không nhận ra
+                } else if (errAvg < -dead && pcm.length > 0) {
+                    track.write(new short[]{pcm[0], pcm[0]}, 0, 2); // nhân đôi mẫu đầu, không chèn số 0
+                    written += 2;
+                    inserted += 2;
                 }
             }
             dropped += start;
