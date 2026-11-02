@@ -146,14 +146,17 @@ final class Led {
                 return stop + INNER_OFF + "; lights_test set " + RING + " 0; lights_test show 500";
             case "thinking":
                 if (comet != null) {
-                    return stop + INNER_OFF + "; lights_test set " + RING + " 0; trap '' HUP; sh "
-                            + comet.getAbsolutePath() + " </dev/null >/dev/null 2>&1 &";
+                    // Ghi PID ngay ở đây chứ không để script tự ghi khi chạy: bấm "về rảnh" liền sau "nghĩ" thì
+                    // lệnh dừng tới trước khi script kịp ghi PID, bỏ qua, và sao chổi chạy mãi (thử trên loa).
+                    return stop + INNER_OFF + "; lights_test set " + RING + " 0; rm -f " + STOPF + "; trap '' HUP; sh "
+                            + comet.getAbsolutePath() + " </dev/null >/dev/null 2>&1 & echo $! > " + PID;
                 }
                 return stop + INNER_OFF + "; lights_test set " + RING + " ffffff";
             default:
-                // Về rảnh: ngắt điện chip đèn trong 1 s rồi mới đóng hiệu ứng - chip đôi khi giữ lại màu cũ
-                // (xanh lá, xanh dương mờ) mà close không xoá được và còn bỏ qua lệnh mới (thử trên loa).
-                return stop + INNER_RESET + "; " + INNER_OFF + "; lights_test set " + RING + " 0";
+                // Về rảnh: đóng hiệu ứng TRƯỚC rồi mới ngắt điện chip đèn trong 1 s. Chip đôi khi giữ lại màu cũ
+                // mà close không xoá được; nhưng reset trước thì hiệu ứng thở 203 còn chạy vẽ lại, close sau đó
+                // dừng đúng lúc đang mờ -> đọng xanh dương mờ (thử trên loa).
+                return stop + INNER_OFF + "; " + INNER_RESET + "; lights_test set " + RING + " 0";
         }
     }
 
@@ -163,7 +166,8 @@ final class Led {
      */
     private static File writeComet(Context ctx) throws Exception {
         String[] tail = {"ffffff", "606060", "181818", "0"};
-        StringBuilder sb = new StringBuilder("rm -f " + STOPF + "\necho $$ > " + PID + "\nn=0\ng=0\nwhile [ $n -lt 200 ]; do\n");
+        // PID do lệnh "nghĩ" ghi ngay khi chạy nền (xem command()); script không tự ghi và không xoá STOPF
+        StringBuilder sb = new StringBuilder("n=0\ng=0\nwhile [ $n -lt 200 ]; do\n");
         for (int k = 0; k < 24; k++) {
             // Đèn trong nhịp xanh lá (~1 s sáng / 1 s tắt): loa không có hiệu ứng thở xanh lá
             if (k % 6 == 0) {
