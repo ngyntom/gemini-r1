@@ -108,6 +108,11 @@ public class BotService extends Service {
         recorder.trigger();
     }
 
+    /** Web UI vừa lưu cấu hình: tắt Gemini Live thì kết thúc ngay phiên Live đang chạy. */
+    void configChanged() {
+        if (!Config.load(this).live) live.cancel();
+    }
+
     /** Bấm nút lúc bot đang nói (cờ cutIn để vòng chính nghe câu hỏi mới ngay sau đó). */
     void interruptSpeech() {
         cutIn = true;
@@ -190,6 +195,9 @@ public class BotService extends Service {
                             continue;
                         }
                         BotLog.i("Đánh thức: " + hit);
+                        // Vòng chờ từ đánh thức có thể kéo dài nhiều phút: đọc lại cấu hình để đổi Live / thường,
+                        // âm báo… trên Web UI trong lúc đó có tác dụng ngay lần gọi này
+                        cfg = Config.load(this);
                         // wake() TRƯỚC khi đổi trạng thái để luồng đèn thấy "listening" là thấy luôn cờ quét sáng.
                         // "web" = nút "Nghe ngay" trên Web UI, không phải nghe thấy từ khóa nên không quét.
                         if (!"web".equals(hit)) Led.wake();

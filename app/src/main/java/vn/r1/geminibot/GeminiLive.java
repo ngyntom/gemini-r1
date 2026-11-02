@@ -50,6 +50,10 @@ final class GeminiLive {
     private volatile boolean setupDone, closed, endRequested, userSpoke;
     /** Bị ngắt bằng nút bấm: bỏ phần audio còn lại của lượt trả lời này. */
     private volatile boolean skipTurn;
+    /** Gemini Live vừa bị tắt trong cài đặt (cancel()). */
+    private volatile boolean cancelled;
+    /** Đang trong một phiên (run() chưa trả về). */
+    private volatile boolean active;
     private volatile String error;
     private volatile long lastActivity;
     private final StringBuilder heard = new StringBuilder();
@@ -63,6 +67,14 @@ final class GeminiLive {
      * Nút bấm lúc loa đang nói: dừng ngay và bỏ phần còn lại của lượt trả lời, mic mở lại sau
      * ECHO_GUARD_MS để nói câu mới. (Mic tắt lúc loa nói nên Gemini không tự nghe thấy bị ngắt lời.)
      */
+    /** Tắt Gemini Live trên Web UI: kết thúc phiên đang chạy ngay, không chờ hết thời gian im lặng. */
+    void cancel() {
+        if (active) {
+            cancelled = true;
+            BotLog.i("Gemini Live: đã tắt trong cài đặt, kết thúc phiên");
+        }
+    }
+
     void cutIn() {
         Player p = player;
         if (p == null || !p.busy()) return;
@@ -73,7 +85,8 @@ final class GeminiLive {
     /** Chạy một phiên trò chuyện, trả về khi phiên kết thúc. */
     void run(Config cfg, VoiceRecorder rec) throws InterruptedException {
         this.cfg = cfg;
-        setupDone = closed = endRequested = userSpoke = skipTurn = false;
+        setupDone = closed = endRequested = userSpoke = skipTurn = cancelled = false;
+        active = true;
         error = null;
         heard.setLength(0);
         said.setLength(0);
@@ -139,7 +152,7 @@ final class GeminiLive {
             ByteArrayOutputStream chunk = new ByteArrayOutputStream();
             int frames = 0;
             int guard = cueGuardFrames(cfg); // các frame đầu còn lẫn ding-dong -> bỏ (xem cueGuardFrames)
-            while (!closed && !endRequested) {
+            while (!closed && !endRequested && !cancelled) {
                 short[] f = rec.readFrame();
                 if (f == null) break;
                 long now = System.currentTimeMillis();
@@ -184,6 +197,7 @@ final class GeminiLive {
         } finally {
             if (ws != null) ws.close(1000, "bye");
             player.close();
+            active = false;
             logTurn();
             BotLog.state = "idle";
             BotLog.i("Gemini Live: kết thúc");

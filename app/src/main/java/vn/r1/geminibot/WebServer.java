@@ -195,6 +195,7 @@ class WebServer {
             case "/api/config":
                 Config.saveFromJson(bot, req);
                 BotLog.i("Đã lưu cấu hình từ Web UI");
+                bot.configChanged();
                 break;
             case "/api/say":
             case "/api/ask":
