@@ -15,7 +15,7 @@ public class Config {
     static final String[] KEYS = {"api_key", "model", "tts_model", "voice", "wake_engine",
             "mww_model", "mww_cutoff", "wake_word", "follow_up", "persona", "mic_gain",
             "tts_engine", "google_voice", "google_tts_key", "tts_rate", "led", "wake_sound", "wake_reply", "local_time",
-            "ha_url", "ha_token", "stt_engine", "live", "live_model", "live_idle", "gcloud_sa"};
+            "ha_url", "ha_token", "stt_engine", "live", "live_model", "live_idle", "gcloud_sa", "search", "city"};
 
     public String apiKey;
     public String model;
@@ -62,6 +62,11 @@ public class Config {
 
     /** File JSON service account Google Cloud (STT / TTS); rỗng = dùng API key. */
     public String gcloudSa;
+
+    /** Cho Gemini tìm kiếm web khi cần thông tin thực tế (giá vàng, xổ số, thời tiết, tin tức…). */
+    public boolean search;
+    /** Thành phố của loa; hỏi thời tiết / "ở đây" hiểu theo thành phố này. */
+    public String city;
     /**
      * Thiết bị Home Assistant đã chọn cho bot: entity_id -> tên gọi khác ("" = dùng tên gốc).
      * Rỗng = chưa chọn, dùng mọi thiết bị điều khiển được như trước.
@@ -141,6 +146,8 @@ public class Config {
                 "Bạn là trợ lý giọng nói trên loa thông minh. Trả lời ngắn gọn, tự nhiên, "
                         + "bằng ngôn ngữ người dùng nói (mặc định tiếng Việt). Không dùng markdown, "
                         + "emoji hay ký hiệu vì câu trả lời sẽ được đọc thành tiếng.");
+        c.search = !"0".equals(p.getString("search", "1").trim());
+        c.city = p.getString("city", "Hà Nội").trim();
         return c;
     }
 
@@ -175,7 +182,9 @@ public class Config {
                 .put("stt_engine", c.sttEngine)
                 .put("live", c.live ? "1" : "0")
                 .put("live_model", c.liveModel)
-                .put("live_idle", String.valueOf(c.liveIdleSec));
+                .put("live_idle", String.valueOf(c.liveIdleSec))
+                .put("search", c.search ? "1" : "0")
+                .put("city", c.city);
     }
 
     /** Lưu các khoá có trong JSON từ Web UI. api_key rỗng = giữ nguyên. */

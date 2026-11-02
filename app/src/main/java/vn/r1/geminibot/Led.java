@@ -18,10 +18,10 @@ import java.io.FileOutputStream;
  * làm lights_test crash (SIGSEGV) mà chuỗi lệnh vẫn chạy tiếp ("echo OK" vẫn in) nên app tưởng đèn
  * đã bật - đúng lỗi viền ngoài không bao giờ sáng từng gặp.
  *
- *   nghe  = viền trắng + đèn trong xanh lá
+ *   nghe  = viền trắng + đèn trong thở xanh dương (show 203)
  *   nghĩ  = sao chổi chạy vòng trên viền + đèn trong nhịp xanh lá (script nền trên loa,
  *           gửi từng khung qua adb thì quá chậm)
- *   nói   = viền trắng + đèn trong thở xanh dương (show 203)
+ *   nói   = viền trắng + đèn trong xanh lá
  *   lỗi   = viền tắt + đèn trong đỏ
  *   rảnh  = tắt hết
  * Nghe thấy từ đánh thức thì vệt sáng quét 1 vòng quanh viền (script nền) rồi mới vào hiệu ứng
@@ -59,9 +59,13 @@ final class Led {
         return "echo '0 100 1 1 1 000000 " + rgb + " 100 0 1 " + id + "' > " + file;
     }
 
-    /** Tắt cả nhóm (dòng "đến đen" của chính lights_test). */
+    /**
+     * Tắt cả nhóm NGAY LẬP TỨC (force màu đen). Dòng "1 200…" kiểu mờ dần từng bị driver xếp hàng sau
+     * các frame của hiệu ứng thở nên đèn trong tắt muộn hơn viền; force thì hai nhóm tắt đồng thời
+     * (thử cả hai trên loa và so sánh).
+     */
     private static String blackAll(String file, String ids) {
-        return "echo '1 200 1 1 1 0 0 200 0 " + ids + "' > " + file;
+        return "echo '0 100 1 1 1 000000 000000 100 0 " + ids + "' > " + file;
     }
 
     private static final String RING_WHITE = setColor(RING_COLOR, RING_IDS, "ffffff");
@@ -187,9 +191,9 @@ final class Led {
         switch (mode) {
             // Viền trước, đèn trong sau (giữ thứ tự an toàn của bản cũ dù 2 nhóm là 2 file riêng).
             case "listening":
-                return stop + INNER_OFF + sweepCmd + "; " + RING_WHITE + "; " + INNER_GREEN;
+                return stop + INNER_OFF + sweepCmd + "; " + RING_WHITE + "; lights_test show 203";
             case "speaking":
-                return stop + INNER_OFF + "; " + RING_WHITE + "; lights_test show 203";
+                return stop + INNER_OFF + "; " + RING_WHITE + "; " + INNER_GREEN;
             case "error":
                 return stop + INNER_OFF + "; " + RING_OFF + "; " + INNER_RED;
             case "thinking":

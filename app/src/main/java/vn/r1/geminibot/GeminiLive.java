@@ -41,7 +41,6 @@ final class GeminiLive {
     private static final int OUT_RATE = 24000;
     private static final int SEND_FRAMES = 3;          // gửi mỗi 90 ms
     private static final long ECHO_GUARD_MS = 700;     // mic còn tắt thêm chừng này sau khi loa nói xong (đệm AudioTrack ~0.5 s)
-    private static final long CUE_GUARD_MS = 900;      // bỏ tiếng ding-dong lúc mới vào
 
     private final OkHttpClient http = new OkHttpClient.Builder()
             .readTimeout(0, TimeUnit.MILLISECONDS)
@@ -77,7 +76,6 @@ final class GeminiLive {
 
         final CountDownLatch ready = new CountDownLatch(1);
         player = new Player();
-        long start = System.currentTimeMillis();
         try {
             final String setup = setupJson(devices).toString();
             Request req = new Request.Builder().url(URL).header("x-goog-api-key", cfg.apiKey).build();
@@ -127,11 +125,13 @@ final class GeminiLive {
 
             ByteArrayOutputStream chunk = new ByteArrayOutputStream();
             int frames = 0;
+            int guard = cueGuardFrames(cfg); // các frame đầu còn lẫn ding-dong -> bỏ (xem cueGuardFrames)
             while (!closed && !endRequested) {
                 short[] f = rec.readFrame();
                 if (f == null) break;
                 long now = System.currentTimeMillis();
-                boolean muted = now - start < CUE_GUARD_MS || player.busyUntil() + ECHO_GUARD_MS > now;
+                boolean muted = guard > 0 || player.busyUntil() + ECHO_GUARD_MS > now;
+                if (guard > 0) guard--;
                 for (short v : f) {
                     int s = muted ? 0 : v;
                     chunk.write(s & 0xff);
@@ -177,6 +177,18 @@ final class GeminiLive {
         }
     }
 
+    /**
+     * Bỏ bao nhiêu frame 30 ms đầu cho khỏi tiếng ding-dong lúc mới vào phiên. Đếm theo SỐ FRAME đọc
+     * được chứ không theo giờ đồng hồ: lúc vòng lặp bắt đầu, mic còn đọng đoạn thu trong lúc kết nối
+     * WebSocket (chứa ding-dong lẫn đầu câu nói) nên cờ giờ tắt nhầm cả âm đầu câu ("em học lớp mấy"
+     * bị mất chữ "em" thành "en học lớp mấy"). Chime dài ~0,87 s (0,5 s đợi ampli + 0,37 s nhạc);
+     * chế độ voice đã tắt mic lúc phát câu đáp nên chỉ cần đệm ngắn cho mic khởi động lại.
+     */
+    private static int cueGuardFrames(Config cfg) {
+        if ("chime".equals(cfg.wakeSound)) return 32; // ~0,96 s
+        return "voice".equals(cfg.wakeSound) ? 5 : 3;
+    }
+
     private JSONObject setupJson(String devices) throws Exception {
         JSONArray functions = new JSONArray()
                 .put(new JSONObject().put("name", "end_conversation")
@@ -196,6 +208,19 @@ final class GeminiLive {
                                             .put("description", GeminiClient.USER_WORDS_DESC)))
                             .put("required", new JSONArray().put("domain").put("service").put("entity_id")
                                     .put("user_words"))));
+        }
+        if (cfg.search) {
+            functions.put(new JSONObject().put("name", "web_search")
+                    .put("description", "Tìm kiếm web lấy thông tin thực tế / mới nhất: giá vàng, tỉ giá, "
+                            + "xổ số, thời tiết, tin tức, thể thao, lịch chiếu…")
+                    .put("parameters", new JSONObject()
+                            .put("type", "OBJECT")
+                            .put("properties", new JSONObject()
+                                    .put("query", new JSONObject().put("type", "STRING")
+                                            .put("description", "từ khoá tìm kiếm, vd. \"giá vàng hôm nay\""))
+                                    .put("question", new JSONObject().put("type", "STRING")
+                                            .put("description", "câu hỏi gốc của người dùng")))
+                            .put("required", new JSONArray().put("query").put("question"))));
         }
         return new JSONObject().put("setup", new JSONObject()
                 .put("model", "models/" + cfg.liveModel)
@@ -220,6 +245,15 @@ final class GeminiLive {
                 .append(LocalAnswer.nowForPrompt())
                 .append(". Khi người dùng chào tạm biệt hoặc muốn dừng (\"tạm biệt\", \"thôi nhé\", \"xong rồi\"), ")
                 .append("chào lại thật ngắn rồi gọi hàm end_conversation.");
+        if (!cfg.city.isEmpty()) {
+            sb.append("\nBạn đang ở ").append(cfg.city)
+              .append(" (Việt Nam); hỏi thời tiết hay \"ở đây\" thì hiểu là thành phố này.");
+        }
+        if (cfg.search) {
+            sb.append("\nKhi người dùng hỏi thông tin thực tế / mới nhất (giá vàng, tỉ giá, xổ số, thời tiết, ")
+              .append("tin tức, thể thao…), gọi hàm web_search rồi trả lời theo kết quả nó trả về, không nói ")
+              .append("là không biết hay không có dữ liệu nếu tìm được.");
+        }
         if (devices != null) {
             sb.append("\n\nBạn điều khiển được thiết bị trong nhà qua Home Assistant (entity_id | tên | trạng thái):\n")
               .append(devices)
@@ -291,6 +325,17 @@ final class GeminiLive {
                 if ("end_conversation".equals(name)) {
                     endRequested = true;
                     result = new JSONObject().put("ok", true);
+                } else if ("web_search".equals(name)) {
+                    // Một lượt Gemini chữ kèm Google Search (GeminiClient.searchText); lỗi cũng gói vào
+                    // câu trả lời vì ok:false bên Gemini thường bị coi là "lệnh lỗi" và lặp lại vòng hàm
+                    try {
+                        result = new JSONObject().put("ok", true)
+                                .put("answer", GeminiClient.searchText(cfg, args.optString("query"),
+                                        args.optString("question")));
+                    } catch (Exception e) {
+                        result = new JSONObject().put("ok", true)
+                                .put("answer", "(Không tìm được kết quả: " + e.getMessage() + ")");
+                    }
                 } else if ("ha_call".equals(name)) {
                     try {
                         String dataJson = args.optString("data_json", "").trim();

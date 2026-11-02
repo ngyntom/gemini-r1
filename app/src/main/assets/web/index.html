@@ -403,6 +403,8 @@ const PAGES = {
     list('', [
       inp('api_key', 'API key ' + hint(S.config.api_key_set, '(đã đặt ' + esc(S.config.api_key_hint) + ')'), { ph: 'Để trống = giữ nguyên' }),
       pick('model', 'Model trả lời', MODELS_CHAT),
+      tog('search', 'Tìm kiếm web khi cần', 'Giá vàng, xổ số, thời tiết, tin tức… (dùng được cả trong Gemini Live)'),
+      inp('city', 'Thành phố của bạn', { ph: 'vd. Hà Nội — hỏi thời tiết ở đây' }),
       area('persona', 'Tính cách / chỉ dẫn'),
     ])),
 
@@ -466,7 +468,7 @@ const PAGES = {
 
   led: () => subpage('led', 'Đèn LED',
     list('', [
-      tog('led', 'Đèn theo trạng thái bot', 'Đánh thức: quét sáng viền · Nghe: xanh lá · Nghĩ: sao chổi + nhịp xanh lá · Nói: thở xanh dương · Lỗi: đỏ'),
+      tog('led', 'Đèn theo trạng thái bot', 'Đánh thức: quét sáng viền · Nghe: thở xanh dương · Nghĩ: sao chổi + nhịp xanh lá · Nói: xanh lá · Lỗi: đỏ'),
     ], 'Thử từng kiểu đèn ở tab Loa.')),
 
   update: () => subpage('update', 'Cập nhật app',

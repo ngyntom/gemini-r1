@@ -20,7 +20,10 @@ import java.util.TimeZone;
 /**
  * Gọi Gemini REST API:
  *  1) ask(): gửi audio WAV, nhận về {heard, reply} (Gemini vừa nghe vừa trả lời).
- *  2) tts(): đổi câu trả lời thành giọng nói PCM 24 kHz.
+ *  2) askText() / askSearch(): hỏi bằng chữ; khi bật cfg.search thì kèm tìm kiếm web (Google Search)
+ *     để trả lời được giá vàng, xổ số, thời tiết, tin tức… (Gemini không có dữ liệu mới nếu không tìm).
+ *  3) searchText(): một lượt tìm kiếm web, dùng cho hàm web_search của cả Gemini thường và Live.
+ *  4) tts(): đổi câu trả lời thành giọng nói PCM 24 kHz.
  */
 public class GeminiClient {
     private static final String BASE = "https://generativelanguage.googleapis.com/v1beta/models/";
@@ -39,9 +42,89 @@ public class GeminiClient {
                 .put("data", Base64.encodeToString(wav, Base64.NO_WRAP))));
     }
 
-    /** Hỏi bằng chữ (từ Web UI). */
+    /** Hỏi bằng chữ (từ STT hoặc Web UI); không có Home Assistant thì hỏi kèm tìm kiếm web. */
     public Answer askText(Config cfg, String question) throws Exception {
+        if (cfg.search && !cfg.haEnabled()) return askSearch(cfg, question);
         return askPart(cfg, text(question));
+    }
+
+    /**
+     * Hỏi kèm tìm kiếm web (grounding Google Search) khi không có Home Assistant. Không dùng được
+     * JSON mode cùng lúc với tools nên "heard" chính là câu hỏi đã có sẵn từ STT; có HA thì đi theo
+     * askWithTools và web_search là một hàm để không đụng JSON mode / ha_call.
+     */
+    private synchronized Answer askSearch(Config cfg, String question) throws Exception {
+        JSONObject body = new JSONObject();
+        body.put("system_instruction", new JSONObject().put("parts", new JSONArray()
+                .put(text(searchPrompt(cfg)))));
+        JSONArray contents = new JSONArray();
+        for (int i = 0; i < history.length(); i++) contents.put(history.get(i));
+        contents.put(new JSONObject().put("role", "user").put("parts", new JSONArray().put(text(question))));
+        body.put("contents", contents);
+        body.put("generationConfig", new JSONObject().put("thinkingConfig", thinkingConfig(cfg.model)));
+
+        Answer a = new Answer();
+        a.heard = question;
+        a.reply = joinText(postWithSearch(cfg, body)).trim();
+        if (!a.reply.isEmpty()) {
+            history.put(new JSONObject().put("role", "user").put("parts", new JSONArray().put(text(a.heard))));
+            history.put(new JSONObject().put("role", "model").put("parts", new JSONArray().put(text(a.reply))));
+            while (history.length() > MAX_HISTORY) history.remove(0);
+        }
+        return a;
+    }
+
+    /**
+     * Một lượt tìm kiếm web (Gemini chữ kèm Google Search) — dùng cho hàm web_search của cả Gemini
+     * thường lẫn Gemini Live. Trả về câu chữ ngắn gọn để đọc thành tiếng.
+     */
+    static String searchText(Config cfg, String query, String question) throws Exception {
+        String q = question == null || question.trim().isEmpty() ? query : question.trim();
+        JSONObject body = new JSONObject();
+        body.put("system_instruction", new JSONObject().put("parts", new JSONArray().put(text(
+                "Bạn là bộ tìm kiếm thông tin cho một trợ lý giọng nói tiếng Việt. Trả lời NGẮN (2-4 câu), "
+                        + "kèm con số cụ thể khi có (giá vàng: loại vàng và giá mua/bán; xổ số: các giải lớn; "
+                        + "thời tiết: nhiệt độ, mưa/nắng), đi thẳng vào thông tin, không nói \"theo kết quả tìm "
+                        + "kiếm\". Thời gian hiện tại (giờ Việt Nam): " + LocalAnswer.nowForPrompt() + "."))));
+        body.put("contents", new JSONArray().put(new JSONObject().put("role", "user").put("parts",
+                new JSONArray().put(text("Câu hỏi: " + q
+                        + (query == null || query.trim().isEmpty() || query.trim().equals(q)
+                        ? "" : "\nTừ khoá gợi ý: " + query.trim()))))));
+        body.put("generationConfig", new JSONObject().put("thinkingConfig", thinkingConfig(cfg.model)));
+        String out = joinText(postWithSearch(cfg, body)).trim();
+        return out.isEmpty() ? "(Không tìm thấy thông tin phù hợp.)" : out;
+    }
+
+    /**
+     * Gọi generateContent kèm công cụ Google Search. API nhận tên "google_search" lẫn "googleSearch"
+     * tuỳ phiên bản nên thử lần lượt; model / key không nhận thì cuối cùng bỏ search, vẫn trả lời
+     * bằng kiến thức cũ thay vì làm hỏng cả câu.
+     */
+    private static JSONObject postWithSearch(Config cfg, JSONObject body) throws Exception {
+        for (String key : new String[]{"google_search", "googleSearch"}) {
+            try {
+                body.put("tools", new JSONArray().put(new JSONObject().put(key, new JSONObject())));
+                return post(cfg, cfg.model, body);
+            } catch (Exception e) {
+                if (!String.valueOf(e.getMessage()).contains("HTTP 400")) throw e;
+            } finally {
+                body.remove("tools"); // lượt thử sau / lượt bỏ search phải không còn tools
+            }
+        }
+        BotLog.w("Model " + cfg.model + " không nhận tìm kiếm web, trả lời không kèm");
+        return post(cfg, cfg.model, body);
+    }
+
+    /** Ghép chữ của mọi part trong kết quả (bỏ part suy nghĩ nội bộ nếu model trả kèm). */
+    private static String joinText(JSONObject res) throws Exception {
+        JSONArray parts = res.getJSONArray("candidates").getJSONObject(0)
+                .getJSONObject("content").getJSONArray("parts");
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < parts.length(); i++) {
+            JSONObject p = parts.getJSONObject(i);
+            if (p.has("text") && !p.optBoolean("thought")) sb.append(p.getString("text"));
+        }
+        return sb.toString();
     }
 
     private synchronized Answer askPart(Config cfg, JSONObject userPart) throws Exception {
@@ -138,13 +221,27 @@ public class GeminiClient {
                         .put("user_words", new JSONObject().put("type", "STRING")
                                 .put("description", USER_WORDS_DESC)))
                 .put("required", new JSONArray().put("domain").put("service").put("entity_id").put("user_words"));
-        body.put("tools", new JSONArray().put(new JSONObject().put("functionDeclarations", new JSONArray()
+        JSONArray functions = new JSONArray()
                 .put(new JSONObject().put("name", "ha_call")
                         .put("description", "Điều khiển một thiết bị trong nhà qua Home Assistant")
                         .put("parameters", haSchema))
                 .put(new JSONObject().put("name", "respond")
                         .put("description", "Câu trả lời cuối cùng cho người dùng (luôn gọi sau cùng)")
-                        .put("parameters", answerSchema)))));
+                        .put("parameters", answerSchema));
+        if (cfg.search) {
+            functions.put(new JSONObject().put("name", "web_search")
+                    .put("description", "Tìm kiếm web lấy thông tin thực tế / mới nhất: giá vàng, tỉ giá, "
+                            + "xổ số, thời tiết, tin tức, thể thao, lịch chiếu…")
+                    .put("parameters", new JSONObject()
+                            .put("type", "OBJECT")
+                            .put("properties", new JSONObject()
+                                    .put("query", new JSONObject().put("type", "STRING")
+                                            .put("description", "từ khoá tìm kiếm, vd. \"giá vàng hôm nay\""))
+                                    .put("question", new JSONObject().put("type", "STRING")
+                                            .put("description", "câu hỏi gốc của người dùng")))
+                            .put("required", new JSONArray().put("query").put("question"))));
+        }
+        body.put("tools", new JSONArray().put(new JSONObject().put("functionDeclarations", functions)));
         body.put("toolConfig", new JSONObject().put("functionCallingConfig", new JSONObject().put("mode", "ANY")));
 
         boolean called = false;
@@ -167,17 +264,28 @@ public class GeminiClient {
                 }
                 called = true;
                 JSONObject result;
-                try {
-                    String dataJson = args.optString("data_json", "").trim();
-                    result = HomeAssistant.call(cfg, deviceIds, args.optString("domain"), args.optString("service"),
-                            args.optString("entity_id"), dataJson.isEmpty() ? null : new JSONObject(dataJson),
-                            args.optString("user_words"));
-                } catch (Exception e) {
-                    result = new JSONObject().put("ok", false).put("error", String.valueOf(e.getMessage()));
-                }
-                if (!result.optBoolean("ok")) {
-                    allOk = false;
-                    BotLog.w("Home Assistant lỗi: " + result.optString("error"));
+                if ("web_search".equals(fc.optString("name"))) {
+                    // Lỗi tìm kiếm gói vào câu trả lời (ok:false bị coi là "lệnh lỗi" và lặp lại vòng hàm)
+                    try {
+                        result = new JSONObject().put("ok", true)
+                                .put("answer", searchText(cfg, args.optString("query"), args.optString("question")));
+                    } catch (Exception e) {
+                        result = new JSONObject().put("ok", true)
+                                .put("answer", "(Không tìm được kết quả: " + e.getMessage() + ")");
+                    }
+                } else {
+                    try {
+                        String dataJson = args.optString("data_json", "").trim();
+                        result = HomeAssistant.call(cfg, deviceIds, args.optString("domain"), args.optString("service"),
+                                args.optString("entity_id"), dataJson.isEmpty() ? null : new JSONObject(dataJson),
+                                args.optString("user_words"));
+                    } catch (Exception e) {
+                        result = new JSONObject().put("ok", false).put("error", String.valueOf(e.getMessage()));
+                    }
+                    if (!result.optBoolean("ok")) {
+                        allOk = false;
+                        BotLog.w("Home Assistant lỗi: " + result.optString("error"));
+                    }
                 }
                 responses.put(new JSONObject().put("functionResponse", new JSONObject()
                         .put("name", fc.optString("name")).put("response", result)));
@@ -287,6 +395,15 @@ public class GeminiClient {
         sb.append("\n\n").append(CAPABILITIES);
         sb.append("\n\nThời gian hiện tại (giờ Việt Nam): ").append(LocalAnswer.nowForPrompt())
           .append(". Khi được hỏi giờ / ngày, luôn dùng thời gian này, không lặp lại giờ trong các câu trả lời trước.");
+        if (!cfg.city.isEmpty()) {
+            sb.append("\nBạn đang ở ").append(cfg.city)
+              .append(" (Việt Nam); hỏi thời tiết hay \"ở đây\" thì hiểu là thành phố này.");
+        }
+        if (cfg.search) {
+            sb.append("\nKhi câu hỏi cần thông tin thực tế / mới nhất (giá vàng, tỉ giá, xổ số, thời tiết, ")
+              .append("tin tức, thể thao…), gọi hàm web_search rồi trả lời theo kết quả nó trả về, không nói ")
+              .append("là không biết hay không có dữ liệu nếu tìm được.");
+        }
         sb.append("\n\nMỗi tin nhắn của người dùng là một đoạn ghi âm từ micro của loa, ")
           .append("thu ngay sau khi họ gọi bạn bằng từ đánh thức (hoặc ngay sau khi bạn vừa trả lời). ")
           .append("Trả về JSON: \"heard\" = nội dung bạn nghe được (chép lại nguyên văn), ")
@@ -305,6 +422,22 @@ public class GeminiClient {
               .append("Cuối cùng luôn gọi hàm respond với heard và reply; xác nhận điều khiển thì ngắn, ")
               .append("vd. \"Đã bật đèn phòng khách.\" Nếu ha_call báo lỗi hoặc không tìm thấy thiết bị thì nói rõ.");
         }
+        return sb.toString();
+    }
+
+    /** Dành cho lượt hỏi kèm tìm kiếm web (askSearch): không JSON mode nên không kèm hợp đồng heard/reply. */
+    private static String searchPrompt(Config cfg) {
+        StringBuilder sb = new StringBuilder(cfg.persona).append("\n\n").append(CAPABILITIES);
+        sb.append("\n\nThời gian hiện tại (giờ Việt Nam): ").append(LocalAnswer.nowForPrompt())
+          .append(". Khi được hỏi giờ / ngày, luôn dùng thời gian này.");
+        if (!cfg.city.isEmpty()) {
+            sb.append("\nBạn đang ở ").append(cfg.city)
+              .append(" (Việt Nam); hỏi thời tiết hay \"ở đây\" thì hiểu là thành phố này.");
+        }
+        sb.append("\nBạn được tìm kiếm web (Google Search). Khi câu hỏi cần thông tin thực tế / mới nhất ")
+          .append("(giá vàng, tỉ giá, xổ số, thời tiết, tin tức, thể thao, lịch chiếu…), hãy tìm rồi trả lời ")
+          .append("theo kết quả tìm được, kèm con số cụ thể khi có; không nói là không biết hay không có dữ ")
+          .append("liệu nếu tìm được. Câu trả lời sẽ được đọc thành tiếng: ngắn gọn, tự nhiên, không markdown.");
         return sb.toString();
     }
 
