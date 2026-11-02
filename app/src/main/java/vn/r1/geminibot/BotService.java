@@ -176,6 +176,9 @@ public class BotService extends Service {
                             continue;
                         }
                         BotLog.i("Đánh thức: " + hit);
+                        // wake() TRƯỚC khi đổi trạng thái để luồng đèn thấy "listening" là thấy luôn cờ quét sáng.
+                        // "web" = nút "Nghe ngay" trên Web UI, không phải nghe thấy từ khóa nên không quét.
+                        if (!"web".equals(hit)) Led.wake();
                         BotLog.state = "listening";
                         if ("voice".equals(cfg.wakeSound)) {
                             // Câu đáp dài -> phát xong rồi mới thu, bỏ phần mic đã thu lúc phát

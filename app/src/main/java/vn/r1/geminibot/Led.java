@@ -11,12 +11,14 @@ import java.io.FileOutputStream;
  *  - đèn trong: LED màu id 1..15, chỉ gọi được các hiệu ứng có sẵn bằng "lights_test show <mã>"
  *    (ghi thẳng mặt nạ 1..15 làm loa khởi động lại).
  *
- *   nghe  = viền sáng + đèn trong thở xanh dương (203)
+ *   nghe  = viền sáng + đèn trong xanh lá (501)
  *   nghĩ  = sao chổi chạy vòng trên viền + đèn trong nhịp xanh lá (script nền trên loa,
  *           gửi từng khung qua adb thì quá chậm)
- *   nói   = viền sáng + đèn trong xanh lá (501)
+ *   nói   = viền sáng + đèn trong thở xanh dương (203)
  *   lỗi   = đèn trong đỏ (500)
  *   rảnh  = tắt hết (close từng hiệu ứng đèn trong)
+ * Nghe thấy từ đánh thức thì vệt sáng quét 1 vòng quanh viền (script nền) rồi mới vào hiệu ứng nghe;
+ * nút "Nghe ngay" trên Web UI không quét vì bot không nghe thấy từ khóa.
  *
  * App thường không chạy được lights_test nên gọi qua shell của adbd (LocalAdb).
  */
@@ -57,11 +59,22 @@ final class Led {
     private static String shown = "";
     private static String lastError = "";
     private static File comet;
+    private static File sweep;
+    /** Thời điểm nghe thấy từ đánh thức (wake()); lần vào "listening" kế tiếp trong ~2,5 s sẽ quét sáng viền. */
+    private static volatile long wakeAt;
 
     private Led() {}
 
     static void setEnabled(boolean on) {
         enabled = on;
+    }
+
+    /**
+     * BotService gọi NGAY TRƯỚC khi đặt trạng thái "listening" sau từ đánh thức. Gọi trước khi đổi
+     * trạng thái: volatile ghi wakeAt rồi mới ghi state, nên luồng đèn thấy "listening" là thấy luôn cờ.
+     */
+    static void wake() {
+        wakeAt = System.currentTimeMillis();
     }
 
     /** Luồng theo dõi BotLog.state, chỉ ra lệnh khi kiểu đèn thay đổi. */
@@ -70,6 +83,11 @@ final class Led {
             comet = writeComet(ctx);
         } catch (Exception e) {
             BotLog.w("Không tạo được hiệu ứng sao chổi: " + e.getMessage());
+        }
+        try {
+            sweep = writeSweep(ctx);
+        } catch (Exception e) {
+            BotLog.w("Không tạo được hiệu ứng quét đánh thức: " + e.getMessage());
         }
         Thread t = new Thread(() -> {
             long firstOk = 0, lastOff = 0;
@@ -83,16 +101,22 @@ final class Led {
                     long now = System.currentTimeMillis();
                     if (firstOk == 0 || ("off".equals(mode) && now - firstOk < 30000 && now - lastOff > 5000)) {
                         // command("off") đã gồm ghi đen đèn trong (400) -> xoá cả màu đọng của app cũ
-                        String out = LocalAdb.shell(command("off").replace(INNER_OFF, INNER_ALL_OFF) + "\necho OK", 8000);
+                        String out = LocalAdb.shell(command("off", false).replace(INNER_OFF, INNER_ALL_OFF) + "\necho OK", 8000);
                         if (!out.contains("OK")) throw new Exception("lights_test lỗi: " + out.trim());
                         if (firstOk == 0) firstOk = now;
                         lastOff = now;
                         shown = "off";
                     }
                     if (!mode.equals(shown)) {
+                        // Quét sáng viền khi vào "listening" ngay sau từ đánh thức (cờ đặt trước khi BotService
+                        // đổi trạng thái nên tới đây chắc chắn thấy). Cửa sổ 2,5 s: lần nghe tiếp theo (follow-up)
+                        // hay bật đèn lại sau đó thì không quét; lệnh lỗi thì cờ còn nguyên -> quét lại khi thử lại.
+                        boolean wake = wakeAt != 0 && test == null && "listening".equals(mode)
+                                && System.currentTimeMillis() - wakeAt < 2500;
                         // Xuống dòng, không dùng ";": lệnh "nghĩ" kết thúc bằng "&" và "& ;" là lỗi cú pháp sh
-                        String out = LocalAdb.shell(command(mode) + "\necho OK", 8000); // "off" chờ 400 chạy 1 s
+                        String out = LocalAdb.shell(command(mode, wake) + "\necho OK", 8000); // "off" chờ 400 chạy 1 s
                         if (!out.contains("OK")) throw new Exception("lights_test lỗi: " + out.trim());
+                        if (wake) wakeAt = 0;
                         shown = mode;
                         if (!lastError.isEmpty()) BotLog.i("Đèn LED hoạt động lại");
                         lastError = "";
@@ -130,17 +154,21 @@ final class Led {
         }
     }
 
-    /** Lệnh shell chuyển sang kiểu đèn mới; luôn dừng sao chổi cũ trước. */
-    private static String command(String mode) {
+    /** Lệnh shell chuyển sang kiểu đèn mới; luôn dừng sao chổi cũ trước. wake = quét sáng viền trước hiệu ứng nghe. */
+    private static String command(String mode, boolean wake) {
         String stop = STOP;
+        // Quét đánh thức: script tự dừng sau đúng 1 vòng (~0,5-1 s tuỳ tốc độ lights_test) nên không cần
+        // PID/STOPF như sao chổi. "set" từng đèn như sao chổi nên không huỷ hiệu ứng đèn trong; chạy sau
+        // INNER_OFF để đèn trong tắt sạch trước khi quét.
+        String sweepCmd = wake && sweep != null ? "; sh " + sweep.getAbsolutePath() : "";
         switch (mode) {
             // Viền TRƯỚC rồi mới hiệu ứng đèn trong: "set" CẢ VÒNG viền sau "show" sẽ huỷ hiệu ứng đèn trong (thử
             // trên loa: chỉ còn viền trắng); "set" từng đèn như sao chổi thì không huỷ. INNER_OFF (~150 ms) chạy
             // trước nên lệnh sót của sao chổi đã xong.
             case "listening":
-                return stop + INNER_OFF + "; lights_test set " + RING + " ffffff; lights_test show 203";
+                return stop + INNER_OFF + sweepCmd + "; lights_test set " + RING + " ffffff; lights_test show 501";
             case "speaking":
-                return stop + INNER_OFF + "; lights_test set " + RING + " ffffff; lights_test show 501";
+                return stop + INNER_OFF + "; lights_test set " + RING + " ffffff; lights_test show 203";
             case "error":
                 return stop + INNER_OFF + "; lights_test set " + RING + " 0; lights_test show 500";
             case "thinking":
@@ -179,11 +207,33 @@ final class Led {
         }
         sb.append("n=$((n+1))\ndone\nlights_test close 501\nlights_test set ").append(RING).append(" 0\nrm -f ")
           .append(STOPF).append(' ').append(PID).append('\n');
+        return writeScript(ctx, "led_comet.sh", sb.toString());
+    }
+
+    /**
+     * Script quét sáng đánh thức: đầu sáng chạy đúng 1 vòng viền với đuôi mờ ngắn (3 lệnh "set" mỗi bước
+     * nên nhanh hơn sao chổi), xong là trả lại lệnh cho app. Mở đầu bằng xoá viền cho sạch trường hợp
+     * trước đó viền còn sáng.
+     */
+    private static File writeSweep(Context ctx) throws Exception {
+        String[] tail = {"ffffff", "505050", "0"};
+        StringBuilder sb = new StringBuilder("lights_test set ").append(RING).append(" 0\n");
+        for (int k = 0; k < 24; k++) {
+            for (int t = tail.length - 1; t >= 0; t--) {
+                int led = (k - t + 24) % 24;
+                sb.append("lights_test set ").append(Long.toHexString(1L << (15 + led))).append(' ')
+                  .append(tail[t]).append(t == 0 ? "\n" : "; ");
+            }
+        }
+        return writeScript(ctx, "led_wake_sweep.sh", sb.toString());
+    }
+
+    private static File writeScript(Context ctx, String name, String body) throws Exception {
         File dir = ctx.getExternalCacheDir();
         if (dir == null) throw new Exception("không có bộ nhớ ngoài");
-        File f = new File(dir, "led_comet.sh");
+        File f = new File(dir, name);
         FileOutputStream os = new FileOutputStream(f);
-        os.write(sb.toString().getBytes("UTF-8"));
+        os.write(body.getBytes("UTF-8"));
         os.close();
         return f;
     }
