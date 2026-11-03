@@ -477,7 +477,7 @@ window.moManDangNhap = () => {
           <div class="title">Cài đặt</div>
           <!-- Như Pi: chỉ hiện trong app iOS (Capacitor) - quay về màn nhập địa chỉ để chọn loa / Pi khác -->
           <div class="right" id="settingsNavRight" style="display:none"><a href="#" class="link icon-only" id="btnDoiDiaChi"
-            title="Đổi địa chỉ Voicebot"><i class="icon f7-icons">arrow_right_arrow_left_square</i></a></div>
+            title="Đổi địa chỉ Voicebot"><i class="icon f7-icons">arrow_2_squarepath</i></a></div>
         </div></div>
         <div class="page-content"><div class="page-inner">
           <div class="card card-outline card-dividers">
@@ -926,6 +926,10 @@ const pickSkeleton = () => `<div class="list list-strong-ios list-dividers-ios i
 const app = new Framework7({
   // Kiểu giao diện iOS / Material chỉ đặt được lúc tạo app (trang Giao diện đổi thì tải lại trang)
   el: '#app', theme: docCaiDat(THEME_MODE_KEY) || 'ios', colors: { primary: '#2f80ed' }, routes,
+  // App iOS (Capacitor có window.cordova): mặc định F7 chờ "deviceready" mới init, mà script này tạo popup / view /
+  // searchbar ngay -> app.popup.create() ném lỗi, gãy cả phần sau (tab Chat, Thiết bị trắng). Trang loa không dùng
+  // plugin Cordova nào nên init ngay như trên Safari.
+  initOnDeviceReady: false,
   on: { pageInit(page) { if (PAGES[page.name]) initSubpage(page); } },
 });
 window.f7app = app; // baoLoi() của Pi dùng tên này
