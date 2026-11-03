@@ -924,9 +924,16 @@ const PAGES = {
       <div class="card-content"><div class="led-grid">
         ${LED_TESTS.map(([v, t]) => `<a href="#" class="button button-tonal" data-led="${v}">${t}</a>`).join('')}
       </div></div>
+      <div class="list list-outline-ios list-strong-ios list-dividers-ios" style="margin:0"><ul>
+        <li class="item-content item-input"><div class="item-inner">
+          <div class="item-title item-label">Độ sáng lưỡi liềm đánh thức</div>
+          <div class="item-input-wrap"><input type="text" id="ledWake" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="40 80 c0 ff ff ff c0 80 40" /></div>
+          <div class="item-footer">Mỗi số là 1 đèn của cung, 00 (tắt) … ff (sáng nhất), 1–23 số. Số đèn = độ dài lưỡi liềm.</div></div></li>
+      </ul></div>
+      <div class="block" style="margin:12px 0"><a href="#" class="button button-fill" id="ledWakeThu">Lưu và thử hiệu ứng đánh thức</a></div>
       <div class="card-footer"><span>Bấm một kiểu để giữ đèn ở kiểu đó; "Theo bot" để đèn đổi theo trạng thái bot. Rời trang này thì tự về "Theo bot".</span></div></div>`
     + list('Ý nghĩa', [
-      ['Đánh thức', 'vệt sáng quét một vòng viền'], ['Nghe', 'viền trắng + đèn trong thở xanh dương'],
+      ['Đánh thức', 'lưỡi liềm sáng xoay một vòng viền'], ['Nghe', 'viền trắng + đèn trong thở xanh dương'],
       ['Nghĩ', 'sao chổi chạy vòng + nhịp xanh lá'], ['Nói', 'viền trắng + đèn trong xanh lá'],
       ['Lỗi', 'đèn trong đỏ'], ['Tắt mic', 'đèn trong đỏ mờ'], ['Phát nhạc', 'viền nháy theo nhạc (nếu bật)'], ['Rảnh', 'tắt hết'],
     ].map(([a, b]) => `<li class="item-content"><div class="item-inner"><div class="item-title">${a}</div><div class="item-after">${b}</div></div></li>`))),
@@ -1159,6 +1166,18 @@ function initSubpage(page) {
         post('/api/config', { [k]: v }).then(() => { S.config[k] = v; toast((v === '1' ? 'Đã bật ' : 'Đã tắt ') + ten); });
       }));
     el.addEventListener('page:beforeremove', () => { if (cur) post('/api/led', { state: '' }); });
+    // Lưỡi liềm đánh thức: lưu mức sáng rồi chạy thử ngay trên loa (không cần gọi từ đánh thức)
+    const ow = el.querySelector('#ledWake');
+    ow.value = S.config.led_wake || '';
+    el.querySelector('#ledWakeThu').addEventListener('click', async e => {
+      e.preventDefault();
+      const v = ow.value.trim().toLowerCase().replace(/[^0-9a-f\s,]/g, '');
+      try {
+        if (v !== (S.config.led_wake || '')) { await post('/api/config', { led_wake: v }); S.config.led_wake = v; }
+        await post('/api/led', { state: 'wake' });
+        toast('Đang chạy thử trên loa');
+      } catch (err) {}
+    });
   }
   const mm = el.querySelector('#mwwModel');
   if (mm) {

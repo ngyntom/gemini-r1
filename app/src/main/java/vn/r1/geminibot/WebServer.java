@@ -272,6 +272,10 @@ class WebServer {
                 break;
             }
             case "/api/led": // thử đèn: {state: listening|thinking|speaking|error|paused|idle}, rỗng = theo bot
+                if ("wake".equals(req.optString("state"))) { // chạy lưỡi liềm đánh thức 1 lần, không đổi kiểu đèn đang giữ
+                    Led.testWake();
+                    break;
+                }
                 Led.test = req.optString("state", "").isEmpty() ? null : req.optString("state");
                 break;
             case "/api/wifi/connect": { // {ssid, password, secure}: đổi mạng, không vào được thì tự quay lại mạng cũ

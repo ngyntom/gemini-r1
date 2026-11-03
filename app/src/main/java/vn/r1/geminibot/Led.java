@@ -94,6 +94,24 @@ final class Led {
     private static String lastError = "";
     private static File comet;
     private static File sweep;
+    private static String sweepLevels = "";
+    private static Context appCtx;
+    /** Trang Đèn LED bấm "Thử hiệu ứng đánh thức": chạy lưỡi liềm ngay (không cần gọi loa) rồi về kiểu đèn hiện tại. */
+    private static volatile boolean testWake;
+
+    static void testWake() {
+        testWake = true;
+    }
+
+    /** Mức sáng trong cấu hình đổi thì dựng lại script (thử / đánh thức lần sau dùng ngay mức mới). */
+    private static void capNhatSweep() {
+        if (appCtx == null || Config.load(appCtx).ledWake.equals(sweepLevels)) return;
+        try {
+            sweep = writeSweep(appCtx);
+        } catch (Exception e) {
+            BotLog.w("Không tạo được hiệu ứng đánh thức: " + e.getMessage());
+        }
+    }
     private static File music;
     /** Đèn theo nhạc (Cài đặt → Đèn LED), xem MusicLight. */
     private static volatile boolean musicEnabled = true;
@@ -133,6 +151,7 @@ final class Led {
             BotLog.w("Không tạo được hiệu ứng sao chổi: " + e.getMessage());
         }
         try {
+            appCtx = ctx.getApplicationContext();
             sweep = writeSweep(ctx);
         } catch (Exception e) {
             BotLog.w("Không tạo được hiệu ứng quét đánh thức: " + e.getMessage());
@@ -161,12 +180,23 @@ final class Led {
                         lastOff = now;
                         shown = "off";
                     }
+                    if (testWake) {
+                        testWake = false;
+                        capNhatSweep();
+                        if (sweep != null) {
+                            String out = LocalAdb.shell(STOP + INNER_OFF + "; sh " + sweep.getAbsolutePath() + "; "
+                                    + RING_WHITE + "; sleep 1\necho OK", 8000);
+                            if (!out.contains("OK")) throw new Exception("lights_test lỗi: " + out.trim());
+                        }
+                        shown = ""; // vẽ lại kiểu đèn hiện tại sau khi thử
+                    }
                     if (!mode.equals(shown)) {
                         // Quét sáng viền khi vào "listening" ngay sau từ đánh thức (cờ đặt trước khi BotService
                         // đổi trạng thái nên tới đây chắc chắn thấy). Cửa sổ 2,5 s: lần nghe tiếp theo (follow-up)
                         // hay bật đèn lại sau đó thì không quét; lệnh lỗi thì cờ còn nguyên -> quét lại khi thử lại.
                         boolean wake = wakeAt != 0 && test == null && "listening".equals(mode)
                                 && System.currentTimeMillis() - wakeAt < 2500;
+                        if (wake) capNhatSweep();
                         // Xuống dòng, không dùng ";": lệnh "nghĩ" kết thúc bằng "&" và "& ;" là lỗi cú pháp sh
                         String out = LocalAdb.shell(command(mode, wake) + "\necho OK", 8000); // quét đánh thức chạy ~1 s
                         if (!out.contains("OK")) throw new Exception("lights_test lỗi: " + out.trim());
@@ -280,26 +310,28 @@ final class Led {
      * Script quét sáng đánh thức: đầu sáng chạy đúng 1 vòng viền với đuôi mờ ngắn (~1 s/vòng,
      * thử trên loa), tự kết thúc nên không cần PID/STOPF. Mở đầu bằng xoá viền cho sạch.
      */
-    /** Số đèn của lưỡi liềm đánh thức (đã duyệt trên bản mô phỏng: 9 đèn, ~45 ms / bước, xoay xong viền sáng trắng). */
-    private static final int CRESCENT = 9;
-
     /**
      * Đánh thức: lưỡi liềm sáng (dày giữa, nhọn dần 2 đầu) xoay đúng 1 vòng theo chiều kim đồng hồ rồi dừng; lệnh
      * "listening" ngay sau đó bật cả viền trắng. Mỗi bước ghi lại 9 đèn của cung + tắt đèn vừa ra khỏi đuôi (các lần
      * ghi cộng dồn nên đèn khác giữ nguyên); 10 lần ghi + PACE ~ 45 ms / bước, 24 bước ~ 1,1 s.
      */
     private static File writeSweep(Context ctx) throws Exception {
-        String[] muc = new String[CRESCENT];
-        double giua = (CRESCENT - 1) / 2.0;
-        for (int i = 0; i < CRESCENT; i++) {
-            int v = (int) Math.round(255 * Math.pow(1 - Math.abs(i - giua) / (giua + 1), 1.6));
-            String h = String.format(java.util.Locale.US, "%02x", v);
-            muc[i] = h + h + h;
+        // Mức sáng lấy từ cấu hình (trang Đèn LED): 1..23 số hex. Bản đầu dùng đường cong mờ rất nhanh về 2 đầu
+        // (13 3b 71 b2 ff...): đèn thật dưới ~25% gần như tắt nên nhìn chỉ còn 2-3 đèn, giống vệt quét cũ.
+        List<String> muc = new ArrayList<>();
+        for (String t : Config.load(ctx).ledWake.toLowerCase().split("[\\s,]+")) {
+            if (t.matches("[0-9a-f]{1,2}") && muc.size() < 23) { // 24 thì đèn tắt đuôi trùng đèn đầu cung
+                String h = t.length() == 1 ? "0" + t : t;
+                muc.add(h + h + h);
+            }
         }
+        if (muc.isEmpty()) for (String t : Config.LED_WAKE_MAC_DINH.split(" ")) muc.add(t + t + t);
+        final int CRESCENT = muc.size();
+        sweepLevels = Config.load(ctx).ledWake;
         StringBuilder sb = new StringBuilder(RING_OFF).append('\n');
         for (int b = 0; b < 24; b++) {
             for (int i = 0; i < CRESCENT; i++) {
-                sb.append(setLed(RING_COLOR, 16 + ((b - (CRESCENT - 1) + i) % 24 + 24) % 24, muc[i])).append('\n');
+                sb.append(setLed(RING_COLOR, 16 + ((b - (CRESCENT - 1) + i) % 24 + 24) % 24, muc.get(i))).append('\n');
             }
             sb.append(setLed(RING_COLOR, 16 + ((b - CRESCENT) % 24 + 24) % 24, "000000")).append('\n');
             sb.append(PACE).append('\n');
