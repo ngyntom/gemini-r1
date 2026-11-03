@@ -176,6 +176,18 @@ class WebServer {
             }
             return;
         }
+        // Như /api/ping của Voicebot trên Pi: màn nhập địa chỉ của app iOS (Capacitor) gọi fetch() chế độ
+        // "cors" để biết Web UI đang chạy trước khi mở trang - cần JSON + CORS mở, thiếu thì app báo lỗi
+        if (method.equals("GET") && path.equals("/api/ping")) {
+            byte[] b = new JSONObject().put("ok", true).put("ten", Group.deviceName()).toString().getBytes("UTF-8");
+            OutputStream out = s.getOutputStream();
+            out.write(("HTTP/1.1 200 OK\r\nContent-Type: application/json; charset=utf-8\r\nContent-Length: " + b.length
+                    + "\r\nAccess-Control-Allow-Origin: *\r\nCache-Control: no-store\r\nConnection: close\r\n\r\n")
+                    .getBytes("UTF-8"));
+            out.write(b);
+            out.flush();
+            return;
+        }
         // Nhóm loa: loa khác hỏi tên / phiên bản (lúc tìm loa), và tìm các loa R1 khác trong mạng
         if (method.equals("GET") && path.equals("/api/group/info")) {
             sendJson(s, 200, new JSONObject().put("ten", Group.deviceName())

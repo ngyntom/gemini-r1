@@ -2,7 +2,12 @@
 <html lang="vi">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no, viewport-fit=cover">
+<!-- Như Pi: "Thêm vào MH chính" trên iPhone mở thành app riêng (standalone), app.css hạ tabbar cho chế độ này -->
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Gemini R1">
+<meta name="mobile-web-app-capable" content="yes">
 <meta name="theme-color" content="#f2f2f7">
 <title>Gemini R1</title>
 <!-- Giao diện theo kiểu Voicebot trên Pi: Framework7 (theme iOS) + F7 Icons, tải từ CDN
@@ -28,6 +33,11 @@
     #mobile-tabbar { display: none !important; }
     .page-content { --chat-bar-bottom: 0px; }
   }
+  /* app.css của Pi hạ tabbar 50px (.toolbar-pane margin-bottom:-50px) khi chạy như app: thêm vào MH chính
+     (standalone) hoặc trong app iOS Capacitor (F7 tự gắn html.device-capacitor). Ô chat của loa (.chat-bar,
+     Pi dùng .messagebar) hạ theo cùng khoảng, kẻo nổi lệch cao hơn tabbar. */
+  @media (display-mode: standalone) { #view-chat .chat-bar { --chat-bar-ha: 50px; } }
+  html.device-capacitor #view-chat .chat-bar { --chat-bar-ha: 50px; }
   #sidebar .menu-list li { margin-bottom: 4px; }
   #sidebar .item-subtitle { font-size: 12px; opacity: .65; white-space: normal; }
 
@@ -49,7 +59,7 @@
   .chat-empty { text-align: center; opacity: .55; margin-top: 30vh; }
   .chat-bar { position: absolute; left: 0; right: 0; z-index: 20; padding: 8px 12px;
               bottom: calc(var(--chat-bar-bottom, calc(var(--f7-toolbar-height, 50px) + var(--f7-safe-area-bottom) + 14px))
-                      + var(--mini-player-offset, 0px)); /* mini player (app.css của Pi) chiếm chỗ trên tabbar */
+                      + var(--mini-player-offset, 0px) - var(--chat-bar-ha, 0px)); /* mini player (app.css của Pi) chiếm chỗ trên tabbar */
               display: flex; gap: 8px; align-items: center; max-width: 760px; margin: 0 auto; }
   .chat-bar input { flex: 1; min-width: 0; height: 42px; border-radius: 21px; padding: 0 16px; font-size: 16px;
                     background: var(--f7-list-bg-color, #fff); color: inherit;
