@@ -8,6 +8,14 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Gemini R1">
 <meta name="mobile-web-app-capable" content="yes">
+<!-- manifest "display: standalone" (như Pi): web app trên MH chính mới khớp @media (display-mode: standalone)
+     của app.css - luật hạ tabbar 50px; thiếu manifest thì tabbar web app nằm cao như trong Safari -->
+<link rel="manifest" href="/static/manifest.json">
+<link rel="apple-touch-icon" href="/static/icons/icon-180.png">
+<link rel="apple-touch-icon" sizes="152x152" href="/static/icons/icon-152.png">
+<link rel="apple-touch-icon" sizes="167x167" href="/static/icons/icon-167.png">
+<link rel="apple-touch-icon" sizes="120x120" href="/static/icons/icon-120.png">
+<link rel="icon" type="image/png" sizes="32x32" href="/static/icons/icon-32.png">
 <meta name="theme-color" content="#f2f2f7">
 <title>Gemini R1</title>
 <!-- Giao diện theo kiểu Voicebot trên Pi: Framework7 (theme iOS) + F7 Icons, tải từ CDN
@@ -111,7 +119,8 @@
 </style>
 </head>
 <body>
-<div id="app">
+<!-- Như Pi: class "safe-areas" của F7 9 bật vùng an toàn (notch / Dynamic Island / vạch home) cho mọi phần tử -->
+<div id="app" class="safe-areas">
 
   <!-- Menu trái (máy tính) - cùng kiểu Menu List của F7 như Voicebot trên Pi -->
   <div class="list media-list menu-list no-hairlines" id="sidebar">

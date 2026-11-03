@@ -146,7 +146,9 @@ class WebServer {
         // Trang Nhạc (chép từ Voicebot trên Pi) và CSS của nó: assets/web/static/...
         if (method.equals("GET") && path.startsWith("/static/") && !path.contains("..")) {
             String type = path.endsWith(".css") ? "text/css; charset=utf-8"
-                    : path.endsWith(".js") ? "application/javascript; charset=utf-8" : "text/html; charset=utf-8";
+                    : path.endsWith(".js") ? "application/javascript; charset=utf-8"
+                    : path.endsWith(".png") ? "image/png"
+                    : path.endsWith(".json") ? "application/manifest+json; charset=utf-8" : "text/html; charset=utf-8";
             try {
                 send(s, 200, type, readAsset("web" + path));
             } catch (IOException e) {

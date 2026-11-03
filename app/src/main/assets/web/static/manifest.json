@@ -1,0 +1,12 @@
+{
+  "name": "Gemini R1",
+  "short_name": "Gemini R1",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#2f80ed",
+  "theme_color": "#2f80ed",
+  "icons": [
+    { "src": "/static/icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/static/icons/icon-512.png", "sizes": "512x512", "type": "image/png" }
+  ]
+}
