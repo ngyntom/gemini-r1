@@ -89,6 +89,12 @@ final class Group {
         return "Phicomm R1";
     }
 
+    /** Tên người dùng đặt cho loa (Cài đặt, ô đầu trang), chưa đặt thì tên Bluetooth "Phicomm R1 9457". */
+    static String displayName(Context ctx) {
+        String t = Config.load(ctx).tenHienThi;
+        return t.isEmpty() ? deviceName().replace('_', ' ') : t;
+    }
+
     /** IP các loa trong nhóm (đặt trên Web UI, khoá group_members). */
     List<String> members() {
         List<String> out = new ArrayList<>();

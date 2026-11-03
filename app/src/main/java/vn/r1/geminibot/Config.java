@@ -15,7 +15,7 @@ public class Config {
     static final String[] KEYS = {"api_key", "model", "tts_model", "voice", "wake_engine",
             "mww_model", "mww_cutoff", "wake_word", "follow_up", "persona", "mic_gain",
             "tts_engine", "google_voice", "google_tts_key", "tts_rate", "led", "wake_sound", "wake_reply", "local_time",
-            "ha_url", "ha_token", "stt_engine", "live", "live_model", "live_idle", "gcloud_sa", "search", "city", "barge_in", "bot_self", "user_call", "group_members", "group_stereo", "music_led", "music_led_inner", "ha_dash_order", "ha_dash_icons", "ha_notify"};
+            "ha_url", "ha_token", "stt_engine", "live", "live_model", "live_idle", "gcloud_sa", "search", "city", "barge_in", "bot_self", "user_call", "group_members", "group_stereo", "music_led", "music_led_inner", "ha_dash_order", "ha_dash_icons", "ha_notify", "ten_hien_thi"};
 
     public String apiKey;
     public String model;
@@ -65,6 +65,8 @@ public class Config {
     public String haToken;
     /** Dịch vụ notify của HA gửi mã quên mật khẩu Web UI (vd. mobile_app_iphone), như HA_NOTIFY_SERVICE của Pi. */
     public String haNotify;
+    /** Tên hiển thị của loa (vd. "Loa phòng khách"): rỗng = tên Bluetooth. Xem Group.displayName. */
+    public String tenHienThi;
 
     /** "google" = Cloud Speech-to-Text rồi gửi chữ cho Gemini; "gemini" = gửi audio cho Gemini nghe. */
     public String sttEngine;
@@ -158,6 +160,7 @@ public class Config {
         c.haToken = p.getString("ha_token", "").trim();
         c.haNotify = p.getString("ha_notify", "notify").trim().replaceFirst("^notify\\.", "");
         if (c.haNotify.isEmpty()) c.haNotify = "notify";
+        c.tenHienThi = p.getString("ten_hien_thi", "").trim();
         c.gcloudSa = p.getString("gcloud_sa", "").trim();
         try {
             c.haDevices = new JSONObject(p.getString("ha_devices", "{}"));
@@ -228,6 +231,7 @@ public class Config {
                 .put("ha_url", c.haUrl)
                 .put("ha_token_set", !c.haToken.isEmpty())
                 .put("ha_notify", c.haNotify)
+                .put("ten_hien_thi", c.tenHienThi)
                 .put("gcloud_sa_email", c.gcloudSa.isEmpty() ? "" : GoogleAuth.email(c.gcloudSa))
                 .put("ha_selected", c.haDevices.length())
                 .put("stt_engine", c.sttEngine)

@@ -110,6 +110,18 @@ window.moManDangNhap = () => {
   .upd-steps .xong .icon { color: #34c759; }
   .upd-steps .loi .icon { color: #ff3b30; }
   #sidebar .menu-list li { margin-bottom: 4px; }
+  /* Thẻ "đang điều khiển loa nào" đầu trang Cài đặt */
+  .thiet-bi-dang-mo { display: flex; align-items: center; gap: 14px; padding: 14px 16px; color: inherit; }
+  .thiet-bi-dang-mo .tb-icon { flex: none; width: 52px; height: 52px; border-radius: 14px; display: flex; align-items: center;
+    justify-content: center; color: #fff; background: linear-gradient(135deg, #5ed38b, #1f9d55); } /* xanh lá = loa R1, như app iOS */
+  .thiet-bi-dang-mo .tb-icon i { font-size: 28px; }
+  .thiet-bi-dang-mo .tb-chu { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+  .thiet-bi-dang-mo .tb-ten { font-size: calc(19px * var(--ty-le-co-chu, 1)); font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .thiet-bi-dang-mo .tb-dia-chi { font-size: calc(13px * var(--ty-le-co-chu, 1)); color: var(--f7-list-item-footer-text-color);
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .thiet-bi-dang-mo .tb-phu { display: flex; align-items: center; gap: 6px; font-size: calc(13px * var(--ty-le-co-chu, 1));
+    color: var(--f7-list-item-footer-text-color); }
+  .thiet-bi-dang-mo .tb-sua { flex: none; font-size: 18px; opacity: .45; }
   /* Dòng mô tả dưới tên mục: như Pi (.item-footer trong settings.html) - chữ nhỏ màu xám mờ của F7, không đậm như
      .item-subtitle mặc định. Menu trái máy tính: 13px như #desktop-sidebar của Pi, mục đang chọn cũng giữ màu xám. */
   .list .item-subtitle { font-size: var(--f7-list-item-footer-font-size); line-height: 1.35;
@@ -268,7 +280,7 @@ window.moManDangNhap = () => {
 
   <!-- Menu trái (máy tính) - cùng kiểu Menu List của F7 như Voicebot trên Pi -->
   <div class="list media-list menu-list no-hairlines" id="sidebar">
-    <div class="brand">Phicomm R1 <span class="state-chip muted" style="float:right"><span class="dot" data-state-dot></span><span data-state-text>…</span></span></div>
+    <div class="brand"><span id="sidebarTen">Phicomm R1</span> <span class="state-chip muted" style="float:right"><span class="dot" data-state-dot></span><span data-state-text>…</span></span></div>
     <ul>
       <li><a href="#view-chat" class="item-content item-link tab-link tab-link-active">
         <div class="item-media"><i class="icon f7-icons">chat_bubble_2_fill</i></div>
@@ -455,7 +467,7 @@ window.moManDangNhap = () => {
               <li class="item-content"><div class="item-media"><i class="icon f7-icons">airplayaudio</i></div>
                 <div class="item-inner"><div class="item-title">AirPlay + DLNA<div class="item-footer" id="airplaySub">Phát nhạc từ iPhone / máy tính / app nhiều loa</div></div>
                   <div class="item-after"><label class="toggle"><input type="checkbox" id="airplayToggle"><span class="toggle-icon"></span></label></div></div></li>
-              <li class="item-content"><div class="item-media"><svg class="icon" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6.5 6.5l11 11L12 23V1l5.5 5.5-11 11"/></svg></div>
+              <li class="item-content"><div class="item-media"><i class="icon f7-icons">dot_radiowaves_left_right</i></div>
                 <div class="item-inner"><div class="item-title">Bluetooth</div>
                   <div class="item-after"><label class="toggle"><input type="checkbox" id="btToggle"><span class="toggle-icon"></span></label></div></div></li>
               <li><a href="#" class="item-link item-content" id="btnListen"><div class="item-media"><i class="icon f7-icons">mic_circle_fill</i></div>
@@ -526,6 +538,17 @@ window.moManDangNhap = () => {
             title="Đổi địa chỉ Voicebot"><i class="icon f7-icons">arrow_2_squarepath</i></a></div>
         </div></div>
         <div class="page-content"><div class="page-inner">
+          <!-- Đang điều khiển loa nào: tên (chạm để đổi), địa chỉ đang mở, phiên bản, trạng thái - phân biệt khi
+               có nhiều loa / Pi trong app iOS -->
+          <a href="#" class="card card-outline thiet-bi-dang-mo" id="tbDangMo">
+            <span class="tb-icon"><i class="icon f7-icons">hifispeaker_fill</i></span>
+            <span class="tb-chu">
+              <span class="tb-ten" id="tbTen">Phicomm R1</span>
+              <span class="tb-dia-chi" id="tbDiaChi"></span>
+              <span class="tb-phu"><span class="dot" data-state-dot></span><span data-state-text>…</span><span id="tbPhienBan"></span></span>
+            </span>
+            <i class="icon f7-icons tb-sua">pencil</i>
+          </a>
           <div class="card card-outline card-dividers">
             <div class="card-header"><span>Trợ lý</span><span style="display:flex;align-items:center;gap:8px;font-weight:400;font-size:14px;color:var(--f7-text-color)">Nghe từ đánh thức <label class="toggle"><input type="checkbox" id="runToggle2"><span class="toggle-icon"></span></label></span></div>
             <div class="card-content"><div class="list list-outline-ios list-strong-ios list-dividers-ios media-list" style="margin:0"><ul>
@@ -1626,6 +1649,12 @@ async function refresh() {
     if (S.wifi_switch) $('wifiMsg').textContent = S.wifi_switch_msg;
     // Tên thiết bị thay cho "Loa này": "Phicomm_R1_9457" -> "Phicomm R1 9457"
     if (S.device_name) { const ten = S.device_name.replace(/_/g, ' '); $('speakerTitle').textContent = ten; $('speakerItem').textContent = ten; }
+    // Tên hiển thị (người dùng đặt, chưa đặt = tên Bluetooth): thẻ đầu Cài đặt, menu trái, màn đăng nhập, tiêu đề tab
+    if (S.ten) {
+      ['tbTen', 'sidebarTen', 'login-ten-loa'].forEach(id => $(id).textContent = S.ten);
+      document.title = S.ten;
+    }
+    $('tbPhienBan').textContent = '· v' + S.version;
     if (!extrasPending) { $('airplayToggle').checked = !!S.airplay; $('btToggle').checked = !!S.bluetooth; }
     $('airplaySub').textContent = S.extras_busy || 'Phát nhạc từ iPhone / máy tính / app nhiều loa';
     const log = $('log'), atBottom = log.scrollTop + log.clientHeight >= log.scrollHeight - 10;
@@ -1672,6 +1701,15 @@ async function loadAuth() {
 }
 loadAuth();
 fetch('/api/ping').then(r => r.json()).then(j => { if (j.ten) $('login-ten-loa').textContent = j.ten.replace(/_/g, ' '); }).catch(() => {});
+
+// Thẻ đầu Cài đặt: địa chỉ đang mở (IP trong nhà hay tên miền ngoài) + đổi tên hiển thị của loa
+$('tbDiaChi').textContent = location.host;
+$('tbDangMo').addEventListener('click', e => {
+  e.preventDefault();
+  app.dialog.prompt('Tên hiện trong app, màn đăng nhập và Nhóm loa. Để trống = tên Bluetooth.', 'Tên loa', async ten => {
+    try { await post('/api/config', { ten_hien_thi: ten.trim() }); toast('Đã đổi tên loa'); refresh(); } catch (e) {}
+  }, null, (S && S.config && S.config.ten_hien_thi) || '');
+});
 
 // Quên mật khẩu (như Pi): bước 1 xin mã qua thông báo HA, bước 2 nhập mã + mật khẩu mới -> loa đặt cookie, tải lại là vào
 const forgotPopup = app.popup.create({ el: '#login-forgot-popup' });

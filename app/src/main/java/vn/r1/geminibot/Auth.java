@@ -200,7 +200,7 @@ final class Auth {
             lastCodeSent = now;
         }
         try {
-            HomeAssistant.notify(c, "Mã đặt lại mật khẩu Web UI của loa: " + ma + " (hết hạn sau 5 phút)");
+            HomeAssistant.notify(c, Group.displayName(ctx), "Mã đặt lại mật khẩu Web UI của loa: " + ma + " (hết hạn sau 5 phút)");
         } catch (Exception e) {
             synchronized (Auth.class) {
                 code = null;

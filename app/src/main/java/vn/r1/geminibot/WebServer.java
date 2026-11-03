@@ -174,7 +174,8 @@ class WebServer {
         // Như /api/ping của Voicebot trên Pi: màn nhập địa chỉ của app iOS (Capacitor) gọi fetch() chế độ
         // "cors" để biết Web UI đang chạy trước khi mở trang - cần JSON + CORS mở, thiếu thì app báo lỗi
         if (method.equals("GET") && path.equals("/api/ping")) {
-            byte[] b = new JSONObject().put("ok", true).put("ten", Group.deviceName()).toString().getBytes("UTF-8");
+            byte[] b = new JSONObject().put("ok", true).put("ten", Group.displayName(bot))
+                    .put("loai", "r1").put("bt", Group.deviceName()).toString().getBytes("UTF-8");
             OutputStream out = s.getOutputStream();
             out.write(("HTTP/1.1 200 OK\r\nContent-Type: application/json; charset=utf-8\r\nContent-Length: " + b.length
                     + "\r\nAccess-Control-Allow-Origin: *\r\nCache-Control: no-store\r\nConnection: close\r\n\r\n")
@@ -185,7 +186,7 @@ class WebServer {
         }
         // Nhóm loa: loa khác hỏi tên / phiên bản (lúc tìm loa), và tìm các loa R1 khác trong mạng
         if (method.equals("GET") && path.equals("/api/group/info")) {
-            sendJson(s, 200, new JSONObject().put("ten", Group.deviceName())
+            sendJson(s, 200, new JSONObject().put("ten", Group.displayName(bot))
                     .put("version", bot.getPackageManager().getPackageInfo(bot.getPackageName(), 0).versionName));
             return;
         }
@@ -432,6 +433,7 @@ class WebServer {
                 .put("paused", bot.isPaused())
                 .put("led_test", Led.test == null ? "" : Led.test)
                 .put("device_name", Group.deviceName()) // tên Bluetooth của loa, vd. Phicomm_R1_9457
+                .put("ten", Group.displayName(bot))     // tên hiển thị (người dùng đặt) hoặc tên Bluetooth
                 .put("airplay", Extras.airplayOn(bot))
                 .put("bluetooth", Extras.bluetoothOn())
                 .put("extras_busy", Extras.busy)
