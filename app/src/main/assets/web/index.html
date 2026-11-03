@@ -112,9 +112,8 @@ window.moManDangNhap = () => {
   #sidebar .menu-list li { margin-bottom: 4px; }
   /* Thẻ "đang điều khiển loa nào" đầu trang Cài đặt */
   .thiet-bi-dang-mo { display: flex; align-items: center; gap: 14px; padding: 14px 16px; color: inherit; }
-  .thiet-bi-dang-mo .tb-icon { flex: none; width: 52px; height: 52px; border-radius: 14px; display: flex; align-items: center;
-    justify-content: center; color: #fff; background: linear-gradient(135deg, #5ed38b, #1f9d55); } /* xanh lá = loa R1, như app iOS */
-  .thiet-bi-dang-mo .tb-icon i { font-size: 28px; }
+  /* Icon "R1" của loa - cùng icon app iOS dùng cho loa trong danh sách thiết bị */
+  .thiet-bi-dang-mo .tb-icon { flex: none; width: 52px; height: 52px; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,.15); }
   .thiet-bi-dang-mo .tb-chu { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
   .thiet-bi-dang-mo .tb-ten { font-size: calc(19px * var(--ty-le-co-chu, 1)); font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .thiet-bi-dang-mo .tb-dia-chi { font-size: calc(13px * var(--ty-le-co-chu, 1)); color: var(--f7-list-item-footer-text-color);
@@ -541,7 +540,7 @@ window.moManDangNhap = () => {
           <!-- Đang điều khiển loa nào: tên (chạm để đổi), địa chỉ đang mở, phiên bản, trạng thái - phân biệt khi
                có nhiều loa / Pi trong app iOS -->
           <a href="#" class="card card-outline thiet-bi-dang-mo" id="tbDangMo">
-            <span class="tb-icon"><i class="icon f7-icons">hifispeaker_fill</i></span>
+            <img class="tb-icon" src="/static/icons/icon-120.png" alt="" />
             <span class="tb-chu">
               <span class="tb-ten" id="tbTen">Phicomm R1</span>
               <span class="tb-dia-chi" id="tbDiaChi"></span>
