@@ -11,8 +11,8 @@ android {
         // Phicomm R1 chạy Android 5.1 (API 22)
         minSdk 21
         targetSdk 22
-        versionCode 62
-        versionName '1.61'
+        versionCode 63
+        versionName '1.62'
         // R1 dùng chip RK3229 (ARMv7) – bỏ các ABI khác cho APK nhẹ
         ndk { abiFilters 'armeabi-v7a' }
     }

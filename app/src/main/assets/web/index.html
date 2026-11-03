@@ -97,7 +97,9 @@ window.moManDangNhap = () => {
   .upd-ver-so { font-size: 28px; font-weight: 700; line-height: 1.1; }
   .upd-drop { display: flex; flex-direction: column; align-items: center; gap: 6px; margin: 0 16px; padding: 26px 16px;
               border: 2px dashed rgba(120,120,128,.35); border-radius: 18px; text-align: center; cursor: pointer;
-              background: var(--f7-list-bg-color, #fff); }
+              background: var(--f7-card-bg-color, #fff); }
+  /* Nền ô kéo thả, ô chat, nút tròn: --f7-card-bg-color (F7 khai báo ở gốc, đổi theo sáng / tối). --f7-list-bg-color
+     KHÔNG có ở gốc -> luôn rơi về #fff -> giao diện tối thành chữ trắng trên nền trắng */
   .upd-drop input { display: none; }
   .upd-drop > .icon { font-size: 40px; color: var(--f7-theme-color); }
   .upd-drop.co-file { border-style: solid; border-color: var(--f7-theme-color); }
@@ -154,10 +156,10 @@ window.moManDangNhap = () => {
                       + var(--mini-player-offset, 0px)); /* mini player (app.css của Pi) chiếm chỗ trên tabbar */
               display: flex; gap: 8px; align-items: center; max-width: 760px; margin: 0 auto; }
   .chat-bar input { flex: 1; min-width: 0; height: 42px; border-radius: 21px; padding: 0 16px; font-size: 16px;
-                    background: var(--f7-list-bg-color, #fff); color: inherit;
+                    background: var(--f7-card-bg-color, #fff); color: inherit;
                     box-shadow: 0 2px 10px rgba(0,0,0,.12); border: none; outline: none; }
   .round-btn { flex: none; width: 42px; height: 42px; border-radius: 50%; display: flex; align-items: center;
-               justify-content: center; background: var(--f7-list-bg-color, #fff); color: var(--f7-theme-color);
+               justify-content: center; background: var(--f7-card-bg-color, #fff); color: var(--f7-theme-color);
                box-shadow: 0 2px 10px rgba(0,0,0,.12); }
   .round-btn.fill { background: var(--f7-text-color, #000); color: var(--f7-page-bg-color, #fff); }
   .round-btn i { font-size: 22px; }
@@ -1476,7 +1478,7 @@ function renderDevices() {
           <div class="ha-dash-name">${esc(d.name)}</div><div class="ha-dash-state">${esc(stateText(d))}</div></div>`;
       }).join('') +
       `</div></div>${sua ? '<p class="card-note">Chạm ô để đổi tên / icon, ✕ để bỏ khỏi bot. Bấm ✓ khi xong.</p>' : ''}</div>`;
-  }).join('') + '<div class="block-footer">Giữ lâu một ô để đổi tên gọi khác và icon.</div>';
+  }).join('');
   root.querySelectorAll('[data-sua]').forEach(a => a.addEventListener('click', e => {
     e.preventDefault();
     const dm = a.dataset.sua;
