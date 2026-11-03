@@ -49,6 +49,8 @@ final class Group {
     /** Phát sau lúc nhận PCM chừng này: đủ cho mạng Wi-Fi + đệm AudioTrack. */
     private static final long LEAD_NS = 700_000_000L;
     private static final byte HELLO = 1, AUDIO = 2, FLUSH = 3, END = 4;
+    /** Âm lượng loa chủ (1 byte 0..100 %): loa thành viên đặt theo - cả nhóm cùng mức với loa chủ. */
+    private static final byte VOLUME = 5;
     private static final int ROLE_MIX = 0, ROLE_LEFT = 1, ROLE_RIGHT = 2;
 
     private static Group instance;
@@ -108,10 +110,14 @@ final class Group {
         List<String> m = members();
         if (!m.isEmpty()) {
             a.put(new JSONObject().put("entity", "nhom").put("loai", "speaker")
-                    .put("ten", "Nhóm loa (" + (m.size() + 1) + " loa" + (Config.load(ctx).groupStereo ? ", stereo" : "") + ")"));
+                    .put("ten", tenNhom()));
         }
         for (String ip : m) a.put(new JSONObject().put("entity", "loa:" + ip).put("loai", "speaker").put("ten", "Loa " + ip));
         return a;
+    }
+
+    private String tenNhom() {
+        return "Nhóm loa (" + (members().size() + 1) + " loa" + (Config.load(ctx).groupStereo ? ", stereo" : "") + ")";
     }
 
     String target() {
@@ -121,7 +127,9 @@ final class Group {
     String targetName() {
         String t = target;
         if (t == null) return null;
-        if (t.equals("nhom")) return "Nhóm loa";
+        // Cùng chữ với mục trong danh sách chọn nơi phát (targets): trang Nhạc chờ trạng thái báo ĐÚNG tên đó mới tắt
+        // vòng xoay "đang chuyển" - trước là "Nhóm loa" khác "Nhóm loa (2 loa)" nên nút Phát xoay mãi dù đã hát
+        if (t.equals("nhom")) return tenNhom();
         return "Loa " + t.substring(4);
     }
 
@@ -192,7 +200,7 @@ final class Group {
         if (target.equals("nhom")) ips.addAll(members());
         else ips.add(target.substring(4));
         for (int i = 0; i < ips.size(); i++) {
-            peers.add(new Peer(ips.get(i), stereo && i == 0 ? ROLE_RIGHT : ROLE_MIX));
+            peers.add(new Peer(ctx, ips.get(i), stereo && i == 0 ? ROLE_RIGHT : ROLE_MIX));
         }
     }
 
@@ -207,13 +215,15 @@ final class Group {
 
     /** Một loa thành viên: hàng gửi riêng + luồng gửi riêng, mất kết nối thì tự nối lại. */
     private static final class Peer {
+        final Context ctx;
         final String ip;
         final int role;
         final LinkedBlockingQueue<Object[]> q = new LinkedBlockingQueue<>();
         volatile boolean closed;
         private boolean warned;
 
-        Peer(String ip, int role) {
+        Peer(Context ctx, String ip, int role) {
+            this.ctx = ctx;
             this.ip = ip;
             this.role = role;
             new Thread(this::run, "group-send-" + ip).start();
@@ -236,10 +246,25 @@ final class Group {
                     s.setTcpNoDelay(true);
                     DataOutputStream out = new DataOutputStream(new BufferedOutputStream(s.getOutputStream(), 65536));
                     int sentRate = -1, sentCh = -1;
+                    int sentVol = -1;      // -1: vừa nối -> gửi ngay để loa thành viên khớp âm lượng loa chủ
+                    long volCheckedAt = 0;
                     if (warned) BotLog.i("Nhóm loa: đã nối lại " + ip);
                     warned = false;
                     while (true) {
-                        Object[] m = q.poll(1, TimeUnit.SECONDS);
+                        // Đọc âm lượng loa chủ ~3 lần / giây, đổi thì gửi: bắt được MỌI cách chỉnh (web, app, giọng nói,
+                        // nút trên loa) mà không phải sửa từng chỗ chỉnh âm lượng
+                        long now = System.currentTimeMillis();
+                        if (now - volCheckedAt > 300) {
+                            volCheckedAt = now;
+                            int vol = Music.get(ctx).volume();
+                            if (vol != sentVol) {
+                                out.writeByte(VOLUME);
+                                out.writeByte(vol);
+                                out.flush();
+                                sentVol = vol;
+                            }
+                        }
+                        Object[] m = q.poll(300, TimeUnit.MILLISECONDS);
                         if (closed && m == null) break;
                         if (m == null) {
                             out.writeByte(0); // giữ kết nối
@@ -325,6 +350,12 @@ final class Group {
                     }
                     long local = clock.toLocal(playAt);
                     if (local != Long.MIN_VALUE) p.enqueue(local, pcm, rate, ch, role);
+                } else if (type == VOLUME) {
+                    int vol = in.readUnsignedByte();
+                    if (vol != Music.get(ctx).volume()) {
+                        Music.get(ctx).setVolume(vol);
+                        BotLog.i("Nhóm loa: âm lượng theo loa chủ " + vol + "%");
+                    }
                 } else if (type == FLUSH) {
                     if (p != null) p.flush(rate, ch);
                 } else if (type == END) {
