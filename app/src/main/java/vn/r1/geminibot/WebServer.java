@@ -18,6 +18,7 @@ import java.net.Socket;
 import java.net.URLDecoder;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.zip.GZIPOutputStream;
 
 /**
  * Web UI điều khiển bot trong mạng LAN: http://<IP của R1>:8088
@@ -123,6 +124,7 @@ class WebServer {
                 }
             }
             if (MusicApi.handle(bot, s, method, path, query, headers, body)) return;
+            if (method.equals("GET") && serveAsset(s, path, headers)) return;
             route(s, method, path, query, body);
         } catch (Exception e) {
             try {
@@ -139,23 +141,6 @@ class WebServer {
 
     private void route(Socket s, String method, String path, Map<String, String> query, byte[] body)
             throws Exception {
-        if (method.equals("GET") && (path.equals("/") || path.equals("/index.html"))) {
-            send(s, 200, "text/html; charset=utf-8", readAsset("web/index.html"));
-            return;
-        }
-        // Trang Nhạc (chép từ Voicebot trên Pi) và CSS của nó: assets/web/static/...
-        if (method.equals("GET") && path.startsWith("/static/") && !path.contains("..")) {
-            String type = path.endsWith(".css") ? "text/css; charset=utf-8"
-                    : path.endsWith(".js") ? "application/javascript; charset=utf-8"
-                    : path.endsWith(".png") ? "image/png"
-                    : path.endsWith(".json") ? "application/manifest+json; charset=utf-8" : "text/html; charset=utf-8";
-            try {
-                send(s, 200, type, readAsset("web" + path));
-            } catch (IOException e) {
-                send(s, 404, "text/plain", "Not found".getBytes("UTF-8"));
-            }
-            return;
-        }
         if (method.equals("GET") && path.equals("/api/status")) {
             sendJson(s, 200, status());
             return;
@@ -379,6 +364,61 @@ class WebServer {
                 .put("builtin_models", new JSONArray(bot.getAssets().list("mww")))
                 .put("uploaded_models", uploaded)
                 .put("log", BotLog.tail());
+    }
+
+    // Web UI (index.html + assets/web/static/...): file chỉ đổi khi cài bản app mới, nên nén gzip 1 lần giữ trong RAM
+    // và gắn ETag theo lần cài - trình duyệt hỏi lại thì trả 304 (không gửi lại ~100 KB qua CPU yếu của loa).
+    private final Map<String, byte[]> gzCache = new HashMap<>();
+    private String etag;
+
+    private boolean serveAsset(Socket s, String path, Map<String, String> headers) throws IOException {
+        String name;
+        if (path.equals("/") || path.equals("/index.html")) name = "web/index.html";
+        else if (path.startsWith("/static/") && !path.contains("..")) name = "web" + path;
+        else return false;
+        String type = name.endsWith(".css") ? "text/css; charset=utf-8"
+                : name.endsWith(".js") ? "application/javascript; charset=utf-8"
+                : name.endsWith(".png") ? "image/png"
+                : name.endsWith(".json") ? "application/manifest+json; charset=utf-8" : "text/html; charset=utf-8";
+        if (etag == null) {
+            try {
+                etag = "\"" + bot.getPackageManager().getPackageInfo(bot.getPackageName(), 0).lastUpdateTime + "\"";
+            } catch (Exception e) {
+                etag = "\"0\"";
+            }
+        }
+        if (etag.equals(headers.get("if-none-match"))) {
+            s.getOutputStream().write(("HTTP/1.1 304 Not Modified\r\nETag: " + etag
+                    + "\r\nCache-Control: no-cache\r\nConnection: close\r\n\r\n").getBytes("UTF-8"));
+            return true;
+        }
+        boolean gz = !name.endsWith(".png") && String.valueOf(headers.get("accept-encoding")).contains("gzip");
+        byte[] body;
+        try {
+            if (gz) {
+                synchronized (gzCache) {
+                    body = gzCache.get(name);
+                    if (body == null) {
+                        ByteArrayOutputStream bos = new ByteArrayOutputStream();
+                        GZIPOutputStream z = new GZIPOutputStream(bos);
+                        z.write(readAsset(name));
+                        z.close();
+                        body = bos.toByteArray();
+                        gzCache.put(name, body);
+                    }
+                }
+            } else body = readAsset(name);
+        } catch (IOException e) {
+            send(s, 404, "text/plain", "Not found".getBytes("UTF-8"));
+            return true;
+        }
+        OutputStream out = s.getOutputStream();
+        out.write(("HTTP/1.1 200 OK\r\nContent-Type: " + type + "\r\nContent-Length: " + body.length
+                + (gz ? "\r\nContent-Encoding: gzip" : "") + "\r\nETag: " + etag
+                + "\r\nCache-Control: no-cache\r\nConnection: close\r\n\r\n").getBytes("UTF-8"));
+        out.write(body);
+        out.flush();
+        return true;
     }
 
     private byte[] readAsset(String name) throws IOException {
