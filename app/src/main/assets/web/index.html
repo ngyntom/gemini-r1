@@ -5,6 +5,26 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no, viewport-fit=cover">
 <!-- Như common.js của Pi: áp ngay cỡ chữ đã lưu (Cài đặt > Giao diện > Cỡ chữ) trước khi trang vẽ, khỏi nhảy cỡ -->
 <script>try { const c = localStorage.getItem('voicebot_font_scale'); if (c) document.documentElement.style.setProperty('--ty-le-co-chu', c); } catch (e) {}</script><!-- Như Pi: "Thêm vào MH chính" trên iPhone mở thành app riêng (standalone), app.css hạ tabbar cho chế độ này -->
+<script>
+// Đăng nhập (đặt mật khẩu ở Cài đặt > Đăng nhập): loa trả 401 cho mọi API khi chưa đăng nhập. Bắt 401 ở MỘT chỗ - bọc
+// fetch() trước mọi script khác (cả trang Nhạc) - và chỉ MỞ màn đăng nhập, KHÔNG tải lại trang (tải lại khi đang
+// 401 sẽ lặp vô hạn). Tải lại trang chỉ một lần, sau khi đăng nhập thành công (doLogin).
+window.moManDangNhap = () => {
+  if (window.dangHienDangNhap) return;
+  window.dangHienDangNhap = true;
+  const mo = () => { app.loginScreen.open('#login-screen', false); setTimeout(() => document.getElementById('login-password').focus(), 300); };
+  // "const app" (script chính) không nằm trên window -> dò bằng typeof; app iOS (Capacitor) F7 init muộn -> chờ 'init'
+  const thu = () => { if (typeof app === 'undefined') return setTimeout(thu, 100); app.initialized ? mo() : app.once('init', mo); };
+  thu();
+};
+{
+  const goc = window.fetch.bind(window);
+  window.fetch = (...a) => goc(...a).then(r => {
+    if (r.status === 401 && String(a[0]) !== '/api/login') window.moManDangNhap(); // sai mật khẩu: báo trên màn đăng nhập
+    return r;
+  });
+}
+</script>
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Phicomm R1">
@@ -134,58 +154,22 @@
   .log { font: 12px/1.45 ui-monospace, Consolas, monospace; white-space: pre-wrap; word-break: break-word;
          max-height: 340px; overflow: auto; padding: 12px 16px; }
 
-  /* Thiết bị: lấy nguyên số đo .ha-dash-* trong app.css của Pi - ô vuông 104px trở lên (máy tính tự thêm cột),
-     ô tắt mờ 60%, ô bật ửng màu chủ đề + đổ bóng, icon 26px, tên 12.5px tối đa 2 dòng, huy hiệu tròn 32px */
-  /* Như Pi: auto-fill + minmax(104px, 1fr) - rộng thêm thì THÊM CỘT, ô chỉ co giãn trong ~104-125px (đo trên Pi: 121px) */
-  .tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); gap: 10px; padding: 12px; }
-  .tile { position: relative; aspect-ratio: 1 / 1; border-radius: 16px; padding: 12px; overflow: hidden; cursor: pointer;
-          display: flex; flex-direction: column; justify-content: space-between;
-          background: rgba(115,115,115,.25); opacity: .6; -webkit-tap-highlight-color: transparent;
-          -webkit-touch-callout: none; -webkit-user-select: none; user-select: none;
-          transition: opacity .15s, background .15s, box-shadow .15s; }
-  .tile:active { opacity: .85; }
-  .tile.on { opacity: 1; background: #fff; box-shadow: 0 2px 10px rgba(0,0,0,.12);
-             background: color-mix(in srgb, var(--f7-theme-color) 12%, var(--f7-page-bg-color, #fff)); }
-  .dark .tile.on { background: color-mix(in srgb, var(--f7-theme-color) 22%, var(--f7-page-bg-color, #1c1c1e)); }
-  .tile i.f7-icons { font-size: 26px; color: var(--f7-text-color, #000); }
-  .tile.on i.f7-icons { color: var(--f7-theme-color); }
-  .tile .t-name { font-size: 12.5px; font-weight: 500; line-height: 1.25; margin-top: 8px; color: var(--f7-text-color, #000);
-                  overflow-wrap: anywhere; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
-  .tile .t-state { font-size: 12px; color: var(--f7-list-item-footer-text-color, #888);
-                   white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .tile .t-badge { position: absolute; top: 12px; right: 12px; width: 32px; height: 32px; border-radius: 50%;
-                   border: 1.5px solid var(--f7-list-item-border-color, rgba(0,0,0,.15)); display: flex; align-items: center;
-                   justify-content: center; font-size: 10px; line-height: 1; white-space: nowrap; color: var(--f7-text-color, #000); }
-  .tile.on .t-badge { border-color: color-mix(in srgb, var(--f7-theme-color) 45%, transparent); color: var(--f7-theme-color); }
-  .tile.busy { opacity: .35; }
+  /* Thiết bị: ô dùng thẳng class .ha-dash-* trong app.css của Pi (cùng markup với devices.html của Pi) nên kích thước,
+     màu, huy hiệu, vòng chờ, nút xoá giống hệt - ở đây không tự viết lại CSS ô nữa */
   /* Chú thích cuối card như Pi (api.html / nhac-nho.html): 1 <p> chữ mờ ngay dưới list, KHÔNG dùng .card-footer -
      card-footer có viền trên riêng nên chồng lên đường kẻ dưới ô nhập cuối (app.css giữ đường kẻ đó) thành 2 vạch */
   .card-note { margin: 10px 0 14px; padding: 0 16px; font-size: calc(13px * var(--ty-le-co-chu, 1)); line-height: 1.4;
                color: var(--f7-list-item-footer-text-color); white-space: normal; }
-  /* Khung xương lúc đang tải (như .ha-dash-skeleton của Pi): màu --skeleton-color của F7, tự đổi theo sáng / tối */
-  .tile.sk { background: var(--skeleton-color); opacity: 1; cursor: default; }
   .sk-bar { display: inline-block; height: 14px; border-radius: 4px; background: var(--skeleton-color); vertical-align: middle; }
-  .tile .t-del { position: absolute; top: 12px; right: 12px; width: 32px; height: 32px; border-radius: 50%;
-                 background: var(--f7-color-red, #ff3b30); color: #fff; display: none; align-items: center; justify-content: center; }
-  .tile .t-del i { font-size: 17px !important; color: #fff !important; }
-  .editing .tile { opacity: 1; animation: wiggle .35s ease-in-out infinite alternate; }
-  .editing .tile .t-del { display: flex; }
-  .editing .tile .t-badge { display: none; }
-  /* Như Voicebot: mỗi nhóm 1 card, tên nhóm (chữ thường, màu chủ đề) + bút chì 20px sửa riêng nhóm đó */
-  #devices .card-header { color: var(--f7-theme-color); }
-  #devices .card-header .link { color: inherit; flex-shrink: 0; margin-left: 8px; }
-  #devices .card-header .link i { font-size: 20px; }
   /* Nút đóng thanh tìm (icon ✕ thay chữ "Huỷ"): cỡ vừa nút tròn của F7 */
   .searchbar-disable-button .icon { font-size: 20px; line-height: 1; vertical-align: middle; }
-  /* Máy tính: dùng hết bề ngang (bỏ cột đọc 760px chung); điện thoại hẹp vẫn đủ 3 cột */
+  /* Máy tính: dùng hết bề ngang (bỏ cột đọc 760px chung) */
   #view-devices .page-inner { max-width: none; }
-  @media (max-width: 520px) { #devices .tiles { grid-template-columns: repeat(3, 1fr); } }
   .icon-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(56px, 1fr)); gap: 8px; padding: 8px 16px 20px; }
   .icon-grid a { display: flex; align-items: center; justify-content: center; height: 52px; border-radius: 12px;
                  background: rgba(120,120,128,.12); color: inherit; }
   .icon-grid a.chon { background: var(--f7-theme-color); color: #fff; }
   .icon-grid .icon { font-size: 26px; }
-  @keyframes wiggle { from { transform: rotate(-.6deg); } to { transform: rotate(.6deg); } }
   #devPopup .page-content { overflow-x: hidden; }
   .dev-row .item-subtitle { font-size: 12px; opacity: .6; }
   .dev-row input.alias { width: 100%; margin-top: 6px; padding: 6px 10px; border-radius: 8px; font-size: 14px;
@@ -209,6 +193,32 @@
 <body>
 <!-- Như Pi: class "safe-areas" của F7 9 bật vùng an toàn (notch / Dynamic Island / vạch home) cho mọi phần tử -->
 <div id="app" class="safe-areas">
+
+  <!-- Màn đăng nhập: chép từ index.html của Voicebot trên Pi (kiểu màn khoá macOS, CSS .voicebot-login-* trong app.css).
+       Chỉ hiện khi loa đã đặt mật khẩu (Cài đặt > Đăng nhập). Có ô tên + mật khẩu để iOS lưu / tự điền (Face ID). -->
+  <div class="login-screen" id="login-screen">
+    <div class="voicebot-login-bg">
+      <div class="voicebot-login-card">
+        <img class="voicebot-login-avatar" src="/static/icons/icon-192.png" alt="">
+        <div class="voicebot-login-name" id="login-ten-loa">Phicomm R1</div>
+        <div class="voicebot-login-sub">Đăng nhập để điều khiển loa</div>
+        <form id="login-form">
+          <div class="voicebot-login-input-wrap voicebot-login-user">
+            <i class="icon f7-icons">person</i>
+            <input type="text" id="login-username" name="username" placeholder="Tên đăng nhập" autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false" />
+          </div>
+          <div class="voicebot-login-input-wrap">
+            <i class="icon f7-icons">lock</i>
+            <input type="password" id="login-password" name="password" placeholder="Mật khẩu" autocomplete="current-password" />
+            <a href="#" id="login-btn" class="voicebot-login-submit" aria-label="Đăng nhập"><i class="icon f7-icons">arrow_right</i></a>
+          </div>
+        </form>
+        <div class="voicebot-login-error" id="login-error"></div>
+        <!-- Chỉ trong app iOS: màn này che nút "Đổi địa chỉ" ở Cài đặt -> cho quay về chọn loa / Pi khác ngay tại đây -->
+        <a href="#" id="login-doi-dia-chi" class="voicebot-login-forgot" style="display:none;">Đổi địa chỉ</a>
+      </div>
+    </div>
+  </div>
 
   <!-- Menu trái (máy tính) - cùng kiểu Menu List của F7 như Voicebot trên Pi -->
   <div class="list media-list menu-list no-hairlines" id="sidebar">
@@ -506,6 +516,8 @@
             <div class="card-content"><div class="list list-outline-ios list-strong-ios list-dividers-ios media-list" style="margin:0"><ul>
               <li><a href="/theme/" class="item-link item-content"><div class="item-media"><i class="icon f7-icons" style="color:#2f80ed">paintbrush_fill</i></div>
                 <div class="item-inner"><div class="item-title">Giao diện</div><div class="item-subtitle">Sáng / tối, iOS / Material, cỡ chữ, màu chủ đề</div></div></a></li>
+              <li><a href="#" class="item-link item-content" id="openAuth"><div class="item-media"><i class="icon f7-icons" style="color:#2f80ed">lock_shield_fill</i></div>
+                <div class="item-inner"><div class="item-title">Đăng nhập</div><div class="item-subtitle" id="authSub">Mật khẩu để mở loa ra Internet</div></div></a></li>
               <li><a href="/update/" class="item-link item-content"><div class="item-media"><i class="icon f7-icons" style="color:#2f80ed">arrow_down_circle_fill</i></div>
                 <div class="item-inner"><div class="item-title">Cập nhật app</div><div class="item-subtitle" id="verSub">Cài APK / file zip từ GitHub</div></div></a></li>
             </ul></div></div>
@@ -529,6 +541,40 @@
         Đổi sang mạng khác thì loa đổi IP: mở lại Web UI theo IP mới (xem trong router).</div>
       <div class="list list-strong list-dividers inset"><ul id="wifiList"><li class="item-content"><div class="item-inner">Đang quét…</div></li></ul></div>
       <p class="muted" id="wifiMsg" style="text-align:center;padding:0 16px"></p>
+    </div>
+  </div></div>
+</div>
+
+<!-- Đăng nhập: đặt / đổi / tắt mật khẩu Web UI, đăng xuất (API /api/auth*, xem Auth.java) -->
+<div class="popup" id="authPopup">
+  <div class="view"><div class="page">
+    <div class="navbar"><div class="navbar-bg"></div><div class="navbar-inner">
+      <div class="left"><a href="#" class="link icon-only popup-close" title="Huỷ"><i class="icon f7-icons">xmark</i></a></div>
+      <div class="title">Đăng nhập</div>
+      <div class="right"><a href="#" class="link icon-only" id="authSave" title="Lưu"><i class="icon f7-icons">checkmark_alt</i></a></div>
+    </div></div>
+    <div class="page-content">
+      <div class="block-footer" style="margin-top:16px" id="authTrangThai"></div>
+      <div class="list list-strong inset"><ul>
+        <li class="item-content item-input"><div class="item-inner">
+          <div class="item-title item-label">Tên đăng nhập</div>
+          <div class="item-input-wrap"><input type="text" id="authUser" autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false"></div></div></li>
+        <li class="item-content item-input" id="authOldRow"><div class="item-inner">
+          <div class="item-title item-label">Mật khẩu hiện tại</div>
+          <div class="item-input-wrap"><input type="password" id="authOld" autocomplete="current-password"></div></div></li>
+        <li class="item-content item-input"><div class="item-inner">
+          <div class="item-title item-label">Mật khẩu mới</div>
+          <div class="item-input-wrap"><input type="password" id="authNew" autocomplete="new-password" placeholder="Tối thiểu 6 ký tự"></div></div></li>
+        <li class="item-content item-input"><div class="item-inner">
+          <div class="item-title item-label">Nhập lại mật khẩu mới</div>
+          <div class="item-input-wrap"><input type="password" id="authNew2" autocomplete="new-password"></div></div></li>
+      </ul></div>
+      <div class="block-footer">Đặt mật khẩu TRƯỚC khi mở loa ra Internet (tên miền / proxy như Voicebot). Đổi mật khẩu thì
+        các máy khác bị đăng xuất. Quên mật khẩu: xoá bằng adb (xem README), loa trở về không cần đăng nhập.</div>
+      <div class="block" id="authNutPhu" style="display:flex;flex-direction:column;gap:10px">
+        <a href="#" class="button button-tonal" id="authLogout">Đăng xuất máy này</a>
+        <a href="#" class="button button-tonal color-red" id="authOff">Tắt đăng nhập</a>
+      </div>
     </div>
   </div></div>
 </div>
@@ -867,8 +913,8 @@ const loadingRow = t => `<li class="item-content"><div class="item-media"><span 
   <div class="item-inner"><div class="item-title muted">${t}</div></div></li>`;
 // Khung xương trang Thiết bị (như devices.html của Pi): card + thanh tiêu đề giả + vài ô xám gợn sóng, đúng chỗ dữ liệu thật
 const devSkeleton = () => [3, 6].map(n => `<div class="card card-outline card-dividers">
-  <div class="card-header"><span class="sk-bar skeleton-effect-wave" style="width:110px"></span></div>
-  <div class="card-content"><div class="tiles">${'<div class="tile sk skeleton-effect-wave"></div>'.repeat(n)}</div></div></div>`).join('');
+  <div class="card-header"><div class="ha-dash-skeleton ha-dash-skeleton-header skeleton-effect-wave"></div></div>
+  <div class="card-content"><div class="ha-dash-grid">${'<div class="ha-dash-card ha-dash-skeleton skeleton-effect-wave"></div>'.repeat(n)}</div></div></div>`).join('');
 // Khung xương danh sách chọn thiết bị (chữ mẫu KHÔNG DẤU: font "skeleton" của F7 chỉ có chữ Latin cơ bản)
 const pickSkeleton = () => `<div class="list list-strong-ios list-dividers-ios inset skeleton-text skeleton-effect-wave"><ul>` +
   ['Den phong khach', 'Cong tac quat tran', 'May lanh phong ngu', 'O cam tivi', 'Den ban hoc', 'Rem cua so'].map(t =>
@@ -918,6 +964,8 @@ document.querySelector('#view-chat').addEventListener('tab:show', () => setTimeo
 if (window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform()) {
   $('settingsNavRight').style.display = '';
   $('btnDoiDiaChi').addEventListener('click', e => { e.preventDefault(); history.back(); });
+  $('login-doi-dia-chi').style.display = '';
+  $('login-doi-dia-chi').addEventListener('click', e => { e.preventDefault(); history.back(); });
 }
 // Tab Nhạc: tải trang Nhạc ngay (ẩn) - mini player / trình phát mở rộng ở các tab khác nhận trạng thái
 // nhạc từ trang này (sự kiện "nhac-pi"), như Pi luôn có sẵn tab Nhạc
@@ -1230,7 +1278,12 @@ async function loadDevices() {
   }
 }
 // ----- Như Voicebot: nhóm theo thứ tự đã sắp, icon riêng từng thiết bị, sửa riêng từng nhóm -----
-const devEditing = new Set();           // domain đang sửa (ô rung, có ✕)
+const devEditing = new Set();           // domain đang sửa (ô có ✕)
+const devBusy = new Set();              // id vừa chạm, đang chờ HA (vòng xoay ở góc ô như Pi)
+// Huy hiệu tròn góc ô như huyHieu() của Pi: độ sáng đèn, tốc độ quạt, nhiệt độ phòng của điều hoà
+const devBadge = d => d.domain === 'light' && d.brightness != null ? Math.round(d.brightness / 255 * 100) + '%'
+  : d.domain === 'fan' && d.percentage != null ? Math.round(d.percentage) + '%'
+  : d.current || d.temp ? Math.round(parseFloat(d.current || d.temp)) + '°C' : null;
 const devOrder = () => String(S && S.config && S.config.ha_dash_order || '').split(',').filter(Boolean);
 const devIcons = () => { try { return JSON.parse(S.config.ha_dash_icons || '{}'); } catch (e) { return {}; } };
 const devIcon = d => devIcons()[d.id] || (DOMAINS[d.domain] || [0, 'circle'])[1];
@@ -1254,7 +1307,6 @@ const ICONS = [['lightbulb_fill', 'đèn bóng'], ['lightbulb', 'đèn'], ['ligh
 
 function renderDevices() {
   const root = $('devices');
-  root.classList.remove('editing');
   if (!devices.length) {
     root.innerHTML = `<div class="block" style="text-align:center;margin-top:20vh">
       <i class="icon f7-icons" style="font-size:48px;opacity:.4">square_grid_2x2</i>
@@ -1262,18 +1314,24 @@ function renderDevices() {
       <a href="#" class="button button-fill button-round" onclick="openDevPopup();return false;" style="display:inline-flex;padding:0 20px">Thêm thiết bị</a></div>`;
     return;
   }
+  // Cùng markup .ha-dash-* với taoTheThietBi() trong devices.html của Pi: góc phải là ✕ (đang sửa nhóm) /
+  // vòng chờ (vừa chạm, chờ HA trả trạng thái thật) / huy hiệu %·°C
   root.innerHTML = groupSorted(devices).map(([dom, list]) => {
     const title = (DOMAINS[dom] || [dom])[0], sua = devEditing.has(dom);
-    return `<div class="card card-outline card-dividers${sua ? ' editing' : ''}">
+    return `<div class="card card-outline card-dividers">
       <div class="card-header"><span>${esc(title)} (${list.length})</span>
-        <a href="#" class="link icon-only" data-sua="${esc(dom)}" title="${sua ? 'Xong' : 'Sửa'}"><i class="icon f7-icons">${sua ? 'checkmark_alt' : 'pencil'}</i></a></div>
-      <div class="card-content"><div class="tiles">` +
-      list.map(d => `<div class="tile ${ON.includes(d.state) ? 'on' : ''}" data-id="${esc(d.id)}">
-        ${d.current || d.temp ? `<span class="t-badge">${esc(d.current || d.temp)}°C</span>` : ''}
-        <a href="#" class="t-del" title="Bỏ khỏi bot"><i class="icon f7-icons">xmark</i></a>
-        <i class="icon f7-icons">${esc(devIcon(d))}</i>
-        <div><div class="t-name">${esc(d.name)}</div><div class="t-state">${esc(stateText(d))}</div></div></div>`).join('') +
-      `</div></div>${sua ? '<div class="card-footer muted">Chạm ô để đổi tên / icon, ✕ để bỏ khỏi bot. Bấm ✓ khi xong.</div>' : ''}</div>`;
+        <a href="#" class="link icon-only ha-dash-edit-btn" data-sua="${esc(dom)}" title="${sua ? 'Xong' : 'Sửa'}"><i class="icon f7-icons">${sua ? 'checkmark_alt' : 'pencil'}</i></a></div>
+      <div class="card-content"><div class="ha-dash-grid">` +
+      list.map(d => {
+        const hh = devBadge(d);
+        const goc = sua ? '<div class="ha-dash-delete-badge" title="Bỏ khỏi bot"><i class="icon f7-icons">xmark</i></div>'
+          : devBusy.has(d.id) ? `<div class="ha-dash-loader"><div class="preloader" style="--f7-preloader-size:30px">${htmlPreloader()}</div></div>`
+          : hh ? `<div class="ha-dash-badge">${esc(hh)}</div>` : '';
+        return `<div class="ha-dash-card${ON.includes(d.state) ? ' ha-dash-on' : ''}" data-id="${esc(d.id)}">
+          <div class="ha-dash-card-top"><i class="icon f7-icons ha-dash-icon">${esc(devIcon(d))}</i>${goc}</div>
+          <div class="ha-dash-name">${esc(d.name)}</div><div class="ha-dash-state">${esc(stateText(d))}</div></div>`;
+      }).join('') +
+      `</div></div>${sua ? '<p class="card-note">Chạm ô để đổi tên / icon, ✕ để bỏ khỏi bot. Bấm ✓ khi xong.</p>' : ''}</div>`;
   }).join('') + '<div class="block-footer">Giữ lâu một ô để đổi tên gọi khác và icon.</div>';
   root.querySelectorAll('[data-sua]').forEach(a => a.addEventListener('click', e => {
     e.preventDefault();
@@ -1282,7 +1340,7 @@ function renderDevices() {
     renderDevices();
     if (!devEditing.size) loadDevices();
   }));
-  root.querySelectorAll('.tile').forEach(t => {
+  root.querySelectorAll('.ha-dash-card').forEach(t => {
     // Như Pi: giữ lâu (~0,5 s) trên một ô -> đổi tên gọi; nuốt luôn cú click ngay sau để không bật/tắt nhầm
     let hold = null, held = false;
     const cancel = () => { clearTimeout(hold); hold = null; };
@@ -1292,8 +1350,8 @@ function renderDevices() {
     t.addEventListener('contextmenu', e => e.preventDefault());
     t.addEventListener('click', e => {
       if (held) { e.preventDefault(); held = false; return; }
-      if (e.target.closest('.t-del')) { e.preventDefault(); removeDevice(t.dataset.id); }
-      else if (t.closest('.editing')) editDevice(t.dataset.id);
+      if (e.target.closest('.ha-dash-delete-badge')) { e.preventDefault(); removeDevice(t.dataset.id); }
+      else if (t.querySelector('.ha-dash-delete-badge')) editDevice(t.dataset.id);
       else tapDevice(t);
     });
   });
@@ -1449,7 +1507,7 @@ const devSearchbar = app.searchbar.create({ el: '#devSearchbar', customSearch: t
 $('devAddBtn').addEventListener('click', e => { e.preventDefault(); openDevPopup(); });
 
 async function tapDevice(t) {
-  const d = devices.find(x => x.id === t.dataset.id); if (!d || t.classList.contains('busy')) return;
+  const d = devices.find(x => x.id === t.dataset.id); if (!d || devBusy.has(d.id)) return;
   if (!TAPPABLE.includes(d.domain)) return toast(d.name + ': ' + stateText(d));
   const on = ON.includes(d.state);
   let service = 'toggle';
@@ -1457,9 +1515,11 @@ async function tapDevice(t) {
   else if (['scene', 'script'].includes(d.domain)) service = 'turn_on';
   else if (['button', 'input_button'].includes(d.domain)) service = 'press';
   else if (d.domain === 'lock') return toast('Khoá cửa chỉ điều khiển trong Home Assistant');
-  t.classList.add('busy');
-  try { await post('/api/ha/service', { entity_id: d.id, service }); setTimeout(loadDevices, 600); }
-  catch (e) { t.classList.remove('busy'); }
+  // Như Pi: hiện vòng chờ ngay, màu ô giữ nguyên tới khi HA trả trạng thái thật
+  devBusy.add(d.id); renderDevices();
+  try { await post('/api/ha/service', { entity_id: d.id, service }); await new Promise(r => setTimeout(r, 600)); await loadDevices(); }
+  catch (e) {}
+  devBusy.delete(d.id); renderDevices();
 }
 // Mở trang: vẽ ngay danh sách lần trước (lưu trong trình duyệt) rồi mới hỏi loa/HA; chưa có thì hiện khung xương
 try { devices = JSON.parse(localStorage.getItem(DEV_CACHE_KEY)) || []; } catch (e) { devices = []; }
@@ -1524,6 +1584,77 @@ async function refresh() {
     document.querySelectorAll('[data-state-dot]').forEach(x => x.style.background = '#ff3b30');
   }
 }
+// ---------- Đăng nhập (như app.js của Pi; bắt 401 ở <head>: moManDangNhap) ----------
+const TEN_DN_KEY = 'r1_ten_dn';
+let AUTH = { enabled: false, user: '', logged_in: false };
+try { $('login-username').value = localStorage.getItem(TEN_DN_KEY) || ''; } catch (e) {}
+async function doLogin() {
+  const username = $('login-username').value.trim(), password = $('login-password').value;
+  if (!username) { $('login-error').textContent = 'Nhập tên đăng nhập'; $('login-username').focus(); return; }
+  try {
+    const r = await fetch('/api/login', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username, password }) });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(j.error || ('HTTP ' + r.status));
+    try { localStorage.setItem(TEN_DN_KEY, username); } catch (e) {}
+    location.reload(); // mọi tab tải lại dữ liệu đã dính 401 - chỉ chạy khi đăng nhập ĐÃ thành công
+  } catch (e) {
+    $('login-error').textContent = e.message;
+    $('login-password').select();
+  }
+}
+$('login-form').addEventListener('submit', e => { e.preventDefault(); doLogin(); });
+$('login-btn').addEventListener('click', e => { e.preventDefault(); doLogin(); });
+// Form có 2 ô mà không có nút submit thật -> Enter không tự nộp (đã gặp trên Pi), gọi tay
+$('login-password').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); doLogin(); } });
+$('login-username').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); $('login-password').focus(); } });
+// Face ID / Touch ID tự điền mật khẩu thì tự đăng nhập luôn (animation :-webkit-autofill trong app.css của Pi)
+$('login-password').addEventListener('animationstart', e => { if (e.animationName === 'voicebotAutofillStart') doLogin(); });
+
+async function loadAuth() {
+  try { AUTH = await (await fetch('/api/auth')).json(); } catch (e) { return; }
+  if (AUTH.enabled && !AUTH.logged_in) window.moManDangNhap();
+  $('authSub').textContent = AUTH.enabled ? 'Đang bật · ' + AUTH.user : 'Chưa đặt mật khẩu: ai trong mạng cũng vào được';
+}
+loadAuth();
+fetch('/api/ping').then(r => r.json()).then(j => { if (j.ten) $('login-ten-loa').textContent = j.ten.replace(/_/g, ' '); }).catch(() => {});
+
+const authPopup = app.popup.create({ el: '#authPopup' });
+$('openAuth').addEventListener('click', async e => {
+  e.preventDefault();
+  await loadAuth();
+  $('authUser').value = AUTH.user || 'admin';
+  ['authOld', 'authNew', 'authNew2'].forEach(id => $(id).value = '');
+  $('authOldRow').style.display = AUTH.enabled ? '' : 'none';
+  $('authNutPhu').style.display = AUTH.enabled ? 'flex' : 'none';
+  $('authTrangThai').textContent = AUTH.enabled
+    ? 'Đăng nhập đang BẬT. Muốn đổi tên / mật khẩu thì nhập mật khẩu hiện tại.'
+    : 'Đăng nhập đang TẮT: ai vào được địa chỉ của loa đều điều khiển được loa.';
+  authPopup.open();
+});
+$('authSave').addEventListener('click', async e => {
+  e.preventDefault();
+  if (!$('authNew').value) return toast('Nhập mật khẩu mới');
+  if ($('authNew').value !== $('authNew2').value) return toast('Hai ô mật khẩu mới không giống nhau');
+  try {
+    await post('/api/auth/set', { username: $('authUser').value, password: $('authNew').value, old_password: $('authOld').value });
+    try { localStorage.setItem(TEN_DN_KEY, $('authUser').value.trim()); } catch (e) {}
+    authPopup.close(); toast('Đã lưu mật khẩu'); loadAuth();
+  } catch (e) {}
+});
+$('authOff').addEventListener('click', e => {
+  e.preventDefault();
+  app.dialog.password('Nhập mật khẩu hiện tại để tắt đăng nhập. Sau đó ai trong mạng cũng vào được loa.', 'Tắt đăng nhập', async pw => {
+    try { await post('/api/auth/set', { username: AUTH.user, password: '', old_password: pw }); authPopup.close(); toast('Đã tắt đăng nhập'); loadAuth(); }
+    catch (e) {}
+  });
+});
+$('authLogout').addEventListener('click', async e => {
+  e.preventDefault();
+  try { await post('/api/logout'); } catch (e) {}
+  location.reload();
+});
+
 refresh().then(() => { const sc = $('chatScroll'); sc.scrollTop = sc.scrollHeight; });
 setInterval(refresh, 1500);
 </script>

@@ -92,8 +92,36 @@ trong cùng mạng. Trên đó có thể:
 - **cập nhật app** từ file zip/apk;
 - tải model microWakeWord tự huấn luyện (.tflite) lên loa.
 
-Web UI không có mật khẩu, nên chỉ dùng trong mạng nhà. Cổng 8080 và 8081 thường đã bị các app khác
-trên R1 dùng (vd. AI BOX), nên app này dùng cổng 8088.
+Cổng 8080 và 8081 thường đã bị các app khác trên R1 dùng (vd. AI BOX), nên app này dùng cổng 8088.
+
+### Đăng nhập và truy cập từ xa
+
+Mặc định Web UI **không có mật khẩu**: ai vào được địa chỉ của loa đều điều khiển được loa, kể cả cài APK
+lên loa. Muốn mở loa ra Internet (như Voicebot trên Pi) thì **đặt mật khẩu trước**:
+**Cài đặt → Hệ thống → Đăng nhập**, nhập tên đăng nhập và mật khẩu (tối thiểu 6 ký tự).
+
+Đặt rồi thì mọi API cần đăng nhập (phiên giữ 30 ngày, khởi động lại loa vẫn còn), trừ `/api/ping`
+(app iOS dò địa chỉ), `/api/group/info` (loa khác dò nhóm loa) và chính các API đăng nhập. Sai 5 lần liên
+tiếp thì bị khoá 1 phút, sai tiếp thì thời gian khoá tăng gấp đôi, tối đa 15 phút. Đổi mật khẩu thì mọi
+máy khác bị đăng xuất.
+
+Mở ra ngoài: cho proxy (vd. Nginx Proxy Manager trên Home Assistant, cùng chỗ đang mở Voicebot) trỏ một
+tên miền HTTPS về `http://<IP loa>:8088`. Tắt buffering của proxy (nginx: `proxy_buffering off;`), không thì
+trạng thái nhạc (SSE) bị trễ. Proxy có gửi `X-Forwarded-Proto: https` thì cookie đăng nhập được gắn cờ
+`Secure`. **Chỉ mở cổng 8088.** Không mở 8089 / 8090: đó là cổng nhóm loa trong mạng nhà, không có mật khẩu.
+
+App iOS (Capacitor): gõ tên miền đó ở màn nhập địa chỉ. Tên miền phải nằm trong `allowNavigation` của
+`ios-app/capacitor.config.json` (đang cho phép `*.tnt-hassio.dynu.net`), không thì app mở bằng Safari.
+
+**Quên mật khẩu:** xoá file mật khẩu qua adb rồi chạy lại app. Web UI trở về không cần đăng nhập:
+
+```
+adb connect <IP loa>:5555
+adb shell run-as vn.r1.geminibot rm -f files/auth.json files/sessions.json
+adb shell am force-stop vn.r1.geminibot
+adb shell am startservice -n vn.r1.geminibot/.BotService
+adb disconnect
+```
 
 ## Home Assistant
 

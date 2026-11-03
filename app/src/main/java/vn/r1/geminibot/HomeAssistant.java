@@ -165,6 +165,9 @@ final class HomeAssistant {
                     .put("unit", a.optString("unit_of_measurement", ""));
             if (a.has("temperature") && !a.isNull("temperature")) d.put("temp", a.optString("temperature"));
             if (a.has("current_temperature") && !a.isNull("current_temperature")) d.put("current", a.optString("current_temperature"));
+            // Huy hiệu % trên ô Thiết bị (như Pi): độ sáng đèn 0-255, tốc độ quạt 0-100
+            if (a.has("brightness") && !a.isNull("brightness")) d.put("brightness", a.optDouble("brightness"));
+            if (a.has("percentage") && !a.isNull("percentage")) d.put("percentage", a.optDouble("percentage"));
             out.put(d);
         }
         return out;

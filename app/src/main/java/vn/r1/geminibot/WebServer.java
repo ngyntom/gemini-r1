@@ -97,6 +97,13 @@ class WebServer {
             }
             int len = 0;
             if (headers.containsKey("content-length")) len = Integer.parseInt(headers.get("content-length"));
+            // Đăng nhập (Auth): đã đặt mật khẩu thì mọi API trừ vài API công khai cần cookie phiên - kiểm TRƯỚC
+            // /api/install (đường cài APK chạy trước phần đọc body / định tuyến bên dưới)
+            String authPath = target.indexOf('?') >= 0 ? target.substring(0, target.indexOf('?')) : target;
+            if (!Auth.isPublic(method, authPath) && Auth.enabled(bot) && !Auth.valid(bot, Auth.cookieToken(headers))) {
+                sendJson(s, 401, new JSONObject().put("error", "Cần đăng nhập").put("login", true));
+                return;
+            }
             if (method.equals("POST") && target.equals("/api/install")) {
                 installApk(s, in, len);
                 return;
@@ -123,6 +130,7 @@ class WebServer {
                     if (e > 0) query.put(kv.substring(0, e), URLDecoder.decode(kv.substring(e + 1), "UTF-8"));
                 }
             }
+            if (authRoute(s, method, path, headers, body)) return;
             if (MusicApi.handle(bot, s, method, path, query, headers, body)) return;
             if (method.equals("GET") && serveAsset(s, path, headers)) return;
             route(s, method, path, query, body);
@@ -303,6 +311,59 @@ class WebServer {
         sendJson(s, 200, new JSONObject().put("ok", true));
     }
 
+    /**
+     * Đăng nhập Web UI (xem Auth):
+     *   GET  /api/auth                      {enabled, user, logged_in}
+     *   POST /api/login  {username, password}
+     *   POST /api/logout
+     *   POST /api/auth/set {username, password, old_password}   đặt / đổi mật khẩu, password rỗng = tắt
+     */
+    private boolean authRoute(Socket s, String method, String path, Map<String, String> headers, byte[] body)
+            throws Exception {
+        if (!path.equals("/api/auth") && !path.equals("/api/login") && !path.equals("/api/logout")
+                && !path.equals("/api/auth/set")) return false;
+        String token = Auth.cookieToken(headers);
+        if (method.equals("GET") && path.equals("/api/auth")) {
+            sendJson(s, 200, new JSONObject().put("enabled", Auth.enabled(bot)).put("user", Auth.user(bot))
+                    .put("logged_in", Auth.valid(bot, token)));
+            return true;
+        }
+        if (!method.equals("POST")) return false;
+        JSONObject req = body.length == 0 ? new JSONObject() : new JSONObject(new String(body, "UTF-8"));
+        switch (path) {
+            case "/api/login":
+                try {
+                    String t = Auth.login(bot, req.optString("username"), req.optString("password"));
+                    BotLog.i("Đăng nhập Web UI: " + req.optString("username") + " từ " + client(s, headers));
+                    sendJson(s, 200, new JSONObject().put("ok", true), Auth.setCookie(t, Auth.SESSION_DAYS * 86400, headers));
+                } catch (Exception e) {
+                    BotLog.i("Đăng nhập Web UI sai từ " + client(s, headers));
+                    sendJson(s, 401, new JSONObject().put("error", String.valueOf(e.getMessage())));
+                }
+                return true;
+            case "/api/logout":
+                Auth.logout(bot, token);
+                sendJson(s, 200, new JSONObject().put("ok", true), Auth.setCookie(null, 0, headers));
+                return true;
+            default: // /api/auth/set - đã qua cổng kiểm phiên trong handle() nếu đang bật đăng nhập
+                try {
+                    String t = Auth.set(bot, req.optString("username"), req.optString("password"),
+                            req.optString("old_password"));
+                    sendJson(s, 200, new JSONObject().put("ok", true).put("enabled", t != null),
+                            t != null ? Auth.setCookie(t, Auth.SESSION_DAYS * 86400, headers) : Auth.setCookie(null, 0, headers));
+                } catch (Exception e) {
+                    sendJson(s, 400, new JSONObject().put("error", String.valueOf(e.getMessage())));
+                }
+                return true;
+        }
+    }
+
+    /** IP người gọi để ghi log; qua proxy thì lấy X-Forwarded-For. */
+    private static String client(Socket s, Map<String, String> headers) {
+        String f = headers.get("x-forwarded-for");
+        return f != null ? f.split(",")[0].trim() : s.getInetAddress().getHostAddress();
+    }
+
     /** Nhận APK (body = file, ghi thẳng ra đĩa) rồi tự cài. */
     private void installApk(Socket s, InputStream in, int len) throws Exception {
         if (len <= 0 || len > MAX_APK) {
@@ -444,12 +505,21 @@ class WebServer {
     }
 
     private static void sendJson(Socket s, int code, JSONObject o) throws IOException {
-        send(s, code, "application/json; charset=utf-8", o.toString().getBytes("UTF-8"));
+        sendJson(s, code, o, null);
+    }
+
+    private static void sendJson(Socket s, int code, JSONObject o, String setCookie) throws IOException {
+        send(s, code, "application/json; charset=utf-8", o.toString().getBytes("UTF-8"), setCookie);
     }
 
     private static void send(Socket s, int code, String type, byte[] body) throws IOException {
+        send(s, code, type, body, null);
+    }
+
+    private static void send(Socket s, int code, String type, byte[] body, String setCookie) throws IOException {
         String head = "HTTP/1.1 " + code + (code == 200 ? " OK" : " Error") + "\r\n"
                 + "Content-Type: " + type + "\r\n"
+                + (setCookie != null ? "Set-Cookie: " + setCookie + "\r\n" : "")
                 + "Content-Length: " + body.length + "\r\n"
                 + "Cache-Control: no-store\r\n"
                 + "Connection: close\r\n\r\n";
