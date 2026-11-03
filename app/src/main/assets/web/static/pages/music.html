@@ -574,11 +574,15 @@ export default (props, { $f7, $on }) => {
     return id;
   })();
   function locTrangThaiPi(d) {
+    // Loa R1: loa chung cả nhà - KHÔNG ẩn bài theo máy đã bật (mã máy còn khác nhau giữa IP trong nhà / tên miền /
+    // Safari / app iOS của CÙNG 1 điện thoại -> trang tưởng loa đang dừng, chọn bài mới lại phát ra điện thoại).
+    if (KHONG_LOC_THEO_MAY) return d;
     if (d && d.chu && d.chu !== MAY_ID) {
       return { state: 'stopped', title: null, elapsed: null, duration: null, lap: d.lap, volume: d.volume, cuaMayKhac: true };
     }
     return d;
   }
+  const KHONG_LOC_THEO_MAY = true;
   let noiPhatTen = 'Loa này';     // nơi Pi đang phát ra: "Loa này" hoặc tên thiết bị cast (Mi Box...)
   let noiPhatEntity = '';
   let dangChuyenSangPi = null;
@@ -2606,6 +2610,12 @@ export default (props, { $f7, $on }) => {
     const goiY = true;
     if ((tabDangXem === 'yeu_thich' || tabDangXem === 'ds') && i > 0) { ds = ds.slice(i).concat(ds.slice(0, i)); i = 0; }
     datBaiDangMo(ds[i]);
+    // Loa (hoặc nhóm loa) đang phát mà máy này không phát gì: bài mới gửi xuống loa, không lặng lẽ phát ra điện
+    // thoại. Trang tải lại (app iOS đổi loa, iOS dọn app nền) luôn khởi động ở "Máy này" và có thể lỡ lúc tự
+    // nhận lại loa -> đang phát nhóm 2 loa, chọn bài khác lại ra điện thoại, 2 loa vẫn phát bài cũ (đã gặp).
+    if (cheDoPhat === 'may' && !dangPhatTrenMay() && trangThaiPiCuoi && trangThaiPiCuoi.state !== 'stopped') {
+      chonCheDoPhat('pi', false);
+    }
     if (cheDoPhat === 'may') {
       rungNhe();
       hangChoMay = ds;
