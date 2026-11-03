@@ -124,6 +124,16 @@
   #devices .card-header { color: var(--f7-theme-color); font-weight: 600; }
   #devices .card-header .link { color: var(--f7-theme-color); }
   #devices .card-content .tiles { padding: 12px; }
+  /* Máy tính: dùng hết bề ngang (bỏ cột đọc 760px chung); điện thoại: 3 cột, ô gọn hơn */
+  #view-devices .page-inner { max-width: none; }
+  @media (max-width: 899px) {
+    #devices .tiles { grid-template-columns: repeat(3, 1fr); gap: 8px; padding: 10px; }
+    #devices .tile { min-height: 96px; padding: 10px; border-radius: 14px; }
+    #devices .tile i.f7-icons { font-size: 24px; }
+    #devices .tile .t-name { font-size: 12.5px; margin-top: 8px; line-height: 1.25; overflow-wrap: anywhere; }
+    #devices .tile .t-state { font-size: 11px; }
+    #devices .tile .t-badge { top: 8px; right: 8px; font-size: 10px; }
+  }
   .icon-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(56px, 1fr)); gap: 8px; padding: 8px 16px 20px; }
   .icon-grid a { display: flex; align-items: center; justify-content: center; height: 52px; border-radius: 12px;
                  background: rgba(120,120,128,.12); color: inherit; }
@@ -138,6 +148,12 @@
   .sys-bar span { display: block; height: 100%; background: var(--f7-theme-color); }
 
   .range-row { padding: 6px 16px 12px; }
+  /* Âm lượng gọn 1 dòng: loa nhỏ | thanh trượt | loa to + số */
+  .vol-row .item-inner { gap: 10px; }
+  .vol-row input[type=range] { flex: 1; min-width: 0; accent-color: var(--f7-theme-color); }
+  .vol-row .vol-to { font-size: 22px; opacity: .8; }
+  .vol-row .vol-so { min-width: 42px; text-align: right; font-variant-numeric: tabular-nums; color: var(--f7-list-item-after-text-color, #8e8e93); }
+  #view-speaker .card-header .muted { font-weight: 400; }
   .led-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(88px, 1fr)); gap: 8px; padding: 14px 16px; }
   .range-row input[type=range] { width: 100%; accent-color: var(--f7-theme-color); }
   .btn-row { display: flex; flex-wrap: wrap; gap: 8px; padding: 0 16px 14px; }
@@ -160,10 +176,6 @@
         <div class="item-media"><i class="icon f7-icons">music_note_fill</i></div>
         <div class="item-inner"><div class="item-title-wrap"><div class="item-title">Nhạc</div></div>
           <div class="item-subtitle">Tìm và phát nhạc YouTube trên loa</div></div></a></li>
-      <li><a href="#view-speaker" class="item-content item-link tab-link">
-        <div class="item-media"><i class="icon f7-icons">speaker_3_fill</i></div>
-        <div class="item-inner"><div class="item-title-wrap"><div class="item-title">Loa</div></div>
-          <div class="item-subtitle">Trạng thái, âm lượng, mic, nhật ký</div></div></a></li>
       <li><a href="#view-devices" class="item-content item-link tab-link">
         <div class="item-media"><i class="icon f7-icons">square_grid_2x2_fill</i></div>
         <div class="item-inner"><div class="item-title-wrap"><div class="item-title">Thiết bị</div></div>
@@ -248,7 +260,6 @@
         <div class="toolbar-pane">
           <a href="#view-chat" class="tab-link tab-link-active"><i class="icon f7-icons">chat_bubble_2_fill</i><span class="tabbar-label">Chat</span></a>
           <a href="#view-music" class="tab-link"><i class="icon f7-icons">music_note_fill</i><span class="tabbar-label">Nhạc</span></a>
-          <a href="#view-speaker" class="tab-link"><i class="icon f7-icons">speaker_3_fill</i><span class="tabbar-label">Loa</span></a>
           <a href="#view-devices" class="tab-link"><i class="icon f7-icons">square_grid_2x2_fill</i><span class="tabbar-label">Thiết bị</span></a>
           <a href="#view-settings" class="tab-link"><i class="icon f7-icons">gear_alt_fill</i><span class="tabbar-label">Cài đặt</span></a>
             <!-- Mini player nổi NGAY TRÊN tabbar (kiểu Apple Music) - đặt BÊN
@@ -304,21 +315,49 @@
     <div id="view-speaker" class="view tab" data-url="/">
       <div class="page" data-name="speaker">
         <div class="navbar"><div class="navbar-bg"></div><div class="navbar-inner">
-          <div class="title">Loa</div>
+          <!-- Trang Loa nằm trong Cài đặt (không còn tab riêng): nút quay về Cài đặt -->
+          <div class="left"><a href="#" class="link" id="speakerBack"><i class="icon icon-back"></i><span class="if-not-md">Cài đặt</span></a></div>
+          <div class="title" id="speakerTitle">Loa này</div>
         </div></div>
         <div class="page-content"><div class="page-inner">
-          <div class="list list-strong list-dividers inset">
-            <ul>
+          <div class="card card-outline card-dividers">
+            <div class="card-header"><span>Trạng thái</span><span class="muted" id="version"></span></div>
+            <div class="card-content"><div class="list list-outline-ios list-strong-ios list-dividers-ios" style="margin:0"><ul>
               <li class="item-content"><div class="item-media"><span class="dot" data-state-dot></span></div>
-                <div class="item-inner"><div class="item-title" data-state-text>…</div><div class="item-after" id="version"></div></div></li>
-              <li class="item-content"><div class="item-inner"><div class="item-title">Từ đánh thức</div><div class="item-after" id="wakeName">—</div></div></li>
-              <li class="item-content"><div class="item-inner"><div class="item-title">Mức mic · điểm nhận</div><div class="item-after" id="diag">—</div></div></li>
-            </ul>
+                <div class="item-inner"><div class="item-title" data-state-text>…</div></div></li>
+              <li class="item-content"><div class="item-media"><i class="icon f7-icons">waveform</i></div>
+                <div class="item-inner"><div class="item-title">Từ đánh thức</div><div class="item-after" id="wakeName">—</div></div></li>
+              <li class="item-content"><div class="item-media"><i class="icon f7-icons">mic</i></div>
+                <div class="item-inner"><div class="item-title">Mức mic · điểm nhận</div><div class="item-after" id="diag">—</div></div></li>
+            </ul></div></div>
           </div>
 
-          <div class="block-title">Hệ thống</div>
-          <div class="list list-strong list-dividers inset">
-            <ul>
+          <div class="card card-outline card-dividers">
+            <div class="card-header">Điều khiển</div>
+            <div class="card-content"><div class="list list-outline-ios list-strong-ios list-dividers-ios" style="margin:0"><ul>
+              <!-- Âm lượng: 1 dòng duy nhất - icon nhỏ | thanh trượt | icon to + số (trước đây thanh trượt nằm rời bên dưới) -->
+              <li class="item-content vol-row"><div class="item-media"><i class="icon f7-icons">speaker_1_fill</i></div>
+                <div class="item-inner"><input type="range" id="vol" min="0" max="15" step="1">
+                  <i class="icon f7-icons vol-to">speaker_3_fill</i><span class="vol-so" id="volLabel"></span></div></li>
+              <li class="item-content"><div class="item-media"><i class="icon f7-icons">ear</i></div>
+                <div class="item-inner"><div class="item-title">Nghe từ đánh thức</div>
+                  <div class="item-after"><label class="toggle"><input type="checkbox" id="runToggle"><span class="toggle-icon"></span></label></div></div></li>
+              <li class="item-content"><div class="item-media"><i class="icon f7-icons">airplayaudio</i></div>
+                <div class="item-inner"><div class="item-title">AirPlay + DLNA<div class="item-footer" id="airplaySub">Phát nhạc từ iPhone / máy tính / app nhiều loa</div></div>
+                  <div class="item-after"><label class="toggle"><input type="checkbox" id="airplayToggle"><span class="toggle-icon"></span></label></div></div></li>
+              <li class="item-content"><div class="item-media"><svg class="icon" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6.5 6.5l11 11L12 23V1l5.5 5.5-11 11"/></svg></div>
+                <div class="item-inner"><div class="item-title">Bluetooth</div>
+                  <div class="item-after"><label class="toggle"><input type="checkbox" id="btToggle"><span class="toggle-icon"></span></label></div></div></li>
+              <li><a href="#" class="item-link item-content" id="btnListen"><div class="item-media"><i class="icon f7-icons">mic_circle_fill</i></div>
+                <div class="item-inner"><div class="item-title">Nghe ngay<div class="item-footer">Không cần gọi từ đánh thức</div></div></div></a></li>
+              <li><a href="#" class="item-link item-content" id="btnReset"><div class="item-media"><i class="icon f7-icons">trash</i></div>
+                <div class="item-inner"><div class="item-title">Xoá trí nhớ hội thoại</div></div></a></li>
+            </ul></div></div>
+          </div>
+
+          <div class="card card-outline card-dividers">
+            <div class="card-header">Hệ thống</div>
+            <div class="card-content"><div class="list list-outline-ios list-strong-ios list-dividers-ios" style="margin:0"><ul>
               <li class="item-content"><div class="item-media"><i class="icon f7-icons">speedometer</i></div>
                 <div class="item-inner"><div class="item-title">CPU<div class="item-footer" id="sysCpuSub"></div></div>
                   <div class="item-after"><div style="text-align:right"><span id="sysCpu">—</span><div class="sys-bar"><span id="sysCpuBar" style="width:0"></span></div></div></div></div></li>
@@ -333,43 +372,21 @@
                 <div class="item-inner"><div class="item-title">Bộ nhớ trong</div><div class="item-after" id="sysDisk">—</div></div></li>
               <li class="item-content"><div class="item-media"><i class="icon f7-icons">clock</i></div>
                 <div class="item-inner"><div class="item-title">Đã bật<div class="item-footer" id="sysOs"></div></div><div class="item-after" id="sysUp">—</div></div></li>
-            </ul>
+            </ul></div></div>
           </div>
 
-          <div class="block-title">Điều khiển</div>
-          <div class="list list-strong list-dividers inset">
-            <ul>
-              <li class="item-content"><div class="item-media"><i class="icon f7-icons">ear</i></div>
-                <div class="item-inner"><div class="item-title">Nghe từ đánh thức</div>
-                  <div class="item-after"><label class="toggle"><input type="checkbox" id="runToggle"><span class="toggle-icon"></span></label></div></div></li>
-              <li class="item-content"><div class="item-media"><i class="icon f7-icons">airplayaudio</i></div>
-                <div class="item-inner"><div class="item-title">AirPlay + DLNA<div class="item-footer" id="airplaySub">Phát nhạc từ iPhone / máy tính / app nhiều loa</div></div>
-                  <div class="item-after"><label class="toggle"><input type="checkbox" id="airplayToggle"><span class="toggle-icon"></span></label></div></div></li>
-              <li class="item-content"><div class="item-media"><!-- f7-icons không có biểu tượng Bluetooth: vẽ bằng SVG, cùng màu / cỡ với icon khác -->
-                <svg class="icon" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-                  stroke-linecap="round" stroke-linejoin="round"><path d="M6.5 6.5l11 11L12 23V1l5.5 5.5-11 11"/></svg></div>
-                <div class="item-inner"><div class="item-title">Bluetooth</div>
-                  <div class="item-after"><label class="toggle"><input type="checkbox" id="btToggle"><span class="toggle-icon"></span></label></div></div></li>
-              <li class="item-content"><div class="item-media"><i class="icon f7-icons">speaker_3_fill</i></div>
-                <div class="item-inner"><div class="item-title">Âm lượng</div><div class="item-after" id="volLabel"></div></div></li>
-            </ul>
-            <div class="range-row"><input type="range" id="vol" min="0" max="15" step="1"></div>
-            <div class="btn-row">
-              <a href="#" class="button button-tonal" id="btnListen"><i class="icon f7-icons" style="font-size:18px">mic</i>&nbsp;Nghe ngay</a>
-              <a href="#" class="button button-tonal" id="btnReset"><i class="icon f7-icons" style="font-size:18px">trash</i>&nbsp;Xoá trí nhớ</a>
-            </div>
-          </div>
-
-          <div class="block-title">Micro</div>
-          <div class="list list-strong list-dividers inset">
-            <div class="btn-row" style="padding-top:14px">
+          <div class="card card-outline card-dividers">
+            <div class="card-header">Micro</div>
+            <div class="card-content card-content-padding">
               <a href="#" class="button button-tonal" id="btnMic"><i class="icon f7-icons" style="font-size:18px">play_fill</i>&nbsp;Nghe lại 5 giây mic</a>
+              <audio id="micAudio" controls style="width:100%;margin-top:10px"></audio>
             </div>
-            <div style="padding:0 16px 14px"><audio id="micAudio" controls style="width:100%"></audio></div>
           </div>
 
-          <div class="block-title">Nhật ký</div>
-          <div class="list list-strong list-dividers inset"><div class="log" id="log"></div></div>
+          <div class="card card-outline card-dividers">
+            <div class="card-header">Nhật ký</div>
+            <div class="card-content"><div class="log" id="log"></div></div>
+          </div>
         </div></div>
       </div>
     </div>
@@ -400,39 +417,43 @@
             title="Đổi địa chỉ Voicebot"><i class="icon f7-icons">arrow_right_arrow_left_square</i></a></div>
         </div></div>
         <div class="page-content"><div class="page-inner">
-          <div class="list list-strong list-dividers inset media-list">
-            <ul>
-              <li class="list-group-title" style="display:flex;justify-content:space-between;align-items:center">
-                <span>Trợ lý</span>
-                <span style="display:flex;align-items:center;gap:8px;font-weight:400;font-size:14px">Nghe từ đánh thức
-                  <label class="toggle"><input type="checkbox" id="runToggle2"><span class="toggle-icon"></span></label></span></li>
+          <div class="card card-outline card-dividers">
+            <div class="card-header"><span>Trợ lý</span><span style="display:flex;align-items:center;gap:8px;font-weight:400;font-size:14px;color:var(--f7-text-color)">Nghe từ đánh thức <label class="toggle"><input type="checkbox" id="runToggle2"><span class="toggle-icon"></span></label></span></div>
+            <div class="card-content"><div class="list list-outline-ios list-strong-ios list-dividers-ios media-list" style="margin:0"><ul>
               <li><a href="/gemini/" class="item-link item-content"><div class="item-media"><i class="icon f7-icons" style="color:#2f80ed">sparkles</i></div>
-                <div class="item-inner"><div class="item-title">Gemini</div><div class="item-subtitle">API key, model, tính cách</div></div></a></li>
+                <div class="item-inner"><div class="item-title">Gemini</div><div class="item-subtitle">API key, model, tính cách, xưng hô</div></div></a></li>
               <li><a href="/voice/" class="item-link item-content"><div class="item-media"><i class="icon f7-icons" style="color:#2f80ed">waveform</i></div>
                 <div class="item-inner"><div class="item-title">Giọng đọc</div><div class="item-subtitle">Bộ đọc, giọng, tốc độ</div></div></a></li>
               <li><a href="/stt/" class="item-link item-content"><div class="item-media"><i class="icon f7-icons" style="color:#2f80ed">text_bubble_fill</i></div>
                 <div class="item-inner"><div class="item-title">Nhận giọng nói & Gemini Live</div><div class="item-subtitle">Google STT, service account, trò chuyện liên tục</div></div></a></li>
               <li><a href="/ha/" class="item-link item-content"><div class="item-media"><i class="icon f7-icons" style="color:#2f80ed">house_fill</i></div>
                 <div class="item-inner"><div class="item-title">Home Assistant</div><div class="item-subtitle">Địa chỉ, token, kiểm tra kết nối</div></div></a></li>
-            </ul>
+            </ul></div></div>
           </div>
-          <div class="list list-strong list-dividers inset media-list">
-            <ul>
-              <li class="list-group-title">Mic & Led</li>
+          <div class="card card-outline card-dividers">
+            <div class="card-header">Mic & Led</div>
+            <div class="card-content"><div class="list list-outline-ios list-strong-ios list-dividers-ios media-list" style="margin:0"><ul>
               <li><a href="/wake/" class="item-link item-content"><div class="item-media"><i class="icon f7-icons" style="color:#2f80ed">mic_fill</i></div>
                 <div class="item-inner"><div class="item-title">Từ đánh thức & micro</div><div class="item-subtitle">Model, ngưỡng, âm báo, độ nhạy mic</div></div></a></li>
               <li><a href="/led/" class="item-link item-content"><div class="item-media"><i class="icon f7-icons" style="color:#2f80ed">lightbulb_fill</i></div>
-                <div class="item-inner"><div class="item-title">Đèn LED</div><div class="item-subtitle">Bật/tắt đèn theo trạng thái</div></div></a></li>
+                <div class="item-inner"><div class="item-title">Đèn LED</div><div class="item-subtitle">Theo trạng thái, theo nhạc, thử đèn</div></div></a></li>
+            </ul></div></div>
+          </div>
+          <div class="card card-outline card-dividers">
+            <div class="card-header">Loa</div>
+            <div class="card-content"><div class="list list-outline-ios list-strong-ios list-dividers-ios media-list" style="margin:0"><ul>
+              <li><a href="#" class="item-link item-content" id="openSpeaker"><div class="item-media"><i class="icon f7-icons" style="color:#2f80ed">speaker_3_fill</i></div>
+                <div class="item-inner"><div class="item-title" id="speakerItem">Loa này</div><div class="item-subtitle">Trạng thái, âm lượng, AirPlay, Bluetooth, Wi-Fi, nhật ký</div></div></a></li>
               <li><a href="/group/" class="item-link item-content"><div class="item-media"><i class="icon f7-icons" style="color:#2f80ed">hifispeaker_2_fill</i></div>
                 <div class="item-inner"><div class="item-title">Nhóm loa</div><div class="item-subtitle">Phát nhạc đồng bộ nhiều loa, stereo</div></div></a></li>
-            </ul>
+            </ul></div></div>
           </div>
-          <div class="list list-strong list-dividers inset media-list">
-            <ul>
-              <li class="list-group-title">Hệ thống</li>
+          <div class="card card-outline card-dividers">
+            <div class="card-header">Hệ thống</div>
+            <div class="card-content"><div class="list list-outline-ios list-strong-ios list-dividers-ios media-list" style="margin:0"><ul>
               <li><a href="/update/" class="item-link item-content"><div class="item-media"><i class="icon f7-icons" style="color:#2f80ed">arrow_down_circle_fill</i></div>
                 <div class="item-inner"><div class="item-title">Cập nhật app</div><div class="item-subtitle" id="verSub">Cài APK / file zip từ GitHub</div></div></a></li>
-            </ul>
+            </ul></div></div>
           </div>
         </div></div>
       </div>
@@ -587,7 +608,10 @@ function rng(k, label, min, max, step, fmt, foot) {
   return row(`<div class="item-title item-label">${label} <b data-rl="${k}"></b></div>
     <div class="item-input-wrap" style="padding:6px 0"><input data-k="${k}" data-fmt="${fmt}" type="range" min="${min}" max="${max}" step="${step}" style="width:100%;accent-color:var(--f7-theme-color)"></div>`, foot);
 }
-const list = (title, items, footer) => `${title ? `<div class="block-title">${title}</div>` : ''}<div class="list list-strong list-dividers inset"><ul>${items.join('')}</ul></div>${footer ? `<div class="block-footer">${footer}</div>` : ''}`;
+// Như Voicebot: mỗi nhóm cài đặt là 1 card (tiêu đề trên card-header), danh sách nằm trong card
+const list = (title, items, footer) => `<div class="card card-outline card-dividers">${title ? `<div class="card-header">${title}</div>` : ''}
+  <div class="card-content"><div class="list list-outline-ios list-strong-ios list-dividers-ios" style="margin:0"><ul>${items.join('')}</ul></div></div>
+  ${footer ? `<div class="card-footer"><span>${footer}</span></div>` : ''}</div>`;
 function subpage(name, title, body, opt = {}) {
   return `<div class="page" data-name="${name}">
     <div class="navbar"><div class="navbar-bg"></div><div class="navbar-inner">
@@ -659,12 +683,11 @@ const PAGES = {
       sel('stt_engine', 'Cách nghe câu hỏi', [['google', 'Google Cloud STT → chữ (nhanh, hỏi giờ trả lời tại loa)'], ['gemini', 'Gemini nghe trực tiếp (không cần Cloud)']]),
       tog('local_time', 'Hỏi giờ / ngày / thứ trả lời tại loa', 'Không gửi Gemini, nhanh hơn'),
     ])
-    + `<div class="block-title">Service account Google Cloud</div>
-      <div class="list list-strong list-dividers inset"><ul>
-        <li class="item-content"><div class="item-inner"><div class="item-title">${S.config.gcloud_sa_email ? esc(S.config.gcloud_sa_email) : 'Chưa có – dùng API key'}
-          <div class="item-footer">Dùng cho Google STT và Cloud TTS (project phải bật billing).</div></div></div></li>
-        <li class="item-content item-input"><div class="item-inner"><div class="item-input-wrap"><input type="file" id="saFile" accept=".json,application/json"></div></div></li>
-      </ul><div class="btn-row" style="padding-top:6px"><a href="#" class="button button-fill" id="saUpload">Lưu file JSON</a><a href="#" class="button button-tonal color-red" id="saClear">Xoá</a></div></div>`
+    + list('Service account Google Cloud', [
+      `<li class="item-content"><div class="item-inner"><div class="item-title">${S.config.gcloud_sa_email ? esc(S.config.gcloud_sa_email) : 'Chưa có – dùng API key'}
+          <div class="item-footer">Dùng cho Google STT và Cloud TTS (project phải bật billing).</div></div></div></li>`,
+      `<li class="item-content item-input"><div class="item-inner"><div class="item-input-wrap"><input type="file" id="saFile" accept=".json,application/json"></div></div></li>`,
+      `<li><div class="btn-row" style="padding:10px 16px"><a href="#" class="button button-fill" id="saUpload">Lưu file JSON</a><a href="#" class="button button-tonal color-red" id="saClear">Xoá</a></div></li>`])
     + list('Gemini Live (trò chuyện liên tục)', [
       tog('live', 'Bật Gemini Live', 'Gọi từ đánh thức một lần rồi nói chuyện liên tục; nói "tạm biệt" để dừng'),
       pick('live_model', 'Model Live', MODELS_LIVE, 'Không có bản Live 3.5 để trò chuyện (3.5 chỉ có Live dịch / chép lời).'),
@@ -695,10 +718,10 @@ const PAGES = {
     + list('Micro', [
       rng('mic_gain', 'Khuếch đại micro', 0.5, 16, 0.5, 'x', 'Mic R1 thu nhỏ; đang dùng khoảng 4.'),
     ])
-    + `<div class="block-title">Model tự huấn luyện (.tflite, kèm .json)</div>
-      <div class="list list-strong list-dividers inset"><ul><li class="item-content item-input"><div class="item-inner"><div class="item-input-wrap">
-      <input type="file" id="modelFile" accept=".tflite,.json" multiple></div></div></li></ul>
-      <div class="btn-row" style="padding-top:6px"><a href="#" class="button button-fill" id="modelUpload">Tải lên & chọn</a></div></div>`),
+    + list('Model tự huấn luyện (.tflite, kèm .json)', [
+      `<li class="item-content item-input"><div class="item-inner"><div class="item-input-wrap">
+      <input type="file" id="modelFile" accept=".tflite,.json" multiple></div></div></li>`,
+      `<li><div class="btn-row" style="padding:10px 16px"><a href="#" class="button button-fill" id="modelUpload">Tải lên & chọn</a></div></li>`])),
 
   led: () => subpage('led', 'Đèn LED',
     list('', [
@@ -706,11 +729,11 @@ const PAGES = {
       tog('music_led', 'Đèn theo nhạc', 'Đang phát nhạc thì viền sáng nhiều / ít theo độ to của nhạc (cả nhạc nhóm loa).'),
       tog('music_led_inner', 'Đèn trong theo nhạc', 'Đèn nhỏ ở giữa đổi màu theo độ to: xanh dương → xanh ngọc → xanh lá → hồng tím.'),
     ])
-    + `<div class="block-title">Thử đèn</div>
-      <div class="list list-strong inset"><div class="led-grid">
+    + `<div class="card card-outline card-dividers"><div class="card-header">Thử đèn</div>
+      <div class="card-content"><div class="led-grid">
         ${LED_TESTS.map(([v, t]) => `<a href="#" class="button button-tonal" data-led="${v}">${t}</a>`).join('')}
       </div></div>
-      <div class="block-footer">Bấm một kiểu để giữ đèn ở kiểu đó; "Theo bot" để đèn đổi theo trạng thái bot. Rời trang này thì tự về "Theo bot".</div>`
+      <div class="card-footer"><span>Bấm một kiểu để giữ đèn ở kiểu đó; "Theo bot" để đèn đổi theo trạng thái bot. Rời trang này thì tự về "Theo bot".</span></div></div>`
     + list('Ý nghĩa', [
       ['Đánh thức', 'vệt sáng quét một vòng viền'], ['Nghe', 'viền trắng + đèn trong thở xanh dương'],
       ['Nghĩ', 'sao chổi chạy vòng + nhịp xanh lá'], ['Nói', 'viền trắng + đèn trong xanh lá'],
@@ -718,9 +741,10 @@ const PAGES = {
     ].map(([a, b]) => `<li class="item-content"><div class="item-inner"><div class="item-title">${a}</div><div class="item-after">${b}</div></div></li>`))),
 
   group: () => subpage('group', 'Nhóm loa',
-    `<div class="block-title">Loa trong nhóm</div>
-      <div class="list list-strong list-dividers inset"><ul id="grpList"><li class="item-content"><div class="item-inner muted">Đang tìm loa R1 trong mạng…</div></li></ul></div>
-      <div class="block-footer">Loa R1 khác chạy app Gemini R1 trong cùng mạng. Chọn rồi bấm Lưu (đĩa mềm ở trên).</div>`
+    `<div class="card card-outline card-dividers"><div class="card-header">Loa trong nhóm</div>
+      <div class="card-content"><div class="list list-outline-ios list-strong-ios list-dividers-ios" style="margin:0"><ul id="grpList">
+        <li class="item-content"><div class="item-inner muted">Đang tìm loa R1 trong mạng…</div></li></ul></div></div>
+      <div class="card-footer"><span>Loa R1 khác chạy app Gemini R1 trong cùng mạng. Chọn rồi bấm Lưu (đĩa mềm ở trên).</span></div></div>`
     + list('', [
       inp('group_members', 'IP các loa (cách nhau bằng dấu phẩy)', { ph: '192.168.2.98' }),
       tog('group_stereo', 'Stereo', 'Loa này phát kênh trái, loa đầu tiên trong danh sách phát kênh phải'),
@@ -773,6 +797,9 @@ const app = new Framework7({
   on: { pageInit(page) { if (PAGES[page.name]) initSubpage(page); } },
 });
 window.f7app = app; // baoLoi() của Pi dùng tên này
+// Cài đặt → "Loa này" mở trang Loa; nút ‹ Cài đặt quay về
+document.getElementById('openSpeaker').addEventListener('click', e => { e.preventDefault(); app.tab.show('#view-speaker'); });
+document.getElementById('speakerBack').addEventListener('click', e => { e.preventDefault(); app.tab.show('#view-settings'); });
 
 // Ô chat nằm ngay trên thanh tab (và mini player nếu đang hiện) theo VỊ TRÍ THẬT đo được: app.css của Pi dời
 // tabbar khác nhau tuỳ Safari / web app trên MH chính / app Capacitor, đặt số cố định thì có lúc bị che.
@@ -803,9 +830,11 @@ if (window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.is
 app.views.create('#view-music', { url: '/music/' });
 ['#view-chat', '#view-music', '#view-speaker', '#view-devices', '#view-settings'].forEach(v => {
   if (v !== '#view-music') app.views.create(v); // view Nhạc đã tạo ở trên
-  // F7 chỉ tô nút trong menu vừa bấm -> đồng bộ cả menu trái (máy tính) lẫn thanh tab dưới (điện thoại)
+  // F7 chỉ tô nút trong menu vừa bấm -> đồng bộ cả menu trái (máy tính) lẫn thanh tab dưới (điện thoại).
+  // Trang Loa nằm trong Cài đặt (không có tab riêng) -> vẫn tô Cài đặt.
+  const tab = v === '#view-speaker' ? '#view-settings' : v;
   document.querySelector(v).addEventListener('tab:show', () => document.querySelectorAll('.tab-link')
-    .forEach(a => a.classList.toggle('tab-link-active', a.getAttribute('href') === v)));
+    .forEach(a => a.classList.toggle('tab-link-active', a.getAttribute('href') === tab)));
 });
 
 function fillFields(el) {
@@ -1383,6 +1412,8 @@ async function refresh() {
     }
     renderSys(S.sys || {});
     if (S.wifi_switch) $('wifiMsg').textContent = S.wifi_switch_msg;
+    // Tên thiết bị thay cho "Loa này": "Phicomm_R1_9457" -> "Phicomm R1 9457"
+    if (S.device_name) { const ten = S.device_name.replace(/_/g, ' '); $('speakerTitle').textContent = ten; $('speakerItem').textContent = ten; }
     if (!extrasPending) { $('airplayToggle').checked = !!S.airplay; $('btToggle').checked = !!S.bluetooth; }
     $('airplaySub').textContent = S.extras_busy || 'Phát nhạc từ iPhone / máy tính / app nhiều loa';
     const log = $('log'), atBottom = log.scrollTop + log.clientHeight >= log.scrollHeight - 10;

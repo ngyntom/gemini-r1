@@ -361,6 +361,7 @@ class WebServer {
                 .put("version", bot.getPackageManager().getPackageInfo(bot.getPackageName(), 0).versionName)
                 .put("paused", bot.isPaused())
                 .put("led_test", Led.test == null ? "" : Led.test)
+                .put("device_name", Group.deviceName()) // tên Bluetooth của loa, vd. Phicomm_R1_9457
                 .put("airplay", Extras.airplayOn(bot))
                 .put("bluetooth", Extras.bluetoothOn())
                 .put("extras_busy", Extras.busy)
