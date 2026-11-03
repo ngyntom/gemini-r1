@@ -2,7 +2,9 @@
 <html lang="vi">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no, viewport-fit=cover"><!-- Như Pi: "Thêm vào MH chính" trên iPhone mở thành app riêng (standalone), app.css hạ tabbar cho chế độ này -->
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no, viewport-fit=cover">
+<!-- Như common.js của Pi: áp ngay cỡ chữ đã lưu (Cài đặt > Giao diện > Cỡ chữ) trước khi trang vẽ, khỏi nhảy cỡ -->
+<script>try { const c = localStorage.getItem('voicebot_font_scale'); if (c) document.documentElement.style.setProperty('--ty-le-co-chu', c); } catch (e) {}</script><!-- Như Pi: "Thêm vào MH chính" trên iPhone mở thành app riêng (standalone), app.css hạ tabbar cho chế độ này -->
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Phicomm R1">
@@ -66,13 +68,13 @@
   #sidebar .item-subtitle { font-size: 12px; opacity: .65; white-space: normal; }
 
   .page-inner { max-width: 760px; margin: 0 auto; }
-  .muted { opacity: .6; font-size: 13px; }
+  .muted { opacity: .6; font-size: calc(13px * var(--ty-le-co-chu, 1)); }
   .block-footer, .item-footer { white-space: normal; }
 
   /* Chat */
   .chat-list { padding: 12px 14px 90px; display: flex; flex-direction: column; gap: 6px; max-width: 760px; margin: 0 auto; }
   .chat-time { align-self: center; font-size: 12px; opacity: .55; margin: 10px 0 4px; }
-  .msg { max-width: 78%; padding: 8px 13px; border-radius: 18px; font-size: 16px; line-height: 1.35;
+  .msg { max-width: 78%; padding: 8px 13px; border-radius: 18px; font-size: calc(16px * var(--ty-le-co-chu, 1)); line-height: 1.35;
          white-space: pre-wrap; word-break: break-word; }
   .msg.user { align-self: flex-end; background: var(--f7-theme-color); color: #fff; border-bottom-right-radius: 6px; }
   .msg-row { display: flex; align-items: flex-end; gap: 8px; align-self: flex-start; max-width: 86%; }
@@ -128,7 +130,7 @@
   .tile.busy { opacity: .35; }
   /* Chú thích cuối card như Pi (api.html / nhac-nho.html): 1 <p> chữ mờ ngay dưới list, KHÔNG dùng .card-footer -
      card-footer có viền trên riêng nên chồng lên đường kẻ dưới ô nhập cuối (app.css giữ đường kẻ đó) thành 2 vạch */
-  .card-note { margin: 10px 0 14px; padding: 0 16px; font-size: 13px; line-height: 1.4;
+  .card-note { margin: 10px 0 14px; padding: 0 16px; font-size: calc(13px * var(--ty-le-co-chu, 1)); line-height: 1.4;
                color: var(--f7-list-item-footer-text-color); white-space: normal; }
   /* Khung xương lúc đang tải (như .ha-dash-skeleton của Pi): màu --skeleton-color của F7, tự đổi theo sáng / tối */
   .tile.sk { background: var(--skeleton-color); opacity: 1; cursor: default; }
@@ -473,7 +475,7 @@
             <div class="card-header">Hệ thống</div>
             <div class="card-content"><div class="list list-outline-ios list-strong-ios list-dividers-ios media-list" style="margin:0"><ul>
               <li><a href="/theme/" class="item-link item-content"><div class="item-media"><i class="icon f7-icons" style="color:#2f80ed">paintbrush_fill</i></div>
-                <div class="item-inner"><div class="item-title">Giao diện</div><div class="item-subtitle">Sáng / tối, iOS / Material, màu chủ đề</div></div></a></li>
+                <div class="item-inner"><div class="item-title">Giao diện</div><div class="item-subtitle">Sáng / tối, iOS / Material, cỡ chữ, màu chủ đề</div></div></a></li>
               <li><a href="/update/" class="item-link item-content"><div class="item-media"><i class="icon f7-icons" style="color:#2f80ed">arrow_down_circle_fill</i></div>
                 <div class="item-inner"><div class="item-title">Cập nhật app</div><div class="item-subtitle" id="verSub">Cài APK / file zip từ GitHub</div></div></a></li>
             </ul></div></div>
@@ -809,7 +811,7 @@ routes.push({ path: '/theme/', componentUrl: '/static/pages/theme.html' }); // t
 const THEME_MODE_KEY = 'voicebot_theme_mode';   // 'ios' | 'md' | 'auto'
 const DARK_MODE_KEY = 'voicebot_dark_mode';     // 'light' | 'dark' | 'auto'
 const COLOR_THEME_KEY = 'voicebot_color_theme'; // mã hex
-const FONT_SCALE_KEY = 'voicebot_font_scale';   // trang Giao diện của Pi cần biến này; loa không dùng mục Cỡ chữ
+const FONT_SCALE_KEY = 'voicebot_font_scale';   // Cỡ chữ (trang Giao diện) - áp lúc tải trang ở <head>
 function docCaiDat(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
 routes.push({ path: '/speaker/', el: SPEAKER_PAGE }); // trang Loa, mở từ Cài đặt có hiệu ứng trượt như trang con
 

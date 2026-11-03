@@ -85,7 +85,29 @@
         </div>
       </div>
 
-<div class="card card-outline card-dividers">
+      <div class="card card-outline card-dividers">
+        <div class="card-header">Cỡ chữ</div>
+        <div class="card-content">
+          <div class="list no-hairlines-md" style="margin:0;">
+            <ul>
+              <li class="item-content item-input">
+                <div class="item-inner">
+                  <!-- Như Pi: 2 icon nhỏ/lớn cố định kẹp 2 bên thanh trượt (không co theo cỡ chữ đang chỉnh) -->
+                  <div class="item-input-wrap" id="theme-font-scale-wrap">
+                    <div style="display:flex; align-items:center; gap:8px;">
+                      <i class="icon f7-icons" style="font-size:14px; flex-shrink:0;">textformat_size</i>
+                      <div class="range-slider" id="theme-font-scale-range" style="flex:1;"></div>
+                      <i class="icon f7-icons" style="font-size:22px; flex-shrink:0;">textformat_size</i>
+                    </div>
+                  </div>
+                </div>
+              </li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
+      <div class="card card-outline card-dividers">
         <div class="card-header">Màu chủ đề</div>
         <div class="card-content" style="padding:16px;">
           <div class="grid grid-cols-3 medium-grid-cols-4 grid-gap" id="theme-color-grid"></div>
@@ -244,7 +266,7 @@ export default (props, { $f7, $on }) => {
     renderMauChuDeGrid();
     bindThemeDarkPreview();
     bindThemeIosMdPreview();
-    // (Cỡ chữ: bỏ trên loa, không dùng)
+    ensureThemeFontScaleRange();
 
     const mauDaLuu = localStorage.getItem(COLOR_THEME_KEY);
     const mauHienTai = mauDaLuu || getComputedStyle(document.documentElement).getPropertyValue('--f7-color-primary').trim() || '#007aff';
