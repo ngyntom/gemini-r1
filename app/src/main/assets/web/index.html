@@ -44,8 +44,25 @@
   /* app.css của Pi hạ tabbar 50px (.toolbar-pane margin-bottom:-50px) khi chạy như app: thêm vào MH chính
      (standalone) hoặc trong app iOS Capacitor (F7 tự gắn html.device-capacitor). Ô chat của loa (.chat-bar,
      Pi dùng .messagebar) hạ theo cùng khoảng, kẻo nổi lệch cao hơn tabbar. */
-  @media (display-mode: standalone) { #view-chat .chat-bar { --chat-bar-ha: 50px; } }
-  html.device-capacitor #view-chat .chat-bar { --chat-bar-ha: 50px; }
+  /* (Vị trí thật do JS đặt: datChatBar() đo thanh tab, xem cuối file - hạ cố định 50px thì bị tabbar che) */
+  /* Trang Cập nhật app */
+  .upd-ver { display: flex; align-items: center; gap: 14px; margin: 20px 16px 14px; }
+  .upd-ver > .icon { font-size: 44px; color: var(--f7-theme-color); }
+  .upd-ver-so { font-size: 28px; font-weight: 700; line-height: 1.1; }
+  .upd-drop { display: flex; flex-direction: column; align-items: center; gap: 6px; margin: 0 16px; padding: 26px 16px;
+              border: 2px dashed rgba(120,120,128,.35); border-radius: 18px; text-align: center; cursor: pointer;
+              background: var(--f7-list-bg-color, #fff); }
+  .upd-drop input { display: none; }
+  .upd-drop > .icon { font-size: 40px; color: var(--f7-theme-color); }
+  .upd-drop.co-file { border-style: solid; border-color: var(--f7-theme-color); }
+  .upd-drop-t { font-weight: 600; font-size: 16px; word-break: break-all; }
+  .upd-steps { margin: 16px 4px 4px; display: flex; flex-direction: column; gap: 10px; }
+  .upd-steps > div { display: flex; align-items: center; gap: 10px; opacity: .5; }
+  .upd-steps > div .icon { font-size: 22px; }
+  .upd-steps .dang, .upd-steps .xong, .upd-steps .loi { opacity: 1; }
+  .upd-steps .dang .icon { color: var(--f7-theme-color); }
+  .upd-steps .xong .icon { color: #34c759; }
+  .upd-steps .loi .icon { color: #ff3b30; }
   #sidebar .menu-list li { margin-bottom: 4px; }
   #sidebar .item-subtitle { font-size: 12px; opacity: .65; white-space: normal; }
 
@@ -67,7 +84,7 @@
   .chat-empty { text-align: center; opacity: .55; margin-top: 30vh; }
   .chat-bar { position: absolute; left: 0; right: 0; z-index: 20; padding: 8px 12px;
               bottom: calc(var(--chat-bar-bottom, calc(var(--f7-toolbar-height, 50px) + var(--f7-safe-area-bottom) + 14px))
-                      + var(--mini-player-offset, 0px) - var(--chat-bar-ha, 0px)); /* mini player (app.css của Pi) chiếm chỗ trên tabbar */
+                      + var(--mini-player-offset, 0px)); /* mini player (app.css của Pi) chiếm chỗ trên tabbar */
               display: flex; gap: 8px; align-items: center; max-width: 760px; margin: 0 auto; }
   .chat-bar input { flex: 1; min-width: 0; height: 42px; border-radius: 21px; padding: 0 16px; font-size: 16px;
                     background: var(--f7-list-bg-color, #fff); color: inherit;
@@ -525,12 +542,12 @@ function rng(k, label, min, max, step, fmt, foot) {
     <div class="item-input-wrap" style="padding:6px 0"><input data-k="${k}" data-fmt="${fmt}" type="range" min="${min}" max="${max}" step="${step}" style="width:100%;accent-color:var(--f7-theme-color)"></div>`, foot);
 }
 const list = (title, items, footer) => `${title ? `<div class="block-title">${title}</div>` : ''}<div class="list list-strong list-dividers inset"><ul>${items.join('')}</ul></div>${footer ? `<div class="block-footer">${footer}</div>` : ''}`;
-function subpage(name, title, body) {
+function subpage(name, title, body, opt = {}) {
   return `<div class="page" data-name="${name}">
     <div class="navbar"><div class="navbar-bg"></div><div class="navbar-inner">
       <div class="left"><a href="#" class="link back"><i class="icon icon-back"></i><span class="if-not-md">Cài đặt</span></a></div>
       <div class="title">${title}</div>
-      <div class="right"><a href="#" class="link icon-only save-btn" title="Lưu"><i class="icon f7-icons">floppy_disk</i></a></div>
+      ${opt.noSave ? '' : '<div class="right"><a href="#" class="link icon-only save-btn" title="Lưu"><i class="icon f7-icons">floppy_disk</i></a></div>'}
     </div></div>
     <div class="page-content"><div class="page-inner" style="padding-bottom:40px">${body}</div></div></div>`;
 }
@@ -664,12 +681,25 @@ const PAGES = {
     ], 'Phát theo nhóm: trang Nhạc → biểu tượng chọn nơi phát → "Nhóm loa" (hoặc chỉ một loa khác). '
       + 'Nhạc ra cùng lúc trên mọi loa; gọi từ đánh thức ở loa nào thì loa đó tạm im.')),
 
+  // Không có nút 💾 trên navbar (trang này không có gì để "lưu"): 1 nút Cài duy nhất, các bước hiện ngay trong trang
   update: () => subpage('update', 'Cập nhật app',
-    `<div class="list list-strong list-dividers inset"><ul>
-      <li class="item-content"><div class="item-inner"><div class="item-title">Phiên bản đang chạy</div><div class="item-after">v${esc(S.version)}</div></div></li>
-      <li class="item-content item-input"><div class="item-inner"><div class="item-input-wrap"><input type="file" id="apkFile" accept=".apk,.zip"></div></div></li>
-    </ul><div class="btn-row" style="padding-top:6px"><a href="#" class="button button-fill" id="installBtn">Cài đặt</a></div></div>
-    <div class="block-footer" id="installMsg">Chọn app-debug.apk hoặc file .zip tải từ GitHub Actions. Cài đặt và API key được giữ nguyên.</div>`),
+    `<div class="upd-ver"><i class="icon f7-icons">checkmark_seal_fill</i>
+      <div><div class="upd-ver-so">v${esc(S.version)}</div><div class="muted">Phiên bản đang chạy trên loa này</div></div></div>
+    <label class="upd-drop" id="updDrop">
+      <input type="file" id="apkFile" accept=".apk,.zip">
+      <i class="icon f7-icons">arrow_up_doc_fill</i>
+      <div class="upd-drop-t" id="updFileName">Chọn file cập nhật</div>
+      <div class="muted" id="updFileInfo">gemini-r1-apk.zip tải từ GitHub Actions, hoặc app-debug.apk</div>
+    </label>
+    <div class="block">
+      <a href="#" class="button button-fill button-large button-round disabled" id="installBtn">Cài bản mới</a>
+      <div class="upd-steps" id="updSteps" style="display:none">
+        <div data-step="0"><i class="icon f7-icons">circle</i>Tải file lên loa <span id="updPct"></span></div>
+        <div data-step="1"><i class="icon f7-icons">circle</i>Loa cài bản mới</div>
+        <div data-step="2"><i class="icon f7-icons">circle</i>Bot khởi động lại</div>
+      </div>
+      <p class="muted" id="installMsg" style="text-align:center">Cài đặt, API key và thiết bị đã lưu được giữ nguyên.</p>
+    </div>`, { noSave: true }),
 };
 
 const routes = Object.keys(PAGES).map(name => ({
@@ -697,6 +727,25 @@ const app = new Framework7({
   on: { pageInit(page) { if (PAGES[page.name]) initSubpage(page); } },
 });
 window.f7app = app; // baoLoi() của Pi dùng tên này
+
+// Ô chat nằm ngay trên thanh tab (và mini player nếu đang hiện) theo VỊ TRÍ THẬT đo được: app.css của Pi dời
+// tabbar khác nhau tuỳ Safari / web app trên MH chính / app Capacitor, đặt số cố định thì có lúc bị che.
+function datChatBar() {
+  const bar = document.querySelector('#view-chat .chat-bar');
+  const tab = document.querySelector('#mobile-tabbar .toolbar-pane');
+  if (!bar || !tab || !bar.offsetParent || bar.style.transform) return; // đang gõ (ghim.js dịch ô chat) thì thôi
+  const r = tab.getBoundingClientRect();
+  if (!r.height) { bar.style.bottom = ''; return; } // máy tính: không có tabbar, dùng CSS
+  let top = r.top;
+  const mini = document.getElementById('mini-player');
+  if (mini && mini.style.display !== 'none') top = Math.min(top, mini.getBoundingClientRect().top);
+  const day = bar.offsetParent.getBoundingClientRect().bottom;
+  bar.style.bottom = Math.max(0, Math.round(day - top + 8)) + 'px';
+}
+['resize', 'orientationchange'].forEach(ev => window.addEventListener(ev, () => setTimeout(datChatBar, 50)));
+setInterval(datChatBar, 1000); // mini player hiện / ẩn, tabbar đổi chỗ sau khi F7 dựng xong
+setTimeout(datChatBar, 300);
+document.querySelector('#view-chat').addEventListener('tab:show', () => setTimeout(datChatBar, 0));
 // App iOS (Capacitor) mở Web UI bằng location.href từ màn nhập địa chỉ, F7 không dùng history ->
 // history.back() quay đúng về màn đó (cùng cách nút "Đổi địa chỉ Voicebot" của Pi)
 if (window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform()) {
@@ -786,7 +835,8 @@ function initSubpage(page) {
     mm.innerHTML = opts.map(([v, t]) => `<option value="${esc(v)}">${esc(t)}</option>`).join('');
     mm.value = cur;
   }
-  el.querySelector('.save-btn').addEventListener('click', async e => {
+  const saveBtn = el.querySelector('.save-btn');
+  if (saveBtn) saveBtn.addEventListener('click', async e => {
     e.preventDefault();
     const data = {};
     el.querySelectorAll('[data-k]').forEach(f => { data[f.dataset.k] = f.type === 'checkbox' ? (f.checked ? '1' : '0') : f.value; });
@@ -818,33 +868,69 @@ function initSubpage(page) {
     await refresh(); toast('Đã tải lên và chọn model'); page.router.back();
   });
   on('installBtn', () => installApk(el));
+  const fileIn = el.querySelector('#apkFile');
+  if (fileIn) fileIn.addEventListener('change', () => {
+    const f = fileIn.files[0];
+    el.querySelector('#updFileName').textContent = f ? f.name : 'Chọn file cập nhật';
+    el.querySelector('#updFileInfo').textContent = f ? (f.size / 1048576).toFixed(1) + ' MB · chạm để chọn file khác'
+      : 'gemini-r1-apk.zip tải từ GitHub Actions, hoặc app-debug.apk';
+    el.querySelector('#updDrop').classList.toggle('co-file', !!f);
+    el.querySelector('#installBtn').classList.toggle('disabled', !f);
+  });
+}
+
+// Bước cài trên trang Cập nhật: i = bước đang chạy (các bước trước tick xanh), err = bước đó lỗi
+function updStep(el, i, err) {
+  el.querySelector('#updSteps').style.display = '';
+  el.querySelectorAll('[data-step]').forEach(d => {
+    const k = +d.dataset.step, ic = d.querySelector('.icon');
+    d.className = k < i ? 'xong' : k === i ? (err ? 'loi' : 'dang') : '';
+    ic.textContent = k < i ? 'checkmark_circle_fill' : k === i ? (err ? 'xmark_circle_fill' : 'arrow_right_circle_fill') : 'circle';
+  });
+}
+// fetch không báo tiến độ tải lên -> dùng XMLHttpRequest
+function uploadWithProgress(url, file, onPct) {
+  return new Promise((ok, fail) => {
+    const x = new XMLHttpRequest();
+    x.open('POST', url);
+    x.upload.onprogress = e => { if (e.lengthComputable) onPct(Math.round(e.loaded * 100 / e.total)); };
+    x.onload = () => { let j = {}; try { j = JSON.parse(x.responseText); } catch (e) {}
+      x.status >= 200 && x.status < 300 ? ok(j) : fail(new Error(j.error || ('HTTP ' + x.status))); };
+    x.onerror = () => fail(new Error('Mất kết nối với loa'));
+    x.send(file);
+  });
 }
 
 // ---------- Cập nhật app ----------
 async function installApk(el) {
   let f = el.querySelector('#apkFile').files[0]; if (!f) return toast('Chọn file APK trước');
-  const btn = el.querySelector('#installBtn'), msg = el.querySelector('#installMsg');
+  const btn = el.querySelector('#installBtn'), msg = el.querySelector('#installMsg'), pct = el.querySelector('#updPct');
   btn.classList.add('disabled');
+  let step = 0;
   try {
+    updStep(el, 0);
     if (f.name.toLowerCase().endsWith('.zip')) { msg.textContent = 'Đang lấy APK trong file zip…'; f = await apkFromZip(f); }
     msg.textContent = 'Đang tải lên ' + (f.size / 1048576).toFixed(1) + ' MB…';
-    const r = await fetch('/api/install', { method: 'POST', body: f });
-    const j = await r.json().catch(() => ({}));
-    if (!r.ok) throw new Error(j.error || r.status);
-    msg.textContent = j.message;
+    const j = await uploadWithProgress('/api/install', f, p => { pct.textContent = p + '%'; });
+    pct.textContent = '';
+    step = 1; updStep(el, 1);
+    msg.textContent = j.message || 'Loa đang cài…';
     const old = S.version, t0 = Date.now();
     let down = false;
-    // App bị tắt khi cài -> chờ nó chạy lại rồi tải lại trang
+    // App bị tắt khi cài -> chờ nó chạy lại (mất kết nối = đang khởi động lại) rồi tải lại trang
     const wait = setInterval(async () => {
       try {
         const s = await (await fetch('/api/status')).json();
-        if (down || s.version !== old) { clearInterval(wait); location.reload(); return; }
+        if (down || s.version !== old) {
+          clearInterval(wait); updStep(el, 3); msg.textContent = 'Đã cập nhật lên v' + s.version + ', đang tải lại trang…';
+          setTimeout(() => location.reload(), 1200); return;
+        }
         const res = (s.log || []).filter(l => l.includes('Kết quả cập nhật')).pop();
-        if (res && res.includes('Failure')) { clearInterval(wait); msg.textContent = 'Cài lỗi: ' + res.split('Kết quả cập nhật: ')[1]; btn.classList.remove('disabled'); }
-      } catch (e) { down = true; }
-      if (Date.now() - t0 > 180000) { clearInterval(wait); msg.textContent = 'Hết giờ chờ, xem nhật ký.'; btn.classList.remove('disabled'); }
+        if (res && res.includes('Failure')) { clearInterval(wait); updStep(el, 1, true); msg.textContent = 'Cài lỗi: ' + res.split('Kết quả cập nhật: ')[1]; btn.classList.remove('disabled'); }
+      } catch (e) { if (!down) { down = true; step = 2; updStep(el, 2); msg.textContent = 'Bot đang khởi động lại (~30 giây)…'; } }
+      if (Date.now() - t0 > 180000) { clearInterval(wait); updStep(el, step, true); msg.textContent = 'Hết giờ chờ, xem nhật ký ở tab Loa.'; btn.classList.remove('disabled'); }
     }, 3000);
-  } catch (e) { msg.textContent = 'Lỗi: ' + e.message; btn.classList.remove('disabled'); }
+  } catch (e) { updStep(el, step, true); msg.textContent = 'Lỗi: ' + e.message; btn.classList.remove('disabled'); }
 }
 
 // Lấy file .apk đầu tiên trong zip (artifact GitHub Actions nén kiểu deflate)
