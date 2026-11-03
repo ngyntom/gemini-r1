@@ -28,7 +28,7 @@ import java.util.List;
  *   lỗi   = viền tắt + đèn trong đỏ
  *   tắt mic = viền tắt + đèn trong đỏ mờ
  *   rảnh  = tắt hết
- * Nghe thấy từ đánh thức thì vệt sáng quét 1 vòng quanh viền (script nền) rồi mới vào hiệu ứng
+ * Nghe thấy từ đánh thức thì lưỡi liềm sáng xoay 1 vòng quanh viền (script nền) rồi mới vào hiệu ứng
  * nghe; nút "Nghe ngay" trên Web UI không quét vì bot không nghe thấy từ khóa.
  *
  * App thường không chạy được lights_test / ghi được /sys nên gọi qua shell của adbd (LocalAdb).
@@ -280,12 +280,28 @@ final class Led {
      * Script quét sáng đánh thức: đầu sáng chạy đúng 1 vòng viền với đuôi mờ ngắn (~1 s/vòng,
      * thử trên loa), tự kết thúc nên không cần PID/STOPF. Mở đầu bằng xoá viền cho sạch.
      */
+    /** Số đèn của lưỡi liềm đánh thức (đã duyệt trên bản mô phỏng: 9 đèn, ~45 ms / bước, xoay xong viền sáng trắng). */
+    private static final int CRESCENT = 9;
+
+    /**
+     * Đánh thức: lưỡi liềm sáng (dày giữa, nhọn dần 2 đầu) xoay đúng 1 vòng theo chiều kim đồng hồ rồi dừng; lệnh
+     * "listening" ngay sau đó bật cả viền trắng. Mỗi bước ghi lại 9 đèn của cung + tắt đèn vừa ra khỏi đuôi (các lần
+     * ghi cộng dồn nên đèn khác giữ nguyên); 10 lần ghi + PACE ~ 45 ms / bước, 24 bước ~ 1,1 s.
+     */
     private static File writeSweep(Context ctx) throws Exception {
+        String[] muc = new String[CRESCENT];
+        double giua = (CRESCENT - 1) / 2.0;
+        for (int i = 0; i < CRESCENT; i++) {
+            int v = (int) Math.round(255 * Math.pow(1 - Math.abs(i - giua) / (giua + 1), 1.6));
+            String h = String.format(java.util.Locale.US, "%02x", v);
+            muc[i] = h + h + h;
+        }
         StringBuilder sb = new StringBuilder(RING_OFF).append('\n');
-        for (int k = 0; k < 24; k++) {
-            sb.append(setLed(RING_COLOR, 16 + k, "ffffff")).append('\n');
-            sb.append(setLed(RING_COLOR, 16 + (k + 23) % 24, "505050")).append('\n');
-            sb.append(setLed(RING_COLOR, 16 + (k + 21) % 24, "000000")).append('\n');
+        for (int b = 0; b < 24; b++) {
+            for (int i = 0; i < CRESCENT; i++) {
+                sb.append(setLed(RING_COLOR, 16 + ((b - (CRESCENT - 1) + i) % 24 + 24) % 24, muc[i])).append('\n');
+            }
+            sb.append(setLed(RING_COLOR, 16 + ((b - CRESCENT) % 24 + 24) % 24, "000000")).append('\n');
             sb.append(PACE).append('\n');
         }
         return writeScript(ctx, "led_wake_sweep.sh", sb.toString());
