@@ -120,8 +120,19 @@ public class BotService extends Service {
     }
 
     /** Web UI vừa lưu cấu hình: tắt Gemini Live thì kết thúc ngay phiên Live đang chạy. */
+    /** Model từ đánh thức đang nạp (vòng chính ghi lúc configure) - khác cấu hình mới thì nạp lại ngay. */
+    private volatile String lastWakeKey;
+
+    private static String wakeKey(Config cfg) {
+        return cfg.wakeEngine + "|" + cfg.mwwModel + "|" + cfg.mwwCutoff + "|" + cfg.wakeWord;
+    }
+
     void configChanged() {
         Config cfg = Config.load(this);
+        // Vòng chính chỉ nạp model từ đánh thức TRƯỚC mỗi lần chờ, mà lần chờ kéo dài tới khi nghe được từ CŨ:
+        // đổi model trên web xong vẫn nghe từ cũ (đã gặp: chọn hey_google mà loa vẫn chờ "Alexa"). Báo bộ
+        // nhận thoát ra để nạp ngay.
+        if (lastWakeKey != null && !wakeKey(cfg).equals(lastWakeKey)) recorder.requestReload();
         Led.setEnabled(cfg.led); // vòng chính có thể đang chờ từ đánh thức rất lâu -> áp dụng ngay ở đây
         Led.setMusicEnabled(cfg.musicLed, cfg.musicLedInner);
         if (!cfg.live) live.cancel();
@@ -244,6 +255,7 @@ public class BotService extends Service {
                     } else {
                         followUp = false;
                         wake.configure(cfg);
+                        lastWakeKey = wakeKey(cfg);
                         BotLog.state = "idle";
                         if (!barged) {
                             PcmPlayer.keepAwake(false); // rảnh: cho ampli nghỉ

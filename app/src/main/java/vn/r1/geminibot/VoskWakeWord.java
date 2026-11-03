@@ -50,6 +50,7 @@ class VoskWakeWord implements WakeEngine {
             short[] frame = mic.readFrame();
             if (frame == null) return null;
             if (mic.takeTrigger()) return "web";
+            if (mic.takeReload()) return null; // vòng chính nạp lại cấu hình (model mới) rồi chờ tiếp
             mic.trackNoise(frame);
             boolean done = recognizer.acceptWaveForm(frame, frame.length);
             String text = done ? field(recognizer.getResult(), "text")

@@ -42,6 +42,20 @@ public class VoiceRecorder {
         triggered = true;
     }
 
+    private volatile boolean reload;
+
+    /** Đổi từ đánh thức / model trên Web UI: bộ nhận đang chờ thoát ra để vòng chính nạp model mới ngay. */
+    public void requestReload() {
+        reload = true;
+    }
+
+    /** Bộ nhận từ đánh thức gọi mỗi frame; true một lần sau mỗi requestReload(). */
+    public boolean takeReload() {
+        if (!reload) return false;
+        reload = false;
+        return true;
+    }
+
     /** Bộ nhận từ đánh thức gọi mỗi frame; true một lần sau mỗi trigger(). */
     public boolean takeTrigger() {
         if (!triggered) return false;

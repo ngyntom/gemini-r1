@@ -110,6 +110,7 @@ class MicroWakeWord implements WakeEngine {
             short[] frame = mic.readFrame();
             if (frame == null) return null;
             if (mic.takeTrigger()) return "web";
+            if (mic.takeReload()) return null; // vòng chính nạp lại cấu hình (model mới) rồi chờ tiếp
             mic.trackNoise(frame);
             for (int off = 0; off + MicroFrontend.STEP_SAMPLES <= frame.length;
                  off += MicroFrontend.STEP_SAMPLES) {
