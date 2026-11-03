@@ -185,6 +185,12 @@ final class HomeAssistant {
         request(cfg, "POST", "/api/services/" + domain + "/" + service, new JSONObject().put("entity_id", entityId));
     }
 
+    /** Gửi thông báo qua dịch vụ notify đã chọn (mã quên mật khẩu Web UI). */
+    static void notify(Config cfg, String message) throws Exception {
+        request(cfg, "POST", "/api/services/notify/" + cfg.haNotify,
+                new JSONObject().put("title", Group.deviceName().replace('_', ' ')).put("message", message));
+    }
+
     /** Kiểm tra kết nối cho Web UI: trả về số thiết bị đọc được. */
     static String test(Config cfg) throws Exception {
         int total = devices(cfg, true).length();

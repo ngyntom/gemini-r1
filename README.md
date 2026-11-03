@@ -113,7 +113,12 @@ trạng thái nhạc (SSE) bị trễ. Proxy có gửi `X-Forwarded-Proto: https
 App iOS (Capacitor): gõ tên miền đó ở màn nhập địa chỉ. Tên miền phải nằm trong `allowNavigation` của
 `ios-app/capacitor.config.json` (đang cho phép `*.tnt-hassio.dynu.net`), không thì app mở bằng Safari.
 
-**Quên mật khẩu:** xoá file mật khẩu qua adb rồi chạy lại app. Web UI trở về không cần đăng nhập:
+**Quên mật khẩu** (như Voicebot): bấm **Quên mật khẩu?** trên màn đăng nhập → **Gửi mã xác thực**. Loa gửi mã 6 số qua
+thông báo Home Assistant (dịch vụ đặt ở **Cài đặt → Home Assistant → Dịch vụ thông báo**, vd. `mobile_app_iphone`;
+mặc định `notify`). Nhập mã + mật khẩu mới là đăng nhập luôn. Mã sống 5 phút, sai 5 lần phải xin mã mới, mỗi
+lần xin mã cách nhau ít nhất 1 phút. Link chỉ hiện khi loa đã nối Home Assistant.
+
+Không có Home Assistant thì xoá file mật khẩu qua adb rồi chạy lại app. Web UI trở về không cần đăng nhập:
 
 ```
 adb connect <IP loa>:5555

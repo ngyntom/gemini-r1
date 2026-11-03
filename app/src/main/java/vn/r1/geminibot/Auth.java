@@ -21,7 +21,8 @@ import javax.crypto.spec.PBEKeySpec;
  * Một tài khoản: tên + mật khẩu băm PBKDF2 trong files/auth.json. Chưa đặt mật khẩu thì Web UI mở như cũ
  * (chỉ nên dùng trong mạng nhà). Đặt rồi thì mọi /api/* (trừ vài API công khai, xem isPublic) cần cookie phiên.
  * Phiên lưu ở files/sessions.json nên khởi động lại app không bị đăng xuất.
- * Quên mật khẩu: xoá files/auth.json qua adb (README), Web UI trở về không cần đăng nhập.
+ * Quên mật khẩu: mã 6 số gửi qua thông báo Home Assistant (requestCode / confirmCode), hoặc xoá files/auth.json
+ * qua adb (README) - Web UI trở về không cần đăng nhập.
  */
 final class Auth {
     static final String COOKIE = "r1_session";
@@ -78,7 +79,8 @@ final class Auth {
         if (!path.startsWith("/api/")) return true; // trang + file tĩnh: phải tải được mới hiện màn đăng nhập
         if (method.equals("GET") && (path.equals("/api/ping") || path.equals("/api/group/info")
                 || path.equals("/api/auth"))) return true;
-        return method.equals("POST") && (path.equals("/api/login") || path.equals("/api/logout"));
+        return method.equals("POST") && (path.equals("/api/login") || path.equals("/api/logout")
+                || path.equals("/api/auth/forgot/request") || path.equals("/api/auth/forgot/confirm"));
     }
 
     static String cookieToken(Map<String, String> headers) {
@@ -170,6 +172,74 @@ final class Auth {
         String token = randomB64(32);
         sessions.put(token, System.currentTimeMillis() + SESSION_DAYS * 86_400_000L);
         write(ctx, "sessions.json", sessions);
+        return token;
+    }
+
+    // ---------- Quên mật khẩu (như /api/change_password/* của Pi): mã 6 số gửi qua thông báo Home Assistant ----------
+    // Bảo mật dựa vào việc có mã trên điện thoại (thông báo HA), nên 2 API này không cần đăng nhập.
+    private static String code;
+    private static long codeExpires, lastCodeSent;
+    private static int codeFailures;
+
+    /** Tạo mã mới và gửi qua HA. Chặn xin mã dồn dập (API công khai: không để người lạ spam thông báo). */
+    static void requestCode(Context ctx) throws Exception {
+        Config c = Config.load(ctx);
+        String ma;
+        synchronized (Auth.class) {
+            load(ctx);
+            if (account == null) throw new Exception("Loa chưa đặt mật khẩu");
+            if (!c.haEnabled()) throw new Exception("Loa chưa kết nối Home Assistant nên không gửi được mã");
+            long now = System.currentTimeMillis();
+            if (now - lastCodeSent < 60_000L) {
+                throw new Exception("Vừa gửi mã, chờ " + ((60_000L - (now - lastCodeSent)) / 1000 + 1) + " giây rồi thử lại");
+            }
+            ma = String.format(java.util.Locale.US, "%06d", RNG.nextInt(1_000_000));
+            code = ma;
+            codeExpires = now + 5 * 60_000L;
+            codeFailures = 0;
+            lastCodeSent = now;
+        }
+        try {
+            HomeAssistant.notify(c, "Mã đặt lại mật khẩu Web UI của loa: " + ma + " (hết hạn sau 5 phút)");
+        } catch (Exception e) {
+            synchronized (Auth.class) {
+                code = null;
+                lastCodeSent = 0;
+            }
+            throw new Exception("Gửi thông báo qua Home Assistant thất bại: " + e.getMessage());
+        }
+        BotLog.i("Đã gửi mã quên mật khẩu Web UI qua Home Assistant (notify." + c.haNotify + ")");
+    }
+
+    /** Đúng mã thì đặt mật khẩu mới (giữ tên đăng nhập), huỷ mọi phiên cũ, trả token phiên mới. */
+    static synchronized String confirmCode(Context ctx, String nhap, String password) throws Exception {
+        load(ctx);
+        if (code == null) throw new Exception("Chưa xin mã - bấm \"Gửi mã xác thực\" trước");
+        if (System.currentTimeMillis() > codeExpires) {
+            code = null;
+            throw new Exception("Mã đã hết hạn - xin mã mới");
+        }
+        if (password.length() < 6) throw new Exception("Mật khẩu mới tối thiểu 6 ký tự");
+        if (!MessageDigest.isEqual(code.getBytes("UTF-8"), nhap.trim().getBytes("UTF-8"))) {
+            if (++codeFailures >= 5) {
+                code = null;
+                throw new Exception("Sai mã quá nhiều lần - xin mã mới");
+            }
+            throw new Exception("Mã xác thực không đúng");
+        }
+        code = null;
+        String user = account.optString("user");
+        String salt = randomB64(16);
+        JSONObject a = new JSONObject().put("user", user).put("salt", salt)
+                .put("hash", Base64.encodeToString(hash(password, salt), Base64.NO_WRAP));
+        write(ctx, "auth.json", a);
+        account = a;
+        failures = 0;
+        lockedUntil = 0;
+        String token = randomB64(32);
+        sessions = new JSONObject().put(token, System.currentTimeMillis() + SESSION_DAYS * 86_400_000L);
+        write(ctx, "sessions.json", sessions);
+        BotLog.i("Đã đặt lại mật khẩu Web UI bằng mã Home Assistant");
         return token;
     }
 

@@ -317,15 +317,19 @@ class WebServer {
      *   POST /api/login  {username, password}
      *   POST /api/logout
      *   POST /api/auth/set {username, password, old_password}   đặt / đổi mật khẩu, password rỗng = tắt
+     *   POST /api/auth/forgot/request                 gửi mã 6 số qua thông báo Home Assistant (quên mật khẩu)
+     *   POST /api/auth/forgot/confirm {code, new_password}       đúng mã thì đặt mật khẩu mới + đăng nhập luôn
      */
     private boolean authRoute(Socket s, String method, String path, Map<String, String> headers, byte[] body)
             throws Exception {
         if (!path.equals("/api/auth") && !path.equals("/api/login") && !path.equals("/api/logout")
-                && !path.equals("/api/auth/set")) return false;
+                && !path.startsWith("/api/auth/")) return false;
         String token = Auth.cookieToken(headers);
         if (method.equals("GET") && path.equals("/api/auth")) {
+            // forgot: màn đăng nhập chỉ hiện "Quên mật khẩu?" khi gửi được mã (đã đặt mật khẩu + đã nối Home Assistant)
             sendJson(s, 200, new JSONObject().put("enabled", Auth.enabled(bot)).put("user", Auth.user(bot))
-                    .put("logged_in", Auth.valid(bot, token)));
+                    .put("logged_in", Auth.valid(bot, token))
+                    .put("forgot", Auth.enabled(bot) && Config.load(bot).haEnabled()));
             return true;
         }
         if (!method.equals("POST")) return false;
@@ -345,7 +349,25 @@ class WebServer {
                 Auth.logout(bot, token);
                 sendJson(s, 200, new JSONObject().put("ok", true), Auth.setCookie(null, 0, headers));
                 return true;
-            default: // /api/auth/set - đã qua cổng kiểm phiên trong handle() nếu đang bật đăng nhập
+            case "/api/auth/forgot/request":
+                try {
+                    Auth.requestCode(bot);
+                    BotLog.i("Xin mã quên mật khẩu từ " + client(s, headers));
+                    sendJson(s, 200, new JSONObject().put("ok", true));
+                } catch (Exception e) {
+                    sendJson(s, 400, new JSONObject().put("error", String.valueOf(e.getMessage())));
+                }
+                return true;
+            case "/api/auth/forgot/confirm":
+                try {
+                    String t = Auth.confirmCode(bot, req.optString("code"), req.optString("new_password"));
+                    sendJson(s, 200, new JSONObject().put("ok", true), Auth.setCookie(t, Auth.SESSION_DAYS * 86400, headers));
+                } catch (Exception e) {
+                    BotLog.i("Nhập mã quên mật khẩu sai từ " + client(s, headers));
+                    sendJson(s, 400, new JSONObject().put("error", String.valueOf(e.getMessage())));
+                }
+                return true;
+            case "/api/auth/set": // đã qua cổng kiểm phiên trong handle() nếu đang bật đăng nhập
                 try {
                     String t = Auth.set(bot, req.optString("username"), req.optString("password"),
                             req.optString("old_password"));
@@ -355,6 +377,8 @@ class WebServer {
                     sendJson(s, 400, new JSONObject().put("error", String.valueOf(e.getMessage())));
                 }
                 return true;
+            default:
+                return false;
         }
     }
 

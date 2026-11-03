@@ -214,8 +214,54 @@ window.moManDangNhap = () => {
           </div>
         </form>
         <div class="voicebot-login-error" id="login-error"></div>
+        <!-- Như Pi: chỉ hiện khi loa gửi được mã (đã nối Home Assistant), xem loadAuth() -->
+        <a href="#" id="login-forgot-link" class="voicebot-login-forgot" style="display:none;">Quên mật khẩu?</a>
         <!-- Chỉ trong app iOS: màn này che nút "Đổi địa chỉ" ở Cài đặt -> cho quay về chọn loa / Pi khác ngay tại đây -->
         <a href="#" id="login-doi-dia-chi" class="voicebot-login-forgot" style="display:none;">Đổi địa chỉ</a>
+      </div>
+    </div>
+
+    <!-- Quên mật khẩu: chép từ #login-forgot-popup của Pi - mã 6 số gửi qua thông báo Home Assistant
+         (/api/auth/forgot/*, không cần đăng nhập). Đổi xong loa đặt cookie phiên luôn -> tải lại là vào. -->
+    <div class="popup" id="login-forgot-popup">
+      <div class="view">
+        <div class="page">
+          <div class="navbar">
+            <div class="navbar-bg"></div>
+            <div class="navbar-inner">
+              <div class="title">Quên mật khẩu</div>
+              <div class="right"><a href="#" class="link popup-close" title="Đóng"><i class="icon f7-icons">xmark</i></a></div>
+            </div>
+          </div>
+          <div class="page-content">
+            <div class="card card-outline card-dividers">
+              <div class="card-header">Bước 1 - Gửi mã xác thực</div>
+              <div class="card-content" style="padding-bottom:10px;">
+                <p class="card-note">Mã 6 số gửi qua thông báo Home Assistant (Cài đặt → Home Assistant → Dịch vụ thông báo).
+                  Mã sống 5 phút, sai quá 5 lần phải xin mã mới.</p>
+                <div class="block" style="margin:0 0 4px;"><a href="#" id="login-forgot-send-btn" class="button button-fill">Gửi mã xác thực</a></div>
+              </div>
+            </div>
+            <div class="card card-outline card-dividers" id="login-forgot-step2" style="display:none;">
+              <div class="card-header">Bước 2 - Nhập mã và mật khẩu mới</div>
+              <div class="card-content" style="padding-bottom:10px;">
+                <div class="list no-hairlines-md" style="margin:0;">
+                  <ul>
+                    <li class="item-content item-input"><div class="item-inner">
+                      <div class="item-title item-label">Mã xác thực</div>
+                      <div class="item-input-wrap"><input type="text" id="login-forgot-code" inputmode="numeric" maxlength="6" placeholder="6 số" autocomplete="one-time-code" /></div>
+                    </div></li>
+                    <li class="item-content item-input"><div class="item-inner">
+                      <div class="item-title item-label">Mật khẩu mới</div>
+                      <div class="item-input-wrap"><input type="password" id="login-forgot-new-password" placeholder="Tối thiểu 6 ký tự" autocomplete="new-password" /></div>
+                    </div></li>
+                  </ul>
+                </div>
+                <div class="block" style="margin:16px 0 4px;"><a href="#" id="login-forgot-confirm-btn" class="button button-fill">Đổi mật khẩu &amp; đăng nhập</a></div>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   </div>
@@ -570,7 +616,8 @@ window.moManDangNhap = () => {
           <div class="item-input-wrap"><input type="password" id="authNew2" autocomplete="new-password"></div></div></li>
       </ul></div>
       <div class="block-footer">Đặt mật khẩu TRƯỚC khi mở loa ra Internet (tên miền / proxy như Voicebot). Đổi mật khẩu thì
-        các máy khác bị đăng xuất. Quên mật khẩu: xoá bằng adb (xem README), loa trở về không cần đăng nhập.</div>
+        các máy khác bị đăng xuất. Quên mật khẩu: bấm "Quên mật khẩu?" trên màn đăng nhập, mã gửi qua thông báo
+        Home Assistant (Cài đặt → Home Assistant → Dịch vụ thông báo). Không có HA thì xoá bằng adb (xem README).</div>
       <div class="block" id="authNutPhu" style="display:flex;flex-direction:column;gap:10px">
         <a href="#" class="button button-tonal" id="authLogout">Đăng xuất máy này</a>
         <a href="#" class="button button-tonal color-red" id="authOff">Tắt đăng nhập</a>
@@ -802,6 +849,8 @@ const PAGES = {
     list('', [
       inp('ha_url', 'Địa chỉ', { ph: 'http://192.168.2.100:8123', foot: 'Dùng IP trong mạng nhà (http), không dùng homeassistant.local hay https.' }),
       inp('ha_token', 'Long-lived access token ' + hint(S.config.ha_token_set), { ph: 'Để trống = giữ nguyên' }),
+      // Như HA_NOTIFY_SERVICE của Pi: nơi nhận mã khi quên mật khẩu Web UI
+      inp('ha_notify', 'Dịch vụ thông báo', { ph: 'notify', foot: 'Nhận mã khi quên mật khẩu Web UI, vd. mobile_app_iphone_cua_ban (tên sau "notify." trong HA). Để "notify" = gửi mọi thiết bị.' }),
     ], 'Tạo token: trong HA bấm tên tài khoản → Bảo mật → Long-lived access tokens → Tạo token. Lưu rồi bấm Kiểm tra.')
     + `<div class="block"><a href="#" class="button button-fill button-large" id="haTest">Kiểm tra kết nối</a>
        <p class="muted" id="haMsg" style="text-align:center"></p></div>`),
@@ -1618,10 +1667,37 @@ $('login-password').addEventListener('animationstart', e => { if (e.animationNam
 async function loadAuth() {
   try { AUTH = await (await fetch('/api/auth')).json(); } catch (e) { return; }
   if (AUTH.enabled && !AUTH.logged_in) window.moManDangNhap();
+  $('login-forgot-link').style.display = AUTH.forgot ? '' : 'none';
   $('authSub').textContent = AUTH.enabled ? 'Đang bật · ' + AUTH.user : 'Chưa đặt mật khẩu: ai trong mạng cũng vào được';
 }
 loadAuth();
 fetch('/api/ping').then(r => r.json()).then(j => { if (j.ten) $('login-ten-loa').textContent = j.ten.replace(/_/g, ' '); }).catch(() => {});
+
+// Quên mật khẩu (như Pi): bước 1 xin mã qua thông báo HA, bước 2 nhập mã + mật khẩu mới -> loa đặt cookie, tải lại là vào
+const forgotPopup = app.popup.create({ el: '#login-forgot-popup' });
+$('login-forgot-link').addEventListener('click', e => {
+  e.preventDefault();
+  $('login-forgot-step2').style.display = 'none';
+  $('login-forgot-code').value = ''; $('login-forgot-new-password').value = '';
+  forgotPopup.open();
+});
+$('login-forgot-send-btn').addEventListener('click', async e => {
+  e.preventDefault();
+  try {
+    await post('/api/auth/forgot/request');
+    toast('Đã gửi mã qua Home Assistant');
+    $('login-forgot-step2').style.display = '';
+    $('login-forgot-code').focus();
+  } catch (e) {}
+});
+$('login-forgot-confirm-btn').addEventListener('click', async e => {
+  e.preventDefault();
+  if (!/^\d{6}$/.test($('login-forgot-code').value.trim())) return toast('Nhập đủ mã 6 số');
+  try {
+    await post('/api/auth/forgot/confirm', { code: $('login-forgot-code').value, new_password: $('login-forgot-new-password').value });
+    location.reload(); // loa đã đặt cookie phiên mới
+  } catch (e) {}
+});
 
 const authPopup = app.popup.create({ el: '#authPopup' });
 $('openAuth').addEventListener('click', async e => {
