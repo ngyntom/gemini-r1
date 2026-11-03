@@ -36,8 +36,33 @@
     #sidebar { display: block; position: fixed; left: 0; top: 0; bottom: 0; width: var(--sidebar-w); margin: 0;
                padding: 12px; overflow: auto; z-index: 10; background: var(--f7-page-bg-color);
                border-right: 1px solid var(--f7-list-outline-border-color, rgba(0,0,0,.12)); }
-    #sidebar .brand { font-weight: 600; font-size: 17px; padding: 10px 10px 14px;
-                      border-bottom: 1px solid var(--f7-list-outline-border-color, rgba(0,0,0,.12)); margin: 0 10px 10px 0;}
+    /* #sidebar .brand { font-weight: 600; font-size: 17px; padding: 10px 10px 14px;
+                      border-bottom: 1px solid var(--f7-list-outline-border-color, rgba(0,0,0,.12)); margin: 0 10px 10px 0;} */
+      #sidebar .brand {
+        display: flex;             /* Đưa các phần tử bên trong nằm cùng 1 hàng */
+        align-items: center;       /* Căn giữa theo chiều dọc */
+        justify-content: space-between; /* Đẩy chữ Phicomm R1 sang trái, chip trạng thái sang phải */
+        
+        font-weight: 600;
+        font-size: 17px;
+        padding: 10px 10px 14px;
+        border-bottom: 1px solid var(--f7-list-outline-border-color, rgba(0,0,0,.12));
+        margin: 0 0 10px 0;        /* Đã gộp margin gọn lại */
+      }
+
+      /* Đảm bảo chấm màu và chữ trạng thái cũng nằm inline với nhau */
+      #sidebar .brand .state-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;                  /* Khoảng cách giữa chấm xanh và chữ */
+      }
+
+      #sidebar .brand .dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        display: inline-block;
+      }                      
     .views.tabs { margin-left: var(--sidebar-w); width: calc(100% - var(--sidebar-w)); }
     #mobile-tabbar { display: none !important; }
     .page-content { --chat-bar-bottom: 0px; }
