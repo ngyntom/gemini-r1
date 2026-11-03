@@ -2,8 +2,7 @@
 <html lang="vi">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no, viewport-fit=cover">
-<!-- Như Pi: "Thêm vào MH chính" trên iPhone mở thành app riêng (standalone), app.css hạ tabbar cho chế độ này -->
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no, viewport-fit=cover"><!-- Như Pi: "Thêm vào MH chính" trên iPhone mở thành app riêng (standalone), app.css hạ tabbar cho chế độ này -->
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Phicomm R1">
@@ -103,44 +102,52 @@
   .log { font: 12px/1.45 ui-monospace, Consolas, monospace; white-space: pre-wrap; word-break: break-word;
          max-height: 340px; overflow: auto; padding: 12px 16px; }
 
-  /* Thiết bị */
-  .tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; padding: 12px; }
-  .tile { position: relative; border-radius: 16px; padding: 12px; min-height: 120px; cursor: pointer; user-select: none;
-          background: rgba(120,120,128,.14); display: flex; flex-direction: column; justify-content: space-between;
-          transition: background .15s, transform .1s; }
-  .tile:active { transform: scale(.97); }
-  .tile.on { background: var(--f7-theme-color); color: #fff; }
-  .tile i.f7-icons { font-size: 28px; }
-  .tile .t-name { font-size: 14px; font-weight: 500; margin-top: 10px; }
-  .tile .t-state { font-size: 12px; opacity: .7; }
-  .tile .t-badge { position: absolute; top: 10px; right: 10px; font-size: 11px; border: 1px solid currentColor;
-                   border-radius: 999px; padding: 2px 6px; opacity: .8; }
-  .tile.busy { opacity: .5; }
+  /* Thiết bị: lấy nguyên số đo .ha-dash-* trong app.css của Pi - ô vuông 104px trở lên (máy tính tự thêm cột),
+     ô tắt mờ 60%, ô bật ửng màu chủ đề + đổ bóng, icon 26px, tên 12.5px tối đa 2 dòng, huy hiệu tròn 32px */
+  /* Như Pi: auto-fill + minmax(104px, 1fr) - rộng thêm thì THÊM CỘT, ô chỉ co giãn trong ~104-125px (đo trên Pi: 121px) */
+  .tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); gap: 10px; padding: 12px; }
+  .tile { position: relative; aspect-ratio: 1 / 1; border-radius: 16px; padding: 12px; overflow: hidden; cursor: pointer;
+          display: flex; flex-direction: column; justify-content: space-between;
+          background: rgba(115,115,115,.25); opacity: .6; -webkit-tap-highlight-color: transparent;
+          -webkit-touch-callout: none; -webkit-user-select: none; user-select: none;
+          transition: opacity .15s, background .15s, box-shadow .15s; }
+  .tile:active { opacity: .85; }
+  .tile.on { opacity: 1; background: #fff; box-shadow: 0 2px 10px rgba(0,0,0,.12);
+             background: color-mix(in srgb, var(--f7-theme-color) 12%, var(--f7-page-bg-color, #fff)); }
+  .dark .tile.on { background: color-mix(in srgb, var(--f7-theme-color) 22%, var(--f7-page-bg-color, #1c1c1e)); }
+  .tile i.f7-icons { font-size: 26px; color: var(--f7-text-color, #000); }
+  .tile.on i.f7-icons { color: var(--f7-theme-color); }
+  .tile .t-name { font-size: 12.5px; font-weight: 500; line-height: 1.25; margin-top: 8px; color: var(--f7-text-color, #000);
+                  overflow-wrap: anywhere; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
+  .tile .t-state { font-size: 12px; color: var(--f7-list-item-footer-text-color, #888);
+                   white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .tile .t-badge { position: absolute; top: 12px; right: 12px; width: 32px; height: 32px; border-radius: 50%;
+                   border: 1.5px solid var(--f7-list-item-border-color, rgba(0,0,0,.15)); display: flex; align-items: center;
+                   justify-content: center; font-size: 10px; line-height: 1; white-space: nowrap; color: var(--f7-text-color, #000); }
+  .tile.on .t-badge { border-color: color-mix(in srgb, var(--f7-theme-color) 45%, transparent); color: var(--f7-theme-color); }
+  .tile.busy { opacity: .35; }
+  /* Chú thích cuối card như Pi (api.html / nhac-nho.html): 1 <p> chữ mờ ngay dưới list, KHÔNG dùng .card-footer -
+     card-footer có viền trên riêng nên chồng lên đường kẻ dưới ô nhập cuối (app.css giữ đường kẻ đó) thành 2 vạch */
+  .card-note { margin: 10px 0 14px; padding: 0 16px; font-size: 13px; line-height: 1.4;
+               color: var(--f7-list-item-footer-text-color); white-space: normal; }
   /* Khung xương lúc đang tải (như .ha-dash-skeleton của Pi): màu --skeleton-color của F7, tự đổi theo sáng / tối */
-  .tile.sk { background: var(--skeleton-color); cursor: default; }
-  .sk-bar { display: inline-block; height: 14px; border-radius: 7px; background: var(--skeleton-color); vertical-align: middle; }
-  .tile .t-del { position: absolute; top: 8px; right: 8px; width: 26px; height: 26px; border-radius: 50%;
-                 background: #ff3b30; color: #fff; display: none; align-items: center; justify-content: center; }
-  .tile .t-del i { font-size: 15px !important; }
+  .tile.sk { background: var(--skeleton-color); opacity: 1; cursor: default; }
+  .sk-bar { display: inline-block; height: 14px; border-radius: 4px; background: var(--skeleton-color); vertical-align: middle; }
+  .tile .t-del { position: absolute; top: 12px; right: 12px; width: 32px; height: 32px; border-radius: 50%;
+                 background: var(--f7-color-red, #ff3b30); color: #fff; display: none; align-items: center; justify-content: center; }
+  .tile .t-del i { font-size: 17px !important; color: #fff !important; }
+  .editing .tile { opacity: 1; animation: wiggle .35s ease-in-out infinite alternate; }
   .editing .tile .t-del { display: flex; }
   .editing .tile .t-badge { display: none; }
-  .editing .tile { animation: wiggle .35s ease-in-out infinite alternate; }
-  /* Như Voicebot: mỗi nhóm 1 card, tên nhóm + nút sửa riêng nhóm đó trên card-header */
-  #devices .card-header { color: var(--f7-theme-color); font-weight: 600; }
-  #devices .card-header .link { color: var(--f7-theme-color); }
-  #devices .card-content .tiles { padding: 12px; }
+  /* Như Voicebot: mỗi nhóm 1 card, tên nhóm (chữ thường, màu chủ đề) + bút chì 20px sửa riêng nhóm đó */
+  #devices .card-header { color: var(--f7-theme-color); }
+  #devices .card-header .link { color: inherit; flex-shrink: 0; margin-left: 8px; }
+  #devices .card-header .link i { font-size: 20px; }
   /* Nút đóng thanh tìm (icon ✕ thay chữ "Huỷ"): cỡ vừa nút tròn của F7 */
   .searchbar-disable-button .icon { font-size: 20px; line-height: 1; vertical-align: middle; }
-  /* Máy tính: dùng hết bề ngang (bỏ cột đọc 760px chung); điện thoại: 3 cột, ô gọn hơn */
+  /* Máy tính: dùng hết bề ngang (bỏ cột đọc 760px chung); điện thoại hẹp vẫn đủ 3 cột */
   #view-devices .page-inner { max-width: none; }
-  @media (max-width: 899px) {
-    #devices .tiles { grid-template-columns: repeat(3, 1fr); gap: 8px; padding: 10px; }
-    #devices .tile { min-height: 96px; padding: 10px; border-radius: 14px; }
-    #devices .tile i.f7-icons { font-size: 24px; }
-    #devices .tile .t-name { font-size: 12.5px; margin-top: 8px; line-height: 1.25; overflow-wrap: anywhere; }
-    #devices .tile .t-state { font-size: 11px; }
-    #devices .tile .t-badge { top: 8px; right: 8px; font-size: 10px; }
-  }
+  @media (max-width: 520px) { #devices .tiles { grid-template-columns: repeat(3, 1fr); } }
   .icon-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(56px, 1fr)); gap: 8px; padding: 8px 16px 20px; }
   .icon-grid a { display: flex; align-items: center; justify-content: center; height: 52px; border-radius: 12px;
                  background: rgba(120,120,128,.12); color: inherit; }
@@ -629,8 +636,8 @@ function rng(k, label, min, max, step, fmt, foot) {
 }
 // Như Voicebot: mỗi nhóm cài đặt là 1 card (tiêu đề trên card-header), danh sách nằm trong card
 const list = (title, items, footer) => `<div class="card card-outline card-dividers">${title ? `<div class="card-header">${title}</div>` : ''}
-  <div class="card-content"><div class="list list-outline-ios list-strong-ios list-dividers-ios" style="margin:0"><ul>${items.join('')}</ul></div></div>
-  ${footer ? `<div class="card-footer"><span>${footer}</span></div>` : ''}</div>`;
+  <div class="card-content"><div class="list list-outline-ios list-strong-ios list-dividers-ios" style="margin:0"><ul>${items.join('')}</ul></div>
+  ${footer ? `<p class="card-note">${footer}</p>` : ''}</div></div>`;
 function subpage(name, title, body, opt = {}) {
   return `<div class="page" data-name="${name}">
     <div class="navbar"><div class="navbar-bg"></div><div class="navbar-inner">
@@ -762,8 +769,8 @@ const PAGES = {
   group: () => subpage('group', 'Nhóm loa',
     `<div class="card card-outline card-dividers"><div class="card-header">Loa trong nhóm</div>
       <div class="card-content"><div class="list list-outline-ios list-strong-ios list-dividers-ios" style="margin:0"><ul id="grpList">
-        ${loadingRow('Đang tìm loa R1 trong mạng…')}</ul></div></div>
-      <div class="card-footer"><span>Loa R1 khác chạy app Gemini R1 trong cùng mạng. Chọn rồi bấm Lưu (đĩa mềm ở trên).</span></div></div>`
+        ${loadingRow('Đang tìm loa R1 trong mạng…')}</ul></div>
+      <p class="card-note">Loa R1 khác chạy app Gemini R1 trong cùng mạng. Chọn rồi bấm Lưu (đĩa mềm ở trên).</p></div></div>`
     + list('', [
       inp('group_members', 'IP các loa (cách nhau bằng dấu phẩy)', { ph: '192.168.2.98' }),
       tog('group_stereo', 'Stereo', 'Loa này phát kênh trái, loa đầu tiên trong danh sách phát kênh phải'),
