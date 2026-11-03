@@ -16,22 +16,21 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.7'
-      # Giữ cùng một khoá ký debug giữa các lần build để APK mới cài đè được lên bản cũ
-      - uses: actions/cache@v4
-        with:
-          path: ~/.android/debug.keystore
-          key: android-debug-keystore-v1
+      # Cùng một khoá ký giữa các lần build để APK mới cài đè được lên bản cũ (không gỡ app, không mất dữ liệu).
+      # Repo chưa có app/debug.keystore: tạo khoá mới ở đó (build.gradle dùng nó), rồi xuất ra để commit vào repo một lần
+      # (khoá debug, không bí mật). Khoá debug mặc định của runner không cố định giữa các lần build.
+      - if: hashFiles('app/debug.keystore') == ''
+        run: |
+          keytool -genkeypair -keystore app/debug.keystore -storepass android -alias androiddebugkey -keypass android \
+            -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
+          echo "NEW_KEY=1" >> "$GITHUB_ENV"
       - run: gradle assembleDebug
       - uses: actions/upload-artifact@v4
         with:
           name: gemini-r1-apk
           path: app/build/outputs/apk/debug/*.apk
-      # Repo chưa có app/debug.keystore: xuất khoá vừa dùng để tải lên repo một lần (khoá debug, không bí mật).
-      # Chép ra thư mục thường trước: upload-artifact@v4 bỏ qua file trong thư mục ẩn (~/.android) nên trước đây không xuất được.
-      - if: hashFiles('app/debug.keystore') == ''
-        run: mkdir -p keystore-out && cp ~/.android/debug.keystore keystore-out/debug.keystore
-      - if: hashFiles('app/debug.keystore') == ''
+      - if: env.NEW_KEY == '1'
         uses: actions/upload-artifact@v4
         with:
           name: debug-keystore
-          path: keystore-out/debug.keystore
+          path: app/debug.keystore
