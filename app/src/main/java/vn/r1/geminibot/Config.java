@@ -15,7 +15,7 @@ public class Config {
     static final String[] KEYS = {"api_key", "model", "tts_model", "voice", "wake_engine",
             "mww_model", "mww_cutoff", "wake_word", "follow_up", "persona", "mic_gain",
             "tts_engine", "google_voice", "google_tts_key", "tts_rate", "led", "wake_sound", "wake_reply", "local_time",
-            "ha_url", "ha_token", "stt_engine", "live", "live_model", "live_idle", "gcloud_sa", "search", "city", "barge_in", "bot_self", "user_call", "group_members", "group_stereo", "music_led", "music_led_inner", "ha_dash_order", "ha_dash_icons", "ha_notify", "ten_hien_thi", "led_wake"};
+            "ha_url", "ha_token", "stt_engine", "live", "live_model", "live_idle", "gcloud_sa", "search", "city", "barge_in", "bot_self", "user_call", "group_members", "group_stereo", "music_led", "music_led_inner", "ha_dash_order", "ha_dash_icons", "ha_notify", "ten_hien_thi", "led_wake_len", "led_wake_ms"};
 
     public String apiKey;
     public String model;
@@ -67,9 +67,8 @@ public class Config {
     public String haNotify;
     /** Tên hiển thị của loa (vd. "Loa phòng khách"): rỗng = tên Bluetooth. Xem Group.displayName. */
     public String tenHienThi;
-    /** Độ sáng từng đèn của lưỡi liềm đánh thức, hex 00..ff cách nhau dấu cách (trang Đèn LED, thử được ngay). */
-    public String ledWake;
-    static final String LED_WAKE_MAC_DINH = "40 80 c0 ff ff ff c0 80 40";
+    /** Lưỡi liềm đánh thức (trang Đèn LED, thử được ngay): số bước đèn giữ sáng (độ dài) và ms mỗi bước (tốc độ). */
+    public int ledWakeLen, ledWakeMs;
 
     /** "google" = Cloud Speech-to-Text rồi gửi chữ cho Gemini; "gemini" = gửi audio cho Gemini nghe. */
     public String sttEngine;
@@ -164,8 +163,8 @@ public class Config {
         c.haNotify = p.getString("ha_notify", "notify").trim().replaceFirst("^notify\\.", "");
         if (c.haNotify.isEmpty()) c.haNotify = "notify";
         c.tenHienThi = p.getString("ten_hien_thi", "").trim();
-        c.ledWake = p.getString("led_wake", "").trim();
-        if (c.ledWake.isEmpty()) c.ledWake = LED_WAKE_MAC_DINH;
+        c.ledWakeLen = Math.max(2, Math.min(10, parseIntOr(p.getString("led_wake_len", "4"), 4)));
+        c.ledWakeMs = Math.max(20, Math.min(120, parseIntOr(p.getString("led_wake_ms", "40"), 40)));
         c.gcloudSa = p.getString("gcloud_sa", "").trim();
         try {
             c.haDevices = new JSONObject(p.getString("ha_devices", "{}"));
@@ -237,7 +236,8 @@ public class Config {
                 .put("ha_token_set", !c.haToken.isEmpty())
                 .put("ha_notify", c.haNotify)
                 .put("ten_hien_thi", c.tenHienThi)
-                .put("led_wake", c.ledWake)
+                .put("led_wake_len", String.valueOf(c.ledWakeLen))
+                .put("led_wake_ms", String.valueOf(c.ledWakeMs))
                 .put("gcloud_sa_email", c.gcloudSa.isEmpty() ? "" : GoogleAuth.email(c.gcloudSa))
                 .put("ha_selected", c.haDevices.length())
                 .put("stt_engine", c.sttEngine)
@@ -277,5 +277,13 @@ public class Config {
             if (intent.hasExtra(k)) e.putString(k, intent.getStringExtra(k));
         }
         e.apply();
+    }
+
+    private static int parseIntOr(String s, int dflt) {
+        try {
+            return Integer.parseInt(s.trim());
+        } catch (Exception e) {
+            return dflt;
+        }
     }
 }

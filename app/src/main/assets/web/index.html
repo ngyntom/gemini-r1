@@ -925,10 +925,8 @@ const PAGES = {
         ${LED_TESTS.map(([v, t]) => `<a href="#" class="button button-tonal" data-led="${v}">${t}</a>`).join('')}
       </div></div>
       <div class="list list-outline-ios list-strong-ios list-dividers-ios" style="margin:0"><ul>
-        <li class="item-content item-input"><div class="item-inner">
-          <div class="item-title item-label">Độ sáng lưỡi liềm đánh thức</div>
-          <div class="item-input-wrap"><input type="text" id="ledWake" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="40 80 c0 ff ff ff c0 80 40" /></div>
-          <div class="item-footer">Mỗi số là 1 đèn của cung, 00 (tắt) … ff (sáng nhất), 1–23 số. Số đèn = độ dài lưỡi liềm.</div></div></li>
+        ${sel('led_wake_len', 'Lưỡi liềm đánh thức: độ dài', [['3', 'Ngắn'], ['4', 'Vừa'], ['6', 'Dài'], ['8', 'Rất dài']])}
+        ${sel('led_wake_ms', 'Lưỡi liềm đánh thức: tốc độ', [['30', 'Nhanh (~0,8 s / vòng)'], ['40', 'Vừa (~1 s / vòng)'], ['60', 'Chậm (~1,5 s / vòng)']])}
       </ul></div>
       <div class="block" style="margin:12px 0"><a href="#" class="button button-fill" id="ledWakeThu">Lưu và thử hiệu ứng đánh thức</a></div>
       <div class="card-footer"><span>Bấm một kiểu để giữ đèn ở kiểu đó; "Theo bot" để đèn đổi theo trạng thái bot. Rời trang này thì tự về "Theo bot".</span></div></div>`
@@ -1166,14 +1164,14 @@ function initSubpage(page) {
         post('/api/config', { [k]: v }).then(() => { S.config[k] = v; toast((v === '1' ? 'Đã bật ' : 'Đã tắt ') + ten); });
       }));
     el.addEventListener('page:beforeremove', () => { if (cur) post('/api/led', { state: '' }); });
-    // Lưỡi liềm đánh thức: lưu mức sáng rồi chạy thử ngay trên loa (không cần gọi từ đánh thức)
-    const ow = el.querySelector('#ledWake');
-    ow.value = S.config.led_wake || '';
+    // Lưỡi liềm đánh thức: lưu độ dài / tốc độ rồi chạy thử ngay trên loa (không cần gọi từ đánh thức)
     el.querySelector('#ledWakeThu').addEventListener('click', async e => {
       e.preventDefault();
-      const v = ow.value.trim().toLowerCase().replace(/[^0-9a-f\s,]/g, '');
+      const data = { led_wake_len: el.querySelector('[data-k="led_wake_len"]').value, led_wake_ms: el.querySelector('[data-k="led_wake_ms"]').value };
       try {
-        if (v !== (S.config.led_wake || '')) { await post('/api/config', { led_wake: v }); S.config.led_wake = v; }
+        if (data.led_wake_len !== S.config.led_wake_len || data.led_wake_ms !== S.config.led_wake_ms) {
+          await post('/api/config', data); Object.assign(S.config, data);
+        }
         await post('/api/led', { state: 'wake' });
         toast('Đang chạy thử trên loa');
       } catch (err) {}
@@ -1183,7 +1181,8 @@ function initSubpage(page) {
   if (mm) {
     const cur = S.config.mww_model, opts = [];
     (S.builtin_models || []).filter(f => f.endsWith('.tflite')).forEach(f => opts.push([f.replace('.tflite', ''), f.replace('.tflite', '') + ' (có sẵn)']));
-    (S.uploaded_models || []).forEach(p => opts.push([p, p.split('/').pop() + ' (đã tải lên)']));
+    // Cùng kiểu tên với model có sẵn: bỏ thư mục và đuôi .tflite (giá trị vẫn là đường dẫn đầy đủ)
+    (S.uploaded_models || []).forEach(p => opts.push([p, p.split('/').pop().replace(/\.tflite$/, '') + ' (đã tải lên)']));
     if (cur && !opts.some(o => o[0] === cur)) opts.push([cur, cur]);
     mm.innerHTML = opts.map(([v, t]) => `<option value="${esc(v)}">${esc(t)}</option>`).join('');
     mm.value = cur;

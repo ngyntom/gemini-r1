@@ -105,7 +105,8 @@ final class Led {
 
     /** Mức sáng trong cấu hình đổi thì dựng lại script (thử / đánh thức lần sau dùng ngay mức mới). */
     private static void capNhatSweep() {
-        if (appCtx == null || Config.load(appCtx).ledWake.equals(sweepLevels)) return;
+        Config c = appCtx == null ? null : Config.load(appCtx);
+        if (c == null || (c.ledWakeLen + "," + c.ledWakeMs).equals(sweepLevels)) return;
         try {
             sweep = writeSweep(appCtx);
         } catch (Exception e) {
@@ -311,32 +312,35 @@ final class Led {
      * thử trên loa), tự kết thúc nên không cần PID/STOPF. Mở đầu bằng xoá viền cho sạch.
      */
     /**
-     * Đánh thức: lưỡi liềm sáng (dày giữa, nhọn dần 2 đầu) xoay đúng 1 vòng theo chiều kim đồng hồ rồi dừng; lệnh
-     * "listening" ngay sau đó bật cả viền trắng. Mỗi bước ghi lại 9 đèn của cung + tắt đèn vừa ra khỏi đuôi (các lần
-     * ghi cộng dồn nên đèn khác giữ nguyên); 10 lần ghi + PACE ~ 45 ms / bước, 24 bước ~ 1,1 s.
+     * Đánh thức: lưỡi liềm sáng xoay đúng 1 vòng rồi dừng; lệnh "listening" ngay sau đó bật cả viền trắng.
+     *
+     * Ghi từng đèn KHÔNG dùng được: driver xếp mỗi lệnh vào hàng ~100 ms (xem writeMusic), 10 lệnh / bước
+     * dồn thành ~24 s rồi bị lệnh viền trắng đè - nhìn chỉ thấy viền trắng (thử trên loa). Làm như hiệu ứng
+     * đánh thức gốc của Phicomm (mã 1-24 trong /system/etc/lights_effects.conf): CẢ hiệu ứng trong MỘT lệnh
+     * nhiều khung nối nhau "1 <ms giữa khung> 1 <số khung>" + mỗi khung "1 <màu từ> <màu tới> <ms chuyển>
+     * <1 = còn khung sau, 0 = cuối> <số đèn> <các đèn>"; driver tự diễn, mỗi đèn chuyển sáng / tối mượt.
+     * Mỗi bước: đèn đầu sáng dần, đèn cách đó len bước tối dần -> cung giữa sáng, 2 đầu mờ = lưỡi liềm.
+     * Lệnh ghi trả về ngay nên script chờ hiệu ứng chạy xong rồi mới để lệnh viền trắng chạy.
      */
     private static File writeSweep(Context ctx) throws Exception {
-        // Mức sáng lấy từ cấu hình (trang Đèn LED): 1..23 số hex. Bản đầu dùng đường cong mờ rất nhanh về 2 đầu
-        // (13 3b 71 b2 ff...): đèn thật dưới ~25% gần như tắt nên nhìn chỉ còn 2-3 đèn, giống vệt quét cũ.
-        List<String> muc = new ArrayList<>();
-        for (String t : Config.load(ctx).ledWake.toLowerCase().split("[\\s,]+")) {
-            if (t.matches("[0-9a-f]{1,2}") && muc.size() < 23) { // 24 thì đèn tắt đuôi trùng đèn đầu cung
-                String h = t.length() == 1 ? "0" + t : t;
-                muc.add(h + h + h);
-            }
+        Config c = Config.load(ctx);
+        int len = c.ledWakeLen, buoc = c.ledWakeMs, khoang = Math.max(10, buoc / 2), chuyen = len * buoc;
+        List<String> khung = new ArrayList<>();
+        for (int b = 0; b < 24 + len; b++) {
+            if (b < 24) khung.add("000000 ffffff " + (16 + b));             // đầu: sáng dần
+            if (b >= len) khung.add("ffffff 000000 " + (16 + (b - len)));   // đuôi: tối dần
         }
-        if (muc.isEmpty()) for (String t : Config.LED_WAKE_MAC_DINH.split(" ")) muc.add(t + t + t);
-        final int CRESCENT = muc.size();
-        sweepLevels = Config.load(ctx).ledWake;
-        StringBuilder sb = new StringBuilder(RING_OFF).append('\n');
-        for (int b = 0; b < 24; b++) {
-            for (int i = 0; i < CRESCENT; i++) {
-                sb.append(setLed(RING_COLOR, 16 + ((b - (CRESCENT - 1) + i) % 24 + 24) % 24, muc.get(i))).append('\n');
-            }
-            sb.append(setLed(RING_COLOR, 16 + ((b - CRESCENT) % 24 + 24) % 24, "000000")).append('\n');
-            sb.append(PACE).append('\n');
+        StringBuilder lenh = new StringBuilder("1 ").append(khoang).append(" 1 ").append(khung.size());
+        for (int i = 0; i < khung.size(); i++) {
+            String[] k = khung.get(i).split(" ");
+            lenh.append(" 1 ").append(k[0]).append(' ').append(k[1]).append(' ').append(chuyen)
+                    .append(i < khung.size() - 1 ? " 1" : " 0").append(" 1 ").append(k[2]);
         }
-        return writeScript(ctx, "led_wake_sweep.sh", sb.toString());
+        double cho = (khung.size() * khoang + chuyen) / 1000.0;
+        sweepLevels = len + "," + buoc;
+        String body = RING_OFF + "\necho '" + lenh + "' > " + RING_COLOR + "\n"
+                + String.format(java.util.Locale.US, "sleep %.2f\n", cho);
+        return writeScript(ctx, "led_wake_sweep.sh", body);
     }
 
     /**
