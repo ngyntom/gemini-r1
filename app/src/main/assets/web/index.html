@@ -110,6 +110,9 @@ window.moManDangNhap = () => {
   .upd-steps .xong .icon { color: #34c759; }
   .upd-steps .loi .icon { color: #ff3b30; }
   #sidebar .menu-list li { margin-bottom: 4px; }
+  /* Popover âm lượng ở Chat: app.css (chép nguyên của Pi) chỉ đặt chiều cao thanh dọc cho #music-volume-range /
+     #mps-vol-range - thiếu thì thanh co lại đè lên nút +/- */
+  .music-vol-wrap #chatVolRange { height: 170px; margin: 8px 0; }
   /* Thẻ "đang điều khiển loa nào" đầu trang Cài đặt */
   .thiet-bi-dang-mo { display: flex; align-items: center; gap: 14px; padding: 14px 16px; color: inherit; }
   /* Icon "R1" của loa - cùng icon app iOS dùng cho loa trong danh sách thiết bị */
@@ -410,7 +413,7 @@ window.moManDangNhap = () => {
       <div class="page" data-name="chat">
         <div class="navbar"><div class="navbar-bg"></div><div class="navbar-inner">
           <div class="title">Chat<span class="subtitle" data-state-text>…</span></div>
-          <div class="right"><a href="#" class="link icon-only popover-open" data-popover="#volPopover" title="Âm lượng"><i class="icon f7-icons">speaker_3_fill</i></a>
+          <div class="right"><a href="#" class="link icon-only" id="chatVolNut" title="Âm lượng"><i class="icon f7-icons" id="chatVolIcon">speaker_3_fill</i></a>
             <a href="#" class="link icon-only" id="listenBtn" title="Nghe ngay (không cần từ đánh thức)"><i class="icon f7-icons">mic_fill</i></a></div>
         </div></div>
         <div class="page-content" id="chatScroll">
@@ -648,11 +651,20 @@ window.moManDangNhap = () => {
   </div></div>
 </div>
 
-<!-- Âm lượng nhanh ở tab Chat, đồng bộ với thanh trong tab Loa -->
-<div class="popover" id="volPopover"><div class="popover-inner"><div class="block" style="margin:14px 0">
-  <div style="display:flex;justify-content:space-between"><span>Âm lượng</span><span id="volLabel2"></span></div>
-  <input type="range" id="vol2" min="0" max="15" step="1" style="width:100%;accent-color:var(--f7-theme-color)">
-</div></div></div>
+<!-- Âm lượng nhanh ở tab Chat: CÙNG kiểu popover âm lượng của trình phát (#mps-am-luong-popover, CSS .music-vol-wrap
+     trong app.css) - số %, +/-, thanh dọc, tắt tiếng - và cùng API /api/music/volume, nên mọi nơi ra cùng một số % -->
+<div class="popover music-volume-popover" id="volPopover">
+  <div class="popover-angle"></div>
+  <div class="popover-inner">
+    <div class="music-vol-wrap">
+      <div class="music-vol-so" id="chatVolSo">--%</div>
+      <a href="#" class="link icon-only" id="chatVolTang" title="Tăng 10%"><i class="icon f7-icons">plus_circle_fill</i></a>
+      <div class="range-slider range-slider-vertical" id="chatVolRange"></div>
+      <a href="#" class="link icon-only" id="chatVolGiam" title="Giảm 10%"><i class="icon f7-icons">minus_circle_fill</i></a>
+      <a href="#" class="link icon-only" id="chatVolMute" title="Tắt/bật tiếng"><i class="icon f7-icons" id="chatVolMuteIcon">speaker_slash_fill</i></a>
+    </div>
+  </div>
+</div>
 
 <!-- Như Voicebot: sắp xếp NHÓM thiết bị (F7 Sortable, kéo ≡), tự lưu ngay -->
 <div class="popup" id="devSortPopup">
@@ -747,6 +759,7 @@ async function post(path, data) {
     body: data === undefined ? '' : JSON.stringify(data) });
   const j = await r.json().catch(() => ({}));
   if (!r.ok) { toast('Lỗi: ' + (j.error || r.status)); throw new Error(j.error || r.status); }
+  if (path === '/api/config' || path === '/api/auth/set') rungThanhCong();
   return j;
 }
 function toast(text) { app.toast.create({ text, closeTimeout: 2000, position: 'center' }).open(); }
@@ -971,8 +984,25 @@ async function api(path, opts) {
 }
 function baoLoi(e, tienTo, ms) { app.toast.create({ text: (tienTo || 'Lỗi: ') + (e && e.message || e), closeTimeout: ms || 3000, position: 'center' }).open(); }
 function luuCaiDatTk(khoa, giaTri) { try { localStorage.setItem(khoa, String(giaTri)); } catch (e) {} } // loa không có tài khoản
-function rungNhe() {}
-function rungThanhCong() {}
+// Rung như common.js của Pi: chỉ trong app iOS (plugin Haptics của Capacitor), trình duyệt thì bỏ qua.
+// rungNhe = chạm điều khiển; rungThanhCong = lưu / đăng nhập xong. Trang Nhạc + mini player (chép từ Pi) gọi sẵn 2 hàm này.
+function rungNhe() {
+  try {
+    if (window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform()) {
+      window.Capacitor.Plugins.Haptics.impact({ style: 'LIGHT' });
+    }
+  } catch (e) {}
+}
+function rungThanhCong() {
+  try {
+    if (window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform()) {
+      window.Capacitor.Plugins.Haptics.notification({ type: 'SUCCESS' });
+    }
+  } catch (e) {}
+}
+// Pi gọi rungNhe() trong từng handler; ở loa các trang Cài đặt dựng bằng JS (tog/sel/inp) nên bắt 1 chỗ chung:
+// mọi công tắc / ô chọn / thanh trượt đổi giá trị đều rung nhẹ
+document.addEventListener('change', e => { if (e.target.matches('input[type=checkbox], input[type=radio], input[type=range], select')) rungNhe(); }, true);
 // Như common.js của Pi: .preloader tạo sau lúc F7 khởi động phải tự chèn ruột đúng theme (Material: vòng SVG, iOS: 8 vạch)
 function htmlPreloader() {
   if (document.documentElement.classList.contains('md'))
@@ -1038,9 +1068,9 @@ document.querySelector('#view-chat').addEventListener('tab:show', () => setTimeo
 // history.back() quay đúng về màn đó (cùng cách nút "Đổi địa chỉ Voicebot" của Pi)
 if (window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform()) {
   $('settingsNavRight').style.display = '';
-  $('btnDoiDiaChi').addEventListener('click', e => { e.preventDefault(); history.back(); });
+  $('btnDoiDiaChi').addEventListener('click', e => { e.preventDefault(); rungNhe(); history.back(); });
   $('login-doi-dia-chi').style.display = '';
-  $('login-doi-dia-chi').addEventListener('click', e => { e.preventDefault(); history.back(); });
+  $('login-doi-dia-chi').addEventListener('click', e => { e.preventDefault(); rungNhe(); history.back(); });
 }
 // Tab Nhạc: tải trang Nhạc ngay (ẩn) - mini player / trình phát mở rộng ở các tab khác nhận trạng thái
 // nhạc từ trang này (sự kiện "nhac-pi"), như Pi luôn có sẵn tab Nhạc
@@ -1291,26 +1321,65 @@ async function sendChat(path) {
   try { await post(path, { text: t }); $('chatInput').value = ''; if (path.endsWith('say')) toast('Loa đang đọc'); }
   catch (e) {} finally { sending = false; }
 }
-$('sendBtn').addEventListener('click', e => { e.preventDefault(); sendChat('/api/ask'); });
+$('sendBtn').addEventListener('click', e => { e.preventDefault(); rungNhe(); sendChat('/api/ask'); });
 $('sayBtn').addEventListener('click', e => { e.preventDefault(); sendChat('/api/say'); });
 // Bộ gõ tiếng Việt có thể bắn Enter 2 lần khi đang ghép chữ -> bỏ qua lúc isComposing
 $('chatInput').addEventListener('keydown', e => {
   if (e.key === 'Enter' && !e.isComposing && e.keyCode !== 229) { e.preventDefault(); sendChat('/api/ask'); }
 });
 const listen = e => { e.preventDefault(); post('/api/listen').then(() => toast('Đang nghe… hãy nói')); };
-$('listenBtn').addEventListener('click', listen);
+$('listenBtn').addEventListener('click', e => { rungNhe(); listen(e); });
 $('btnListen').addEventListener('click', listen);
 
 // ---------- Loa ----------
 $('btnReset').addEventListener('click', e => { e.preventDefault(); post('/api/reset').then(() => toast('Đã xoá trí nhớ hội thoại')); });
 $('btnMic').addEventListener('click', e => { e.preventDefault(); $('micAudio').src = '/api/mic.wav?t=' + Date.now(); $('micAudio').play(); });
 ['runToggle', 'runToggle2'].forEach(id => $(id).addEventListener('change', e => post('/api/pause', { paused: !e.target.checked }).then(refresh)));
-['vol', 'vol2'].forEach(id => {
-  $(id).addEventListener('input', () => {
-    volDragging = true;
-    ['volLabel', 'volLabel2'].forEach(l => $(l).textContent = $(id).value + '/' + $(id).max);
-  });
-  $(id).addEventListener('change', () => { post('/api/volume', { level: +$(id).value }).finally(() => volDragging = false); });
+// Âm lượng hiện theo % ở mọi nơi (trang Loa, popover Chat, trình phát nhạc) - cùng công thức Music.volume() của loa
+const phanTramAmLuong = (v, max) => max ? Math.round(v * 100 / max) : 0;
+$('vol').addEventListener('input', () => {
+  volDragging = true;
+  $('volLabel').textContent = phanTramAmLuong(+$('vol').value, +$('vol').max) + '%';
+});
+$('vol').addEventListener('change', () => { post('/api/volume', { level: +$('vol').value }).finally(() => volDragging = false); });
+
+// Popover âm lượng ở Chat (như mini-player.js của Pi): +/- 10%, kéo thanh dọc, tắt tiếng nhớ mức cũ
+let chatVolRange = null, chatVolPopover = null, chatVolKeo = false, chatVolHen = null, chatVolTruocMute = null, chatVol = 50;
+const iconAmLuong = v => v <= 0 ? 'speaker_slash_fill' : v < 34 ? 'speaker_1_fill' : v < 67 ? 'speaker_2_fill' : 'speaker_3_fill';
+function hienChatVol(v) {
+  chatVol = Math.round(v || 0);
+  $('chatVolSo').textContent = chatVol + '%';
+  $('chatVolIcon').textContent = iconAmLuong(chatVol);
+  $('chatVolMuteIcon').textContent = chatVol > 0 ? 'speaker_slash_fill' : 'speaker_2_fill';
+  if (chatVolRange && chatVolRange.value !== chatVol) chatVolRange.setValue(chatVol);
+}
+function datChatVol(v) {
+  v = Math.max(0, Math.min(100, Math.round(v)));
+  hienChatVol(v);
+  volDragging = true; // refresh() đừng đè số đang chỉnh
+  clearTimeout(chatVolHen);
+  chatVolHen = setTimeout(() => post('/api/music/volume', { level: v }).then(refresh).finally(() => volDragging = false), 250);
+}
+$('chatVolNut').addEventListener('click', e => {
+  e.preventDefault();
+  rungNhe();
+  if (!chatVolRange) {
+    chatVolRange = app.range.create({
+      el: '#chatVolRange', vertical: true, min: 0, max: 100, step: 1, value: chatVol, label: false, draggableBar: false,
+      on: { change(r, v) { if (chatVolKeo) { hienChatVol(v); datChatVol(v); } } },
+    });
+    $('chatVolRange').addEventListener('pointerdown', () => { chatVolKeo = true; });
+    document.addEventListener('pointerup', () => { if (chatVolKeo) { rungNhe(); setTimeout(() => { chatVolKeo = false; }, 800); } });
+  }
+  // Thanh trượt tạo lúc popover còn ẩn (kích thước 0) -> mở xong tính lại
+  if (!chatVolPopover) chatVolPopover = app.popover.create({ el: '#volPopover', on: { opened() { chatVolRange.calcSize(); chatVolRange.setValue(chatVol); } } });
+  chatVolPopover.open('#chatVolNut');
+});
+$('chatVolTang').addEventListener('click', e => { e.preventDefault(); rungNhe(); datChatVol(Math.round(chatVol / 10) * 10 + 10); });
+$('chatVolGiam').addEventListener('click', e => { e.preventDefault(); rungNhe(); datChatVol(Math.round(chatVol / 10) * 10 - 10); });
+$('chatVolMute').addEventListener('click', e => {
+  e.preventDefault(); rungNhe();
+  if (chatVol > 0) { chatVolTruocMute = chatVol; datChatVol(0); } else datChatVol(chatVolTruocMute || 50);
 });
 
 // ---------- Thiết bị (Home Assistant) ----------
@@ -1411,6 +1480,7 @@ function renderDevices() {
   root.querySelectorAll('[data-sua]').forEach(a => a.addEventListener('click', e => {
     e.preventDefault();
     const dm = a.dataset.sua;
+    rungNhe();
     devEditing.has(dm) ? devEditing.delete(dm) : devEditing.add(dm);
     renderDevices();
     if (!devEditing.size) loadDevices();
@@ -1420,7 +1490,7 @@ function renderDevices() {
     let hold = null, held = false;
     const cancel = () => { clearTimeout(hold); hold = null; };
     t.addEventListener('pointerdown', () => { held = false; cancel();
-      hold = setTimeout(() => { held = true; hold = null; editDevice(t.dataset.id); }, 500); });
+      hold = setTimeout(() => { held = true; hold = null; rungNhe(); editDevice(t.dataset.id); }, 500); });
     ['pointerup', 'pointerleave', 'pointercancel'].forEach(ev => t.addEventListener(ev, cancel));
     t.addEventListener('contextmenu', e => e.preventDefault());
     t.addEventListener('click', e => {
@@ -1433,6 +1503,7 @@ function renderDevices() {
 }
 const boDau = s => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/đ/g, 'd').replace(/Đ/g, 'D').toLowerCase();
 async function removeDevice(id) {
+  rungNhe();
   devices = devices.filter(d => d.id !== id);
   renderDevices();
   await saveSelection(selFrom(devices));
@@ -1583,6 +1654,7 @@ $('devAddBtn').addEventListener('click', e => { e.preventDefault(); openDevPopup
 
 async function tapDevice(t) {
   const d = devices.find(x => x.id === t.dataset.id); if (!d || devBusy.has(d.id)) return;
+  rungNhe(); // như chamVaoThe() của Pi
   if (!TAPPABLE.includes(d.domain)) return toast(d.name + ': ' + stateText(d));
   const on = ON.includes(d.state);
   let service = 'toggle';
@@ -1641,8 +1713,9 @@ async function refresh() {
     $('diag').textContent = (S.mic_level || 0) + ' · ' + (S.wake_score || 0).toFixed(2);
     ['runToggle', 'runToggle2'].forEach(id => $(id).checked = !S.paused);
     if (!volDragging) {
-      ['vol', 'vol2'].forEach(id => { $(id).max = S.volume_max; $(id).value = S.volume; });
-      ['volLabel', 'volLabel2'].forEach(l => $(l).textContent = S.volume + '/' + S.volume_max);
+      $('vol').max = S.volume_max; $('vol').value = S.volume;
+      $('volLabel').textContent = phanTramAmLuong(S.volume, S.volume_max) + '%';
+      hienChatVol(phanTramAmLuong(S.volume, S.volume_max));
     }
     renderSys(S.sys || {});
     if (S.wifi_switch) $('wifiMsg').textContent = S.wifi_switch_msg;
@@ -1678,7 +1751,8 @@ async function doLogin() {
     const j = await r.json().catch(() => ({}));
     if (!r.ok) throw new Error(j.error || ('HTTP ' + r.status));
     try { localStorage.setItem(TEN_DN_KEY, username); } catch (e) {}
-    location.reload(); // mọi tab tải lại dữ liệu đã dính 401 - chỉ chạy khi đăng nhập ĐÃ thành công
+    rungThanhCong();
+    setTimeout(() => location.reload(), 150); // cho kịp rung trước khi tải lại // mọi tab tải lại dữ liệu đã dính 401 - chỉ chạy khi đăng nhập ĐÃ thành công
   } catch (e) {
     $('login-error').textContent = e.message;
     $('login-password').select();
@@ -1732,7 +1806,8 @@ $('login-forgot-confirm-btn').addEventListener('click', async e => {
   if (!/^\d{6}$/.test($('login-forgot-code').value.trim())) return toast('Nhập đủ mã 6 số');
   try {
     await post('/api/auth/forgot/confirm', { code: $('login-forgot-code').value, new_password: $('login-forgot-new-password').value });
-    location.reload(); // loa đã đặt cookie phiên mới
+    rungThanhCong();
+    setTimeout(() => location.reload(), 150); // loa đã đặt cookie phiên mới
   } catch (e) {}
 });
 
