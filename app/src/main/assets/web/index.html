@@ -65,7 +65,12 @@
   .upd-steps .xong .icon { color: #34c759; }
   .upd-steps .loi .icon { color: #ff3b30; }
   #sidebar .menu-list li { margin-bottom: 4px; }
-  #sidebar .item-subtitle { font-size: 12px; opacity: .65; white-space: normal; }
+  /* Dòng mô tả dưới tên mục: như Pi (.item-footer trong settings.html) - chữ nhỏ màu xám mờ của F7, không đậm như
+     .item-subtitle mặc định. Menu trái máy tính: 13px như #desktop-sidebar của Pi, mục đang chọn cũng giữ màu xám. */
+  .list .item-subtitle { font-size: var(--f7-list-item-footer-font-size); line-height: 1.35;
+                         color: var(--f7-list-item-footer-text-color); white-space: normal; }
+  #sidebar .item-subtitle, #sidebar .tab-link-active .item-subtitle { font-size: calc(13px * var(--ty-le-co-chu, 1));
+                         color: var(--f7-list-item-footer-text-color, #888); opacity: 1; }
 
   .page-inner { max-width: 760px; margin: 0 auto; }
   .muted { opacity: .6; font-size: calc(13px * var(--ty-le-co-chu, 1)); }
