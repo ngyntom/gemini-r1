@@ -124,6 +124,8 @@
   #devices .card-header { color: var(--f7-theme-color); font-weight: 600; }
   #devices .card-header .link { color: var(--f7-theme-color); }
   #devices .card-content .tiles { padding: 12px; }
+  /* Nút đóng thanh tìm (icon ✕ thay chữ "Huỷ"): cỡ vừa nút tròn của F7 */
+  .searchbar-disable-button .icon { font-size: 20px; line-height: 1; vertical-align: middle; }
   /* Máy tính: dùng hết bề ngang (bỏ cột đọc 760px chung); điện thoại: 3 cột, ô gọn hơn */
   #view-devices .page-inner { max-width: none; }
   @media (max-width: 899px) {
@@ -153,7 +155,7 @@
   .vol-row input[type=range] { flex: 1; min-width: 0; accent-color: var(--f7-theme-color); }
   .vol-row .vol-to { font-size: 22px; opacity: .8; }
   .vol-row .vol-so { min-width: 42px; text-align: right; font-variant-numeric: tabular-nums; color: var(--f7-list-item-after-text-color, #8e8e93); }
-  #view-speaker .card-header .muted { font-weight: 400; }
+  .page[data-name="speaker"] .card-header .muted { font-weight: 400; }
   .led-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(88px, 1fr)); gap: 8px; padding: 14px 16px; }
   .range-row input[type=range] { width: 100%; accent-color: var(--f7-theme-color); }
   .btn-row { display: flex; flex-wrap: wrap; gap: 8px; padding: 0 16px 14px; }
@@ -312,11 +314,12 @@
     </div>
 
     <!-- ===== Loa ===== -->
-    <div id="view-speaker" class="view tab" data-url="/">
+    <!-- Trang Loa: nằm trong Cài đặt, mở bằng router của view Cài đặt (route /speaker/, el = trang này) để có hiệu ứng trượt như mọi trang con -->
+    <div id="speakerHolder" style="display:none">
       <div class="page" data-name="speaker">
         <div class="navbar"><div class="navbar-bg"></div><div class="navbar-inner">
           <!-- Trang Loa nằm trong Cài đặt (không còn tab riêng): nút quay về Cài đặt -->
-          <div class="left"><a href="#" class="link" id="speakerBack"><i class="icon icon-back"></i><span class="if-not-md">Cài đặt</span></a></div>
+          <div class="left"><a href="#" class="link back"><i class="icon icon-back"></i><span class="if-not-md">Cài đặt</span></a></div>
           <div class="title" id="speakerTitle">Loa này</div>
         </div></div>
         <div class="page-content"><div class="page-inner">
@@ -442,7 +445,7 @@
           <div class="card card-outline card-dividers">
             <div class="card-header">Loa</div>
             <div class="card-content"><div class="list list-outline-ios list-strong-ios list-dividers-ios media-list" style="margin:0"><ul>
-              <li><a href="#" class="item-link item-content" id="openSpeaker"><div class="item-media"><i class="icon f7-icons" style="color:#2f80ed">speaker_3_fill</i></div>
+              <li><a href="/speaker/" class="item-link item-content" id="openSpeaker"><div class="item-media"><i class="icon f7-icons" style="color:#2f80ed">speaker_3_fill</i></div>
                 <div class="item-inner"><div class="item-title" id="speakerItem">Loa này</div><div class="item-subtitle">Trạng thái, âm lượng, AirPlay, Bluetooth, Wi-Fi, nhật ký</div></div></a></li>
               <li><a href="/group/" class="item-link item-content"><div class="item-media"><i class="icon f7-icons" style="color:#2f80ed">hifispeaker_2_fill</i></div>
                 <div class="item-inner"><div class="item-title">Nhóm loa</div><div class="item-subtitle">Phát nhạc đồng bộ nhiều loa, stereo</div></div></a></li>
@@ -451,6 +454,8 @@
           <div class="card card-outline card-dividers">
             <div class="card-header">Hệ thống</div>
             <div class="card-content"><div class="list list-outline-ios list-strong-ios list-dividers-ios media-list" style="margin:0"><ul>
+              <li><a href="/theme/" class="item-link item-content"><div class="item-media"><i class="icon f7-icons" style="color:#2f80ed">paintbrush_fill</i></div>
+                <div class="item-inner"><div class="item-title">Giao diện</div><div class="item-subtitle">Sáng / tối, iOS / Material, màu chủ đề</div></div></a></li>
               <li><a href="/update/" class="item-link item-content"><div class="item-media"><i class="icon f7-icons" style="color:#2f80ed">arrow_down_circle_fill</i></div>
                 <div class="item-inner"><div class="item-title">Cập nhật app</div><div class="item-subtitle" id="verSub">Cài APK / file zip từ GitHub</div></div></a></li>
             </ul></div></div>
@@ -502,9 +507,9 @@
 <div class="popup" id="devEditPopup">
   <div class="view"><div class="page">
     <div class="navbar"><div class="navbar-bg"></div><div class="navbar-inner">
-      <div class="left"><a href="#" class="link popup-close">Huỷ</a></div>
+      <div class="left"><a href="#" class="link icon-only popup-close" title="Huỷ"><i class="icon f7-icons">xmark</i></a></div>
       <div class="title">Sửa thiết bị</div>
-      <div class="right"><a href="#" class="link" id="devEditSave"><b>Lưu</b></a></div>
+      <div class="right"><a href="#" class="link icon-only" id="devEditSave" title="Lưu"><i class="icon f7-icons">checkmark_alt</i></a></div>
     </div></div>
     <div class="page-content">
       <div class="list list-strong inset"><ul>
@@ -524,7 +529,8 @@
 <!-- Cửa sổ Thêm/bớt thiết bị - cùng kiểu Voicebot trên Pi: 2 tab Đã thêm / Chưa thêm, tìm kiếm,
      công tắc + "Tên gọi khác". Bot chỉ thấy và chỉ điều khiển được thiết bị đã thêm. -->
 <div class="popup" id="devPopup">
-  <div class="view"><div class="page">
+  <!-- page-with-subnavbar: chừa chỗ cho thanh phụ (Đã thêm / Chưa thêm), thiếu thì nội dung đầu trang bị che -->
+  <div class="view"><div class="page page-with-subnavbar">
     <div class="navbar"><div class="navbar-bg"></div><div class="navbar-inner">
       <div class="title">Thêm/bớt thiết bị</div>
       <div class="right">
@@ -536,7 +542,7 @@
           <div class="searchbar-input-wrap">
             <input type="search" id="devSearch" placeholder="Tìm thiết bị..."><i class="searchbar-icon"></i><span class="input-clear-button"></span>
           </div>
-          <span class="searchbar-disable-button">Huỷ</span>
+          <span class="searchbar-disable-button" title="Đóng tìm kiếm"><i class="icon f7-icons">xmark</i></span>
         </div>
       </form>
       <div class="subnavbar"><div class="subnavbar-inner">
@@ -566,7 +572,9 @@ const STATES = {
   paused: ['Tạm dừng', '#8e8e93'], error: ['Lỗi', '#ff3b30']
 };
 const SECRETS = ['api_key', 'google_tts_key', 'ha_token'];
-const $ = id => document.getElementById(id);
+// Trang Loa do router Cài đặt chèn vào / gỡ ra (route /speaker/): lúc đang gỡ ra khỏi DOM vẫn tìm được phần tử của nó
+const SPEAKER_PAGE = document.querySelector('.page[data-name="speaker"]');
+const $ = id => document.getElementById(id) || SPEAKER_PAGE.querySelector('#' + id);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
 async function post(path, data) {
@@ -777,6 +785,15 @@ const routes = Object.keys(PAGES).map(name => ({
   async({ resolve }) { resolve({ content: PAGES[name]() }); },
 }));
 routes.push({ path: '/music/', componentUrl: '/static/pages/music.html' });
+routes.push({ path: '/theme/', componentUrl: '/static/pages/theme.html' }); // trang Giao diện chép từ Voicebot
+
+// ---------- Giao diện (trang /theme/ của Pi): khoá lưu giống static/js/common.js của Pi ----------
+const THEME_MODE_KEY = 'voicebot_theme_mode';   // 'ios' | 'md' | 'auto'
+const DARK_MODE_KEY = 'voicebot_dark_mode';     // 'light' | 'dark' | 'auto'
+const COLOR_THEME_KEY = 'voicebot_color_theme'; // mã hex
+const FONT_SCALE_KEY = 'voicebot_font_scale';   // trang Giao diện của Pi cần biến này; loa không dùng mục Cỡ chữ
+function docCaiDat(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
+routes.push({ path: '/speaker/', el: SPEAKER_PAGE }); // trang Loa, mở từ Cài đặt có hiệu ứng trượt như trang con
 
 // ---------- Hàm chung mà trang Nhạc của Pi (music.html) gọi - bản rút gọn của static/js/common.js trên Pi ----------
 async function api(path, opts) {
@@ -793,13 +810,22 @@ function htmlPreloader() { return '<span class="preloader-inner">' + '<span clas
 
 // ---------- Khởi tạo Framework7 ----------
 const app = new Framework7({
-  el: '#app', theme: 'ios', darkMode: 'auto', colors: { primary: '#2f80ed' }, routes,
+  // Kiểu giao diện iOS / Material chỉ đặt được lúc tạo app (trang Giao diện đổi thì tải lại trang)
+  el: '#app', theme: docCaiDat(THEME_MODE_KEY) || 'ios', colors: { primary: '#2f80ed' }, routes,
   on: { pageInit(page) { if (PAGES[page.name]) initSubpage(page); } },
 });
 window.f7app = app; // baoLoi() của Pi dùng tên này
+// Sáng / tối và màu chủ đề đã lưu ở trang Giao diện (như app.js của Pi: luôn đặt, mặc định theo máy)
+// Trong app iOS (Capacitor) F7 chờ "deviceready" mới init xong - gọi setDarkMode trước đó sẽ lỗi (như Pi)
+{
+  const apDung = () => {
+    const toi = docCaiDat(DARK_MODE_KEY) || 'auto';
+    app.setDarkMode(toi === 'auto' ? 'auto' : toi === 'dark');
+    if (docCaiDat(COLOR_THEME_KEY)) app.setColorTheme(docCaiDat(COLOR_THEME_KEY));
+  };
+  if (app.initialized) apDung(); else app.once('init', apDung);
+}
 // Cài đặt → "Loa này" mở trang Loa; nút ‹ Cài đặt quay về
-document.getElementById('openSpeaker').addEventListener('click', e => { e.preventDefault(); app.tab.show('#view-speaker'); });
-document.getElementById('speakerBack').addEventListener('click', e => { e.preventDefault(); app.tab.show('#view-settings'); });
 
 // Ô chat nằm ngay trên thanh tab (và mini player nếu đang hiện) theo VỊ TRÍ THẬT đo được: app.css của Pi dời
 // tabbar khác nhau tuỳ Safari / web app trên MH chính / app Capacitor, đặt số cố định thì có lúc bị che.
@@ -828,11 +854,11 @@ if (window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.is
 // Tab Nhạc: tải trang Nhạc ngay (ẩn) - mini player / trình phát mở rộng ở các tab khác nhận trạng thái
 // nhạc từ trang này (sự kiện "nhac-pi"), như Pi luôn có sẵn tab Nhạc
 app.views.create('#view-music', { url: '/music/' });
-['#view-chat', '#view-music', '#view-speaker', '#view-devices', '#view-settings'].forEach(v => {
+['#view-chat', '#view-music', '#view-devices', '#view-settings'].forEach(v => {
   if (v !== '#view-music') app.views.create(v); // view Nhạc đã tạo ở trên
   // F7 chỉ tô nút trong menu vừa bấm -> đồng bộ cả menu trái (máy tính) lẫn thanh tab dưới (điện thoại).
   // Trang Loa nằm trong Cài đặt (không có tab riêng) -> vẫn tô Cài đặt.
-  const tab = v === '#view-speaker' ? '#view-settings' : v;
+  const tab = v;
   document.querySelector(v).addEventListener('tab:show', () => document.querySelectorAll('.tab-link')
     .forEach(a => a.classList.toggle('tab-link-active', a.getAttribute('href') === tab)));
 });

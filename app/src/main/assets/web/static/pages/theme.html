@@ -1,0 +1,284 @@
+<template>
+  <div class="page" data-name="theme">
+    <div class="navbar">
+      <div class="navbar-bg"></div>
+      <div class="navbar-inner">
+        <div class="left">
+          <a href="#" class="link back">
+            <i class="icon icon-back"></i>
+            <span class="if-not-md"></span>
+          </a>
+        </div>
+        <div class="title">Giao diện</div>
+      </div>
+    </div>
+    <div class="page-content">
+      <!-- <div style="padding: 8px 16px 0; color: var(--f7-block-footer-text-color, #888); font-size: 13px;">Các mục dưới đây chỉ ảnh hưởng cách hiển thị trên trình duyệt/điện thoại này, không đụng tới cấu hình bot.</div> -->
+
+      <div class="card card-outline card-dividers">
+        <div class="card-header">Chế độ sáng/tối</div>
+        <div class="card-content" style="padding:16px;">
+          <div class="theme-preview-row" id="theme-dark-preview">
+            <button class="theme-preview-card" data-value="light">
+              <div class="theme-preview-thumb theme-preview-thumb-light">
+                <div class="theme-preview-navbar"></div>
+                <div class="theme-preview-body">
+                  <div class="theme-preview-line"></div>
+                  <div class="theme-preview-line short"></div>
+                </div>
+              </div>
+              <span class="theme-preview-label">Sáng</span>
+            </button>
+            <button class="theme-preview-card" data-value="dark">
+              <div class="theme-preview-thumb theme-preview-thumb-dark">
+                <div class="theme-preview-navbar"></div>
+                <div class="theme-preview-body">
+                  <div class="theme-preview-line"></div>
+                  <div class="theme-preview-line short"></div>
+                </div>
+              </div>
+              <span class="theme-preview-label">Tối</span>
+            </button>
+            <button class="theme-preview-card" data-value="auto">
+              <div class="theme-preview-thumb theme-preview-thumb-auto-lightdark">
+                <div class="theme-preview-navbar"></div>
+                <div class="theme-preview-body">
+                  <div class="theme-preview-line"></div>
+                  <div class="theme-preview-line short"></div>
+                </div>
+              </div>
+              <span class="theme-preview-label">Tự động</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div class="card card-outline card-dividers">
+        <div class="card-header">Kiểu giao diện</div>
+        <div class="card-content">
+          <!-- Dùng thẳng icon logo iOS/Android có sẵn của Framework7 Icons thay
+               cho khung mô phỏng vẽ tay (như mục Sáng/Tối phía trên) - trực quan
+               hơn hẳn vì đây đúng nghĩa "chọn hệ điều hành nào", không phải
+               "chọn màu sắc" như mục Sáng/Tối. "Tự động" dùng icon wand_stars
+               (đũa phép - đúng tinh thần "để app tự quyết định"). -->
+          <div class="theme-preview-row" id="theme-ios-md-preview" style="padding:16px 16px 0;">
+            <button class="theme-preview-card" data-value="ios">
+              <div class="theme-preview-icon-wrap">
+                <i class="icon f7-icons">logo_apple</i>
+              </div>
+              <span class="theme-preview-label">iOS</span>
+            </button>
+            <button class="theme-preview-card" data-value="md">
+              <div class="theme-preview-icon-wrap">
+                <i class="icon f7-icons">logo_android</i>
+              </div>
+              <span class="theme-preview-label">Material</span>
+            </button>
+            <button class="theme-preview-card" data-value="auto">
+              <div class="theme-preview-icon-wrap">
+                <i class="icon f7-icons">wand_stars</i>
+              </div>
+              <span class="theme-preview-label">Tự động</span>
+            </button>
+          </div>
+          <div class="co-chu-tuy-chinh" style="padding: 8px 16px 16px; color: var(--f7-block-footer-text-color, #888); --px: 13;">Đổi mục này cần tải lại trang mới áp dụng đúng (khác chế độ sáng/tối và màu chủ đề, áp dụng ngay không cần tải lại).</div>
+        </div>
+      </div>
+
+<div class="card card-outline card-dividers">
+        <div class="card-header">Màu chủ đề</div>
+        <div class="card-content" style="padding:16px;">
+          <div class="grid grid-cols-3 medium-grid-cols-4 grid-gap" id="theme-color-grid"></div>
+        </div>
+      </div>
+
+      <div class="card card-outline card-dividers">
+        <div class="card-header">Màu tùy chỉnh</div>
+        <div class="card-content">
+          <div class="list no-hairlines-md" style="margin:0;">
+            <ul>
+              <li class="item-content item-input">
+                <div class="item-media" style="align-self:flex-end;">
+                  <div id="theme-color-swatch" style="width: 28px; height: 28px; border-radius: 4px; background: var(--f7-color-primary);"></div>
+                </div>
+                <div class="item-inner">
+                  <div class="item-label">Mã màu HEX</div>
+                  <div class="item-input-wrap">
+                    <input id="theme-color-picker" type="text" readonly placeholder="vd #ff0000" />
+                  </div>
+                </div>
+              </li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</template>
+<script>
+export default (props, { $f7, $on }) => {
+  // THEME_MODE_KEY/DARK_MODE_KEY/COLOR_THEME_KEY khai báo ở common.js (không
+  // phải ở đây) - app.js cần đọc chúng NGAY lúc khởi động, trước khi trang
+  // này từng được mở lần nào.
+  let themeColorPickerInst = null;
+
+  function apDungMauChuDe(hex) {
+    $f7.setColorTheme(hex);
+    luuCaiDatTk(COLOR_THEME_KEY, hex);
+    const swatch = document.getElementById('theme-color-swatch');
+    if (swatch) swatch.style.background = hex;
+    if (themeColorPickerInst) themeColorPickerInst.setValue({ hex });
+  }
+
+  function renderMauChuDeGrid() {
+    const grid = document.getElementById('theme-color-grid');
+    if (!grid) return;
+    const mauSac = Object.keys($f7.colors).filter((c) => c !== 'primary' && c !== 'white' && c !== 'black');
+    grid.innerHTML = mauSac.map((mau) =>
+      '<div><button class="button button-fill button-round button-small color-' + mau + '" data-color="' + mau + '">' + mau + '</button></div>'
+    ).join('');
+    grid.querySelectorAll('button').forEach((btn) => {
+      btn.addEventListener('click', () => apDungMauChuDe($f7.colors[btn.dataset.color]));
+    });
+  }
+
+  // ---------- Cỡ chữ toàn app - đổi biến CSS "--ty-le-co-chu" ở :root (đọc
+  // trong app.css: F7 tự co giãn theo vì mọi font-size của F7 đã được định
+  // nghĩa lại thành calc(size-gốc * biến này), chữ tự viết dùng class
+  // ".co-chu-tuy-chinh" cũng vậy) - áp dụng NGAY, không cần Lưu/tải lại
+  // trang, khác hẳn mục "Kiểu giao diện" ở trên. FONT_SCALE_KEY khai báo ở
+  // common.js (common.js cũng tự áp lại giá trị đã lưu NGAY lúc trang vừa
+  // tải, tránh nhấp nháy cỡ mặc định rồi mới nhảy sang cỡ đã lưu). ----------
+  let themeFontScaleRange = null;
+
+  function apDungCoChu(phanTram) {
+    document.documentElement.style.setProperty('--ty-le-co-chu', phanTram / 100);
+    luuCaiDatTk(FONT_SCALE_KEY, String(phanTram / 100));
+  }
+
+  function ensureThemeFontScaleRange() {
+    const luu = parseFloat(localStorage.getItem(FONT_SCALE_KEY)) || 1;
+    const phanTramBanDau = Math.round(luu * 100);
+    apDungCoChu(phanTramBanDau);
+    themeFontScaleRange = $f7.range.create({
+      el: '#theme-font-scale-range',
+      value: phanTramBanDau,
+      min: 80,
+      max: 150,
+      step: 10,
+      label: true,
+      // Khung chia (tick) trên thanh - đúng tham số chính thức của F7
+      // (framework7.io/docs/range-slider.html, mục "With Scale"). Khoảng
+      // 80-150 bước 10 = 7 đoạn - scaleSteps:7 hiện đủ 8 vạch (80/90/.../150)
+      // khớp từng bước nhấn thật, scaleSubSteps:1 = không chia nhỏ thêm giữa
+      // các vạch (mỗi bước đã đúng 1 nấc rồi, chia thêm sẽ vẽ vạch không khớp
+      // giá trị bấm được).
+      scale: true,
+      scaleSteps: 7,
+      scaleSubSteps: 1,
+      // CHỈ nhận thao tác lúc chạm đúng nút tròn kéo - xem giải thích đầy đủ
+      // trong settings-common.js.
+      draggableBar: false,
+      formatLabel: (val) => Math.round(val) + '%',
+      on: {
+        change(range, val) {
+          rungNhe();
+          apDungCoChu(val);
+        },
+      },
+    });
+  }
+
+  // Chọn thẻ trực quan (kiểu WiFiman Desktop Settings > Theme) - thay cho
+  // segmented chữ trước đây. Chỉ dùng riêng ở trang này (không dùng chung
+  // bindSegmented() của settings-common.js vì cấu trúc DOM khác hẳn: thẻ
+  // hình mô phỏng + chữ, không phải hàng nút .button đơn thuần).
+  function chonThemePreview(containerId, value) {
+    document.querySelectorAll('#' + containerId + ' .theme-preview-card').forEach((card) => {
+      card.classList.toggle('active', card.dataset.value === value);
+    });
+  }
+
+  function bindThemeDarkPreview() {
+    const luu = localStorage.getItem(DARK_MODE_KEY) || 'auto';
+    chonThemePreview('theme-dark-preview', luu);
+    document.querySelectorAll('#theme-dark-preview .theme-preview-card').forEach((card) => {
+      card.addEventListener('click', () => {
+        const val = card.dataset.value;
+        chonThemePreview('theme-dark-preview', val);
+        luuCaiDatTk(DARK_MODE_KEY, val);
+        $f7.setDarkMode(val === 'auto' ? 'auto' : val === 'dark');
+      });
+    });
+  }
+
+  function bindThemeIosMdPreview() {
+    const luuBanDau = localStorage.getItem(THEME_MODE_KEY) || 'ios';
+    chonThemePreview('theme-ios-md-preview', luuBanDau);
+    document.querySelectorAll('#theme-ios-md-preview .theme-preview-card').forEach((card) => {
+      card.addEventListener('click', () => {
+        const val = card.dataset.value;
+        const dangLuu = localStorage.getItem(THEME_MODE_KEY) || 'ios';
+        if (val === dangLuu) return;
+        luuCaiDatTk(THEME_MODE_KEY, val);
+        chonThemePreview('theme-ios-md-preview', val);
+        const ten = { ios: 'iOS', md: 'Material', auto: 'tự động' }[val];
+        $f7.dialog.confirm(
+          'Cần tải lại trang để áp dụng đúng giao diện ' + ten + '. Tải lại ngay?',
+          'Đổi giao diện',
+          () => location.reload(),
+          () => {
+            // Huỷ - trả viền + lựa chọn lưu về đúng giá trị CŨ (trước lúc bấm),
+            // vì bấm chọn ở trên đã đổi cả 2 thứ đó ngay rồi (đổi trước, hỏi
+            // xác nhận sau) - không huỷ lại thì viền hiện lựa chọn MỚI dù giao
+            // diện thật vẫn đang chạy kiểu CŨ (chưa tải lại trang).
+            luuCaiDatTk(THEME_MODE_KEY, dangLuu);
+            chonThemePreview('theme-ios-md-preview', dangLuu);
+          },
+        );
+      });
+    });
+  }
+
+  $on('pageInit', () => {
+    renderMauChuDeGrid();
+    bindThemeDarkPreview();
+    bindThemeIosMdPreview();
+    // (Cỡ chữ: bỏ trên loa, không dùng)
+
+    const mauDaLuu = localStorage.getItem(COLOR_THEME_KEY);
+    const mauHienTai = mauDaLuu || getComputedStyle(document.documentElement).getPropertyValue('--f7-color-primary').trim() || '#007aff';
+    const swatch = document.getElementById('theme-color-swatch');
+    if (swatch) swatch.style.background = mauHienTai;
+
+    // Component ColorPicker THẬT của F7 (giống trang Color Themes trong Kitchen
+    // Sink chính thức) - không tự vẽ lại UI chọn màu.
+    themeColorPickerInst = $f7.colorPicker.create({
+      inputEl: '#theme-color-picker',
+      targetEl: '#theme-color-swatch',
+      value: { hex: mauHienTai },
+      on: {
+        change(cp, value) {
+          apDungMauChuDe(value.hex);
+        },
+      },
+    });
+  });
+
+  // Hủy instance ColorPicker khi rời trang - tránh sinh thêm instance/DOM thừa
+  // mỗi lần quay lại trang này (đã gặp lỗi y hệt kiểu này với thanh tiến trình
+  // nhạc: destroy() không tự dọn hết, phải chủ động ở đây).
+  $on('pageBeforeRemove', () => {
+    if (themeColorPickerInst) {
+      try { themeColorPickerInst.destroy(); } catch (e) { /* noop */ }
+      themeColorPickerInst = null;
+    }
+    if (themeFontScaleRange) {
+      try { themeFontScaleRange.destroy(); } catch (e) { /* noop */ }
+      themeFontScaleRange = null;
+    }
+  });
+
+  return $render;
+};
+</script>
