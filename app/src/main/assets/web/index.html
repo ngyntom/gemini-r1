@@ -120,6 +120,15 @@
   .editing .tile .t-del { display: flex; }
   .editing .tile .t-badge { display: none; }
   .editing .tile { animation: wiggle .35s ease-in-out infinite alternate; }
+  /* Như Voicebot: mỗi nhóm 1 card, tên nhóm + nút sửa riêng nhóm đó trên card-header */
+  #devices .card-header { color: var(--f7-theme-color); font-weight: 600; }
+  #devices .card-header .link { color: var(--f7-theme-color); }
+  #devices .card-content .tiles { padding: 12px; }
+  .icon-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(56px, 1fr)); gap: 8px; padding: 8px 16px 20px; }
+  .icon-grid a { display: flex; align-items: center; justify-content: center; height: 52px; border-radius: 12px;
+                 background: rgba(120,120,128,.12); color: inherit; }
+  .icon-grid a.chon { background: var(--f7-theme-color); color: #fff; }
+  .icon-grid .icon { font-size: 26px; }
   @keyframes wiggle { from { transform: rotate(-.6deg); } to { transform: rotate(.6deg); } }
   #devPopup .page-content { overflow-x: hidden; }
   .dev-row .item-subtitle { font-size: 12px; opacity: .6; }
@@ -371,7 +380,7 @@
         <div class="navbar"><div class="navbar-bg"></div><div class="navbar-inner">
           <div class="title">Thiết bị</div>
           <div class="right">
-            <a href="#" class="link icon-only" id="devEditBtn" title="Sửa: bỏ thiết bị, đổi tên"><i class="icon f7-icons" id="devEditIcon">pencil</i></a>
+            <a href="#" class="link icon-only" id="devSortBtn" title="Sắp xếp nhóm"><i class="icon f7-icons">arrow_up_arrow_down</i></a>
             <a href="#" class="link icon-only" id="devAddBtn" title="Thêm/bớt thiết bị"><i class="icon f7-icons">plus</i></a>
           </div>
         </div></div>
@@ -453,6 +462,43 @@
   <div style="display:flex;justify-content:space-between"><span>Âm lượng</span><span id="volLabel2"></span></div>
   <input type="range" id="vol2" min="0" max="15" step="1" style="width:100%;accent-color:var(--f7-theme-color)">
 </div></div></div>
+
+<!-- Như Voicebot: sắp xếp NHÓM thiết bị (F7 Sortable, kéo ≡), tự lưu ngay -->
+<div class="popup" id="devSortPopup">
+  <div class="view"><div class="page">
+    <div class="navbar"><div class="navbar-bg"></div><div class="navbar-inner">
+      <div class="title">Sắp xếp nhóm</div>
+      <div class="right"><a href="#" class="link icon-only popup-close" title="Xong"><i class="icon f7-icons">checkmark_alt</i></a></div>
+    </div></div>
+    <div class="page-content">
+      <div class="block-footer" style="margin-top:16px">Kéo biểu tượng ≡ bên phải để đổi thứ tự các nhóm trên trang Thiết bị. Tự lưu ngay.</div>
+      <div class="list list-strong inset list-dividers-ios sortable sortable-enabled" id="devSortList"><ul></ul></div>
+    </div>
+  </div></div>
+</div>
+
+<!-- Như Voicebot: sửa 1 thiết bị - tên gọi khác + icon (tìm theo tên icon) -->
+<div class="popup" id="devEditPopup">
+  <div class="view"><div class="page">
+    <div class="navbar"><div class="navbar-bg"></div><div class="navbar-inner">
+      <div class="left"><a href="#" class="link popup-close">Huỷ</a></div>
+      <div class="title">Sửa thiết bị</div>
+      <div class="right"><a href="#" class="link" id="devEditSave"><b>Lưu</b></a></div>
+    </div></div>
+    <div class="page-content">
+      <div class="list list-strong inset"><ul>
+        <li class="item-content item-input"><div class="item-inner">
+          <div class="item-title item-label">Tên gọi khác <span class="muted" id="devEditGoc"></span></div>
+          <div class="item-input-wrap"><input type="text" id="devEditTen" placeholder="Để trống = dùng tên gốc"></div>
+          <div class="item-footer">Bot gọi được thiết bị theo tên này.</div></div></li>
+      </ul></div>
+      <div class="block-title">Icon</div>
+      <div class="block" style="margin:0 0 4px"><input type="search" id="devIconSearch" placeholder="Tìm icon (vd. đèn, quạt, tv)…"
+        style="width:100%;height:36px;border-radius:10px;padding:0 12px;border:none;background:rgba(120,120,128,.14);color:inherit;font-size:15px"></div>
+      <div class="icon-grid" id="devIconGrid"></div>
+    </div>
+  </div></div>
+</div>
 
 <!-- Cửa sổ Thêm/bớt thiết bị - cùng kiểu Voicebot trên Pi: 2 tab Đã thêm / Chưa thêm, tìm kiếm,
      công tắc + "Tên gọi khác". Bot chỉ thấy và chỉ điều khiển được thiết bị đã thêm. -->
@@ -1038,7 +1084,7 @@ const TAPPABLE = ['climate', 'light', 'switch', 'fan', 'cover', 'media_player', 
 const ON = ['on', 'open', 'opening', 'playing', 'cleaning', 'heat', 'cool', 'heat_cool', 'auto', 'dry', 'fan_only', 'unlocked'];
 const STATE_VI = { on: 'Bật', off: 'Tắt', open: 'Mở', closed: 'Đóng', playing: 'Đang phát', paused: 'Tạm dừng', idle: 'Rảnh',
   unavailable: 'Mất kết nối', cool: 'Làm lạnh', heat: 'Sưởi', auto: 'Tự động', dry: 'Hút ẩm', fan_only: 'Quạt', locked: 'Đã khoá', unlocked: 'Mở khoá' };
-let devices = [], devTimer = null, devEdit = false;
+let devices = [], devTimer = null;
 const stateText = d => (STATE_VI[d.state] || d.state) + (d.unit ? ' ' + d.unit : '');
 const groupBy = list => { const g = {}; list.forEach(d => (g[d.domain] = g[d.domain] || []).push(d));
   return Object.keys(DOMAINS).filter(k => g[k]).concat(Object.keys(g).filter(k => !DOMAINS[k]).sort()).map(k => [k, g[k]]); };
@@ -1048,7 +1094,7 @@ async function saveSelection(sel) {
   await post('/api/ha/selection', { devices: sel });
 }
 async function loadDevices() {
-  if (devEdit) return; // đang sửa thì không tự làm mới, tránh mất thao tác
+  if (devEditing.size || (typeof devEditPopup !== 'undefined' && devEditPopup.opened)) return; // đang sửa: đừng vẽ lại
   try {
     const r = await fetch('/api/ha/devices'), j = await r.json();
     if (!r.ok) throw new Error(j.error || r.status);
@@ -1058,9 +1104,32 @@ async function loadDevices() {
       <a href="#" class="button button-tonal" onclick="app.tab.show('#view-settings');app.views.get('#view-settings').router.navigate('/ha/');return false;">Cài đặt Home Assistant</a></div>`;
   }
 }
+// ----- Như Voicebot: nhóm theo thứ tự đã sắp, icon riêng từng thiết bị, sửa riêng từng nhóm -----
+const devEditing = new Set();           // domain đang sửa (ô rung, có ✕)
+const devOrder = () => String(S && S.config && S.config.ha_dash_order || '').split(',').filter(Boolean);
+const devIcons = () => { try { return JSON.parse(S.config.ha_dash_icons || '{}'); } catch (e) { return {}; } };
+const devIcon = d => devIcons()[d.id] || (DOMAINS[d.domain] || [0, 'circle'])[1];
+function groupSorted(list) {
+  const ord = devOrder(), pos = dm => { const i = ord.indexOf(dm); return i < 0 ? 1e6 : i; };
+  return groupBy(list).sort((a, b) => pos(a[0]) - pos(b[0])); // nhóm chưa sắp giữ thứ tự mặc định ở cuối
+}
+// Icon chọn được (F7 Icons) kèm từ khoá tiếng Việt để tìm; gõ đúng tên icon F7 khác cũng được
+const ICONS = [['lightbulb_fill', 'đèn bóng'], ['lightbulb', 'đèn'], ['lightbulb_slash', 'đèn tắt'], ['sun_max_fill', 'đèn sáng mặt trời'],
+  ['moon_fill', 'đèn ngủ trăng'], ['moon_stars_fill', 'ngủ đêm'], ['sparkles', 'đèn trang trí cảnh'], ['wind', 'quạt gió'],
+  ['tornado', 'quạt lốc'], ['snow', 'máy lạnh điều hoà'], ['thermometer', 'nhiệt độ'], ['thermometer_snowflake', 'lạnh'],
+  ['thermometer_sun', 'nóng sưởi'], ['flame_fill', 'bếp lửa nóng lạnh'], ['drop_fill', 'nước bơm'], ['drop', 'nước van'],
+  ['power', 'công tắc nguồn'], ['bolt_fill', 'điện ổ cắm'], ['bolt_circle_fill', 'điện'], ['tv_fill', 'tivi tv'], ['tv', 'tivi'],
+  ['desktopcomputer', 'máy tính pc'], ['gamecontroller_fill', 'game'], ['hifispeaker_fill', 'loa'], ['speaker_2_fill', 'loa âm thanh'],
+  ['music_note', 'nhạc'], ['play_rectangle_fill', 'phát video'], ['videocam_fill', 'camera video'], ['camera_fill', 'camera'],
+  ['bell_fill', 'chuông'], ['alarm_fill', 'báo thức còi'], ['timer', 'hẹn giờ'], ['lock_fill', 'khoá cửa'], ['lock_open_fill', 'mở khoá'],
+  ['shield_fill', 'an ninh'], ['house_fill', 'nhà'], ['bed_double_fill', 'phòng ngủ giường'], ['rectangle_split_3x1_fill', 'rèm cửa'],
+  ['car_fill', 'xe ô tô cổng'], ['wifi', 'wifi mạng'], ['antenna_radiowaves_left_right', 'sóng'], ['printer_fill', 'máy in'],
+  ['tree', 'cây vườn'], ['circle_grid_hex_fill', 'robot hút bụi'], ['gauge', 'cảm biến đồng hồ'], ['cloud_sun_fill', 'thời tiết'],
+  ['person_fill', 'người'], ['location_fill', 'vị trí'], ['heart_fill', 'yêu thích'], ['star_fill', 'sao'], ['square_grid_2x2_fill', 'khác']];
+
 function renderDevices() {
   const root = $('devices');
-  root.classList.toggle('editing', devEdit);
+  root.classList.remove('editing');
   if (!devices.length) {
     root.innerHTML = `<div class="block" style="text-align:center;margin-top:20vh">
       <i class="icon f7-icons" style="font-size:48px;opacity:.4">square_grid_2x2</i>
@@ -1068,28 +1137,38 @@ function renderDevices() {
       <a href="#" class="button button-fill button-round" onclick="openDevPopup();return false;" style="display:inline-flex;padding:0 20px">Thêm thiết bị</a></div>`;
     return;
   }
-  root.innerHTML = groupBy(devices).map(([dom, list]) => {
-    const [title, icon] = DOMAINS[dom] || [dom, 'circle'];
-    return `<div class="block-title">${title} (${list.length})</div><div class="list list-strong list-dividers inset"><div class="tiles">` +
+  root.innerHTML = groupSorted(devices).map(([dom, list]) => {
+    const title = (DOMAINS[dom] || [dom])[0], sua = devEditing.has(dom);
+    return `<div class="card card-outline card-dividers${sua ? ' editing' : ''}">
+      <div class="card-header"><span>${esc(title)} (${list.length})</span>
+        <a href="#" class="link icon-only" data-sua="${esc(dom)}" title="${sua ? 'Xong' : 'Sửa'}"><i class="icon f7-icons">${sua ? 'checkmark_alt' : 'pencil'}</i></a></div>
+      <div class="card-content"><div class="tiles">` +
       list.map(d => `<div class="tile ${ON.includes(d.state) ? 'on' : ''}" data-id="${esc(d.id)}">
         ${d.current || d.temp ? `<span class="t-badge">${esc(d.current || d.temp)}°C</span>` : ''}
         <a href="#" class="t-del" title="Bỏ khỏi bot"><i class="icon f7-icons">xmark</i></a>
-        <i class="icon f7-icons">${icon}</i>
-        <div><div class="t-name">${esc(d.name)}</div><div class="t-state">${esc(stateText(d))}</div></div></div>`).join('') + '</div></div>';
-  }).join('') + (devEdit ? '<div class="block-footer">Chạm vào ô để đổi tên gọi khác, ✕ để bỏ khỏi bot. Bấm ✓ ở trên khi xong.</div>'
-    : '<div class="block-footer">Giữ lâu một ô để đổi tên gọi khác.</div>');
+        <i class="icon f7-icons">${esc(devIcon(d))}</i>
+        <div><div class="t-name">${esc(d.name)}</div><div class="t-state">${esc(stateText(d))}</div></div></div>`).join('') +
+      `</div></div>${sua ? '<div class="card-footer muted">Chạm ô để đổi tên / icon, ✕ để bỏ khỏi bot. Bấm ✓ khi xong.</div>' : ''}</div>`;
+  }).join('') + '<div class="block-footer">Giữ lâu một ô để đổi tên gọi khác và icon.</div>';
+  root.querySelectorAll('[data-sua]').forEach(a => a.addEventListener('click', e => {
+    e.preventDefault();
+    const dm = a.dataset.sua;
+    devEditing.has(dm) ? devEditing.delete(dm) : devEditing.add(dm);
+    renderDevices();
+    if (!devEditing.size) loadDevices();
+  }));
   root.querySelectorAll('.tile').forEach(t => {
     // Như Pi: giữ lâu (~0,5 s) trên một ô -> đổi tên gọi; nuốt luôn cú click ngay sau để không bật/tắt nhầm
     let hold = null, held = false;
     const cancel = () => { clearTimeout(hold); hold = null; };
     t.addEventListener('pointerdown', () => { held = false; cancel();
-      hold = setTimeout(() => { held = true; hold = null; renameDevice(t.dataset.id); }, 500); });
+      hold = setTimeout(() => { held = true; hold = null; editDevice(t.dataset.id); }, 500); });
     ['pointerup', 'pointerleave', 'pointercancel'].forEach(ev => t.addEventListener(ev, cancel));
     t.addEventListener('contextmenu', e => e.preventDefault());
     t.addEventListener('click', e => {
       if (held) { e.preventDefault(); held = false; return; }
       if (e.target.closest('.t-del')) { e.preventDefault(); removeDevice(t.dataset.id); }
-      else if (devEdit) renameDevice(t.dataset.id);
+      else if (t.closest('.editing')) editDevice(t.dataset.id);
       else tapDevice(t);
     });
   });
@@ -1100,20 +1179,62 @@ async function removeDevice(id) {
   renderDevices();
   await saveSelection(selFrom(devices));
 }
-function renameDevice(id) {
-  const d = devices.find(x => x.id === id); if (!d) return;
-  app.dialog.prompt(`Tên gốc: ${esc(d.original)}<br><span class="muted">Để trống = dùng tên gốc. Bot gọi được theo tên này.</span>`,
-    'Tên gọi khác', async v => {
-      d.alias = v.trim() === d.original ? '' : v.trim();
-      d.name = d.alias || d.original;
-      renderDevices();
-      await saveSelection(selFrom(devices)); toast('Đã đổi tên');
-    }, null, d.alias || d.original);
+// ----- Sửa 1 thiết bị: tên gọi khác + icon (như bảng "Sửa thiết bị" của Voicebot) -----
+const devEditPopup = app.popup.create({ el: '#devEditPopup' });
+let devEditId = null, devEditIconSel = null;
+function renderIconGrid() {
+  const q = boDau($('devIconSearch').value.trim());
+  const list = ICONS.filter(([n, k]) => !q || boDau(n + ' ' + k).includes(q));
+  if (q && /^[a-z0-9_]+$/.test(q) && !list.some(([n]) => n === q)) list.push([q, '']); // tên icon F7 bất kỳ
+  $('devIconGrid').innerHTML = list.map(([n]) =>
+    `<a href="#" data-icon="${esc(n)}" class="${n === devEditIconSel ? 'chon' : ''}" title="${esc(n)}"><i class="icon f7-icons">${esc(n)}</i></a>`).join('')
+    || '<div class="muted">Không thấy icon nào</div>';
+  $('devIconGrid').querySelectorAll('[data-icon]').forEach(a => a.addEventListener('click', e => {
+    e.preventDefault(); devEditIconSel = a.dataset.icon; renderIconGrid();
+  }));
 }
-$('devEditBtn').addEventListener('click', e => {
-  e.preventDefault(); devEdit = !devEdit;
-  $('devEditIcon').textContent = devEdit ? 'checkmark_alt' : 'pencil';
-  renderDevices(); if (!devEdit) loadDevices();
+function editDevice(id) {
+  const d = devices.find(x => x.id === id); if (!d) return;
+  devEditId = id; devEditIconSel = devIcon(d);
+  $('devEditGoc').textContent = '(gốc: ' + d.original + ')';
+  $('devEditTen').value = d.alias || d.original;
+  $('devIconSearch').value = '';
+  renderIconGrid();
+  devEditPopup.open();
+}
+$('devIconSearch').addEventListener('input', renderIconGrid);
+$('devEditSave').addEventListener('click', async e => {
+  e.preventDefault();
+  const d = devices.find(x => x.id === devEditId); if (!d) return devEditPopup.close();
+  const ten = $('devEditTen').value.trim();
+  d.alias = !ten || ten === d.original ? '' : ten;
+  d.name = d.alias || d.original;
+  const icons = devIcons();
+  if (devEditIconSel && devEditIconSel !== (DOMAINS[d.domain] || [0, 'circle'])[1]) icons[d.id] = devEditIconSel; else delete icons[d.id];
+  S.config.ha_dash_icons = JSON.stringify(icons);
+  devEditPopup.close();
+  renderDevices();
+  await Promise.all([saveSelection(selFrom(devices)), post('/api/config', { ha_dash_icons: S.config.ha_dash_icons })]);
+  toast('Đã lưu');
+});
+
+// ----- Sắp xếp nhóm (F7 Sortable, kéo ≡), tự lưu ngay -----
+const devSortPopup = app.popup.create({ el: '#devSortPopup' });
+$('devSortBtn').addEventListener('click', e => {
+  e.preventDefault();
+  const groups = groupSorted(devices);
+  if (!groups.length) return toast('Chưa có nhóm thiết bị nào để sắp xếp');
+  $('devSortList').querySelector('ul').innerHTML = groups.map(([dom, list]) => `<li data-domain="${esc(dom)}">
+    <div class="item-content"><div class="item-inner"><div class="item-title">${esc((DOMAINS[dom] || [dom])[0])}</div>
+    <div class="item-after">${list.length} thiết bị</div></div></div><div class="sortable-handler"></div></li>`).join('');
+  devSortPopup.open();
+});
+$('devSortList').addEventListener('sortable:sort', () => {
+  const moi = [...$('devSortList').querySelectorAll('li[data-domain]')].map(li => li.dataset.domain);
+  // Giữ nhóm đã sắp mà hiện không có thiết bị ở cuối: thêm lại sau vẫn về đúng chỗ cũ
+  S.config.ha_dash_order = moi.concat(devOrder().filter(dm => !moi.includes(dm))).join(',');
+  renderDevices();
+  post('/api/config', { ha_dash_order: S.config.ha_dash_order });
 });
 
 // ----- Cửa sổ Thêm/bớt thiết bị -----

@@ -15,7 +15,7 @@ public class Config {
     static final String[] KEYS = {"api_key", "model", "tts_model", "voice", "wake_engine",
             "mww_model", "mww_cutoff", "wake_word", "follow_up", "persona", "mic_gain",
             "tts_engine", "google_voice", "google_tts_key", "tts_rate", "led", "wake_sound", "wake_reply", "local_time",
-            "ha_url", "ha_token", "stt_engine", "live", "live_model", "live_idle", "gcloud_sa", "search", "city", "barge_in", "bot_self", "user_call", "group_members", "group_stereo", "music_led", "music_led_inner"};
+            "ha_url", "ha_token", "stt_engine", "live", "live_model", "live_idle", "gcloud_sa", "search", "city", "barge_in", "bot_self", "user_call", "group_members", "group_stereo", "music_led", "music_led_inner", "ha_dash_order", "ha_dash_icons"};
 
     public String apiKey;
     public String model;
@@ -183,6 +183,10 @@ public class Config {
         return c;
     }
 
+    private static SharedPreferences p(Context ctx) {
+        return ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
+    }
+
     /** Cấu hình cho Web UI; API key chỉ trả về 4 ký tự cuối. */
     public static JSONObject toJson(Context ctx) throws Exception {
         Config c = load(ctx);
@@ -205,6 +209,9 @@ public class Config {
                 .put("group_stereo", c.groupStereo ? "1" : "0")
                 .put("music_led", c.musicLed ? "1" : "0")
                 .put("music_led_inner", c.musicLedInner ? "1" : "0")
+                // Trang Thiết bị (chỉ Web UI dùng): thứ tự nhóm "light,fan,…" và icon riêng {entity_id: tên icon F7}
+                .put("ha_dash_order", p(ctx).getString("ha_dash_order", ""))
+                .put("ha_dash_icons", p(ctx).getString("ha_dash_icons", "{}"))
                 .put("mic_gain", String.valueOf(c.micGain))
                 .put("tts_engine", c.ttsEngine)
                 .put("google_voice", c.googleVoice)
