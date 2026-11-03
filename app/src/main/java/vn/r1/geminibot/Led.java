@@ -317,27 +317,20 @@ final class Led {
      * Ghi từng đèn KHÔNG dùng được: driver xếp mỗi lệnh vào hàng ~100 ms (xem writeMusic), 10 lệnh / bước
      * dồn thành ~24 s rồi bị lệnh viền trắng đè - nhìn chỉ thấy viền trắng (thử trên loa). Làm như hiệu ứng
      * đánh thức gốc của Phicomm (mã 1-24 trong /system/etc/lights_effects.conf): CẢ hiệu ứng trong MỘT lệnh
-     * nhiều khung nối nhau "1 <ms giữa khung> 1 <số khung>" + mỗi khung "1 <màu từ> <màu tới> <ms chuyển>
-     * <1 = còn khung sau, 0 = cuối> <số đèn> <các đèn>"; driver tự diễn, mỗi đèn chuyển sáng / tối mượt.
-     * Mỗi bước: đèn đầu sáng dần, đèn cách đó len bước tối dần -> cung giữa sáng, 2 đầu mờ = lưỡi liềm.
+     * "1 <ms lệch giữa các khung> 1 <số khung>", mỗi khung "1 <màu từ> <màu tới> <ms chuyển> <quay ngược>
+     * <số đèn> <các đèn>". "quay ngược" = 1: đèn sáng tới màu đích rồi TỰ tối về màu đầu (như hiệu ứng thở
+     * 202/203) - lần đầu tưởng là "còn khung sau" nên thêm khung tối dần, khung đó lại tự sáng lên: viền
+     * chạy 2 đường (lấp đầy rồi xoá) thay vì lưỡi liềm. Mỗi đèn 1 khung sáng-rồi-tắt, các đèn bắt đầu lệch
+     * nhau 1 bước -> cung sáng giữa, mờ 2 đầu = lưỡi liềm (chọn trên loa trong 3 kiểu thử).
      * Lệnh ghi trả về ngay nên script chờ hiệu ứng chạy xong rồi mới để lệnh viền trắng chạy.
      */
     private static File writeSweep(Context ctx) throws Exception {
         Config c = Config.load(ctx);
-        int len = c.ledWakeLen, buoc = c.ledWakeMs, khoang = Math.max(10, buoc / 2), chuyen = len * buoc;
-        List<String> khung = new ArrayList<>();
-        for (int b = 0; b < 24 + len; b++) {
-            if (b < 24) khung.add("000000 ffffff " + (16 + b));             // đầu: sáng dần
-            if (b >= len) khung.add("ffffff 000000 " + (16 + (b - len)));   // đuôi: tối dần
-        }
-        StringBuilder lenh = new StringBuilder("1 ").append(khoang).append(" 1 ").append(khung.size());
-        for (int i = 0; i < khung.size(); i++) {
-            String[] k = khung.get(i).split(" ");
-            lenh.append(" 1 ").append(k[0]).append(' ').append(k[1]).append(' ').append(chuyen)
-                    .append(i < khung.size() - 1 ? " 1" : " 0").append(" 1 ").append(k[2]);
-        }
-        double cho = (khung.size() * khoang + chuyen) / 1000.0;
-        sweepLevels = len + "," + buoc;
+        int buoc = c.ledWakeMs, chuyen = c.ledWakeLen * buoc;
+        StringBuilder lenh = new StringBuilder("1 ").append(buoc).append(" 1 24");
+        for (int b = 0; b < 24; b++) lenh.append(" 1 000000 ffffff ").append(chuyen).append(" 1 1 ").append(16 + b);
+        double cho = (24 * buoc + 2 * chuyen) / 1000.0;
+        sweepLevels = c.ledWakeLen + "," + c.ledWakeMs;
         String body = RING_OFF + "\necho '" + lenh + "' > " + RING_COLOR + "\n"
                 + String.format(java.util.Locale.US, "sleep %.2f\n", cho);
         return writeScript(ctx, "led_wake_sweep.sh", body);
