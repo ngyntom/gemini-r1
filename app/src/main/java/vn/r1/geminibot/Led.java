@@ -103,10 +103,18 @@ final class Led {
         testWake = true;
     }
 
+    /** Lưu cài đặt trên web: kiểu đèn có thể đã đổi -> luồng đèn kiểm lại và vẽ lại kiểu đang hiện. */
+    private static volatile boolean doiCauHinh;
+
+    static void daDoiCauHinh() {
+        doiCauHinh = true;
+    }
+
     /** Mức sáng trong cấu hình đổi thì dựng lại script (thử / đánh thức lần sau dùng ngay mức mới). */
     private static void capNhatSweep() {
         Config c = appCtx == null ? null : Config.load(appCtx);
-        if (c == null || (c.ledWakeLen + "," + c.ledWakeMs + "," + c.ledWakeVet).equals(sweepLevels)) return;
+        if (c == null || khoaHieuUng(c).equals(sweepLevels)) return;
+        shown = ""; // Nghe / Nói đang hiện kiểu cũ -> vẽ lại theo kiểu mới
         try {
             sweep = writeSweep(appCtx);
         } catch (Exception e) {
@@ -181,6 +189,10 @@ final class Led {
                         lastOff = now;
                         shown = "off";
                     }
+                    if (doiCauHinh) {
+                        doiCauHinh = false;
+                        capNhatSweep();
+                    }
                     if (testWake) {
                         testWake = false;
                         capNhatSweep();
@@ -245,15 +257,16 @@ final class Led {
     /** Lệnh shell chuyển sang kiểu đèn mới; luôn dừng sao chổi cũ trước. wake = quét sáng viền trước hiệu ứng nghe. */
     private static String command(String mode, boolean wake) {
         String stop = STOP;
+        Config c = appCtx != null && ("listening".equals(mode) || "speaking".equals(mode)) ? Config.load(appCtx) : null;
         // Quét đánh thức: script tự dừng sau đúng 1 vòng (~1 s) nên không cần PID/STOPF như sao chổi;
         // chỉ ghi từng đèn vào viền (multi_leds1) nên không đụng đèn trong, INNER_OFF đã tắt đèn trong trước.
         String sweepCmd = wake && sweep != null ? "; sh " + sweep.getAbsolutePath() : "";
         switch (mode) {
             // Viền trước, đèn trong sau (giữ thứ tự an toàn của bản cũ dù 2 nhóm là 2 file riêng).
             case "listening":
-                return stop + INNER_OFF + sweepCmd + "; " + RING_WHITE + "; lights_test show 203";
+                return stop + INNER_OFF + sweepCmd + "; " + (c == null ? RING_WHITE : vien(c, c.ledNghe, c.ledNgheVet)) + "; lights_test show 203";
             case "speaking":
-                return stop + INNER_OFF + "; " + RING_WHITE + "; " + INNER_GREEN;
+                return stop + INNER_OFF + "; " + (c == null ? RING_WHITE : vien(c, c.ledNoi, c.ledNoiVet)) + "; " + INNER_GREEN;
             case "error":
                 return stop + INNER_OFF + "; " + RING_OFF + "; " + INNER_RED;
             case "muted":
@@ -326,19 +339,57 @@ final class Led {
      */
     private static File writeSweep(Context ctx) throws Exception {
         Config c = Config.load(ctx);
+        sweepLevels = khoaHieuUng(c);
+        String lenh;
+        double cho;
+        if ("khong".equals(c.ledWakeKieu)) return null;                 // vào thẳng hiệu ứng Nghe
+        if ("chop".equals(c.ledWakeKieu)) {                               // cả viền sáng lên rồi tự tắt 1 lần
+            lenh = "1 0 1 1 1 000000 ffffff 250 1 " + RING_IDS;
+            cho = 0.6;
+        } else {
+            lenh = xoayLenh(c, c.ledWakeVet, 1);
+            cho = (24 * c.ledWakeMs + 2 * c.ledWakeLen * c.ledWakeMs) / 1000.0;
+        }
+        String body = RING_OFF + "\necho '" + lenh + "' > " + RING_COLOR + "\n"
+                + String.format(java.util.Locale.US, "sleep %.2f\n", cho);
+        return writeScript(ctx, "led_wake_sweep.sh", body);
+    }
+
+    /**
+     * Lệnh xoay (1 lệnh nhiều khung, driver tự diễn): 24 khung, mỗi khung các đèn "sáng rồi tự tắt", khung sau
+     * bắt đầu sau 1 bước; vet vệt cách đều 24/vet đèn. lap = số lần lặp (1 = 1 vòng; 99999999 = mãi tới khi một
+     * lệnh "0 ..." (ép, như RING_WHITE / RING_OFF) của trạng thái sau đè lên - cột FORCE / SYNC của
+     * lights_effects.conf: dòng bắt đầu bằng 0 ép ngay, bằng 1 xếp hàng theo khung).
+     */
+    private static String xoayLenh(Config c, int vet, int lap) {
         int buoc = c.ledWakeMs, chuyen = c.ledWakeLen * buoc;
-        // 2-3 vệt: mỗi khung bật cùng lúc các đèn cách đều nhau 24/vet vị trí -> các vệt xoay cùng nhau
-        int vet = c.ledWakeVet;
-        StringBuilder lenh = new StringBuilder("1 ").append(buoc).append(" 1 24");
+        StringBuilder lenh = new StringBuilder("1 ").append(buoc).append(' ').append(lap).append(" 24");
         for (int b = 0; b < 24; b++) {
             lenh.append(" 1 000000 ffffff ").append(chuyen).append(" 1 ").append(vet);
             for (int j = 0; j < vet; j++) lenh.append(' ').append(16 + (b + j * 24 / vet) % 24);
         }
-        double cho = (24 * buoc + 2 * chuyen) / 1000.0;
-        sweepLevels = c.ledWakeLen + "," + c.ledWakeMs + "," + c.ledWakeVet;
-        String body = RING_OFF + "\necho '" + lenh + "' > " + RING_COLOR + "\n"
-                + String.format(java.util.Locale.US, "sleep %.2f\n", cho);
-        return writeScript(ctx, "led_wake_sweep.sh", body);
+        return lenh.toString();
+    }
+
+    /** Viền ngoài lúc Nghe / Nói theo cấu hình: trắng đứng yên, thở trắng, xoay liên tục, tắt. */
+    private static String vien(Config c, String kieu, int vet) {
+        if (c == null || kieu == null || "trang".equals(kieu)) return RING_WHITE;
+        switch (kieu) {
+            case "tat":
+                return RING_OFF;
+            case "tho": // như hiệu ứng thở 202 của Phicomm nhưng cho 24 đèn viền
+                return RING_OFF + "; echo '1 3000 99999999 1 1 000000 ffffff 1400 1 " + RING_IDS + "' > " + RING_COLOR;
+            case "xoay":
+                return RING_OFF + "; echo '" + xoayLenh(c, vet, 99999999) + "' > " + RING_COLOR;
+            default:
+                return RING_WHITE;
+        }
+    }
+
+    /** Khoá các thông số hiệu ứng: đổi thì dựng lại script đánh thức và vẽ lại kiểu đèn đang hiện. */
+    private static String khoaHieuUng(Config c) {
+        return c.ledWakeKieu + "," + c.ledWakeLen + "," + c.ledWakeMs + "," + c.ledWakeVet + ","
+                + c.ledNghe + c.ledNgheVet + "," + c.ledNoi + c.ledNoiVet;
     }
 
     /**

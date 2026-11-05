@@ -15,7 +15,8 @@ public class Config {
     static final String[] KEYS = {"api_key", "model", "tts_model", "voice", "wake_engine",
             "mww_model", "mww_cutoff", "wake_word", "follow_up", "persona", "mic_gain",
             "tts_engine", "google_voice", "google_tts_key", "tts_rate", "led", "wake_sound", "wake_reply", "local_time",
-            "ha_url", "ha_token", "stt_engine", "live", "live_model", "live_idle", "gcloud_sa", "search", "city", "barge_in", "bot_self", "user_call", "group_members", "group_stereo", "music_led", "music_led_inner", "ha_dash_order", "ha_dash_icons", "ha_notify", "ten_hien_thi", "led_wake_len", "led_wake_ms", "led_wake_vet"};
+            "ha_url", "ha_token", "stt_engine", "live", "live_model", "live_idle", "gcloud_sa", "search", "city", "barge_in", "bot_self", "user_call", "group_members", "group_stereo", "music_led", "music_led_inner", "ha_dash_order", "ha_dash_icons", "ha_notify", "ten_hien_thi", "led_wake_len", "led_wake_ms", "led_wake_vet",
+            "led_wake_kieu", "led_nghe", "led_nghe_vet", "led_noi", "led_noi_vet"};
 
     public String apiKey;
     public String model;
@@ -69,6 +70,9 @@ public class Config {
     public String tenHienThi;
     /** Lưỡi liềm đánh thức (trang Đèn LED, thử được ngay): số bước đèn giữ sáng (độ dài) và ms mỗi bước (tốc độ). */
     public int ledWakeLen, ledWakeMs, ledWakeVet;   // ledWakeVet: số vệt sáng cách đều nhau (1..3)
+    /** Viền ngoài theo từng lúc (trang Đèn LED): đánh thức xoay | chop | khong; nghe / nói trang | tho | xoay | tat. */
+    public String ledWakeKieu, ledNghe, ledNoi;
+    public int ledNgheVet, ledNoiVet;
 
     /** "google" = Cloud Speech-to-Text rồi gửi chữ cho Gemini; "gemini" = gửi audio cho Gemini nghe. */
     public String sttEngine;
@@ -166,6 +170,11 @@ public class Config {
         c.ledWakeLen = Math.max(2, Math.min(10, parseIntOr(p.getString("led_wake_len", "4"), 4)));
         c.ledWakeMs = Math.max(20, Math.min(120, parseIntOr(p.getString("led_wake_ms", "40"), 40)));
         c.ledWakeVet = Math.max(1, Math.min(3, parseIntOr(p.getString("led_wake_vet", "1"), 1)));
+        c.ledWakeKieu = p.getString("led_wake_kieu", "xoay").trim();
+        c.ledNghe = p.getString("led_nghe", "trang").trim();
+        c.ledNoi = p.getString("led_noi", "trang").trim();
+        c.ledNgheVet = Math.max(1, Math.min(3, parseIntOr(p.getString("led_nghe_vet", "1"), 1)));
+        c.ledNoiVet = Math.max(1, Math.min(3, parseIntOr(p.getString("led_noi_vet", "1"), 1)));
         c.gcloudSa = p.getString("gcloud_sa", "").trim();
         try {
             c.haDevices = new JSONObject(p.getString("ha_devices", "{}"));
@@ -240,6 +249,11 @@ public class Config {
                 .put("led_wake_len", String.valueOf(c.ledWakeLen))
                 .put("led_wake_ms", String.valueOf(c.ledWakeMs))
                 .put("led_wake_vet", String.valueOf(c.ledWakeVet))
+                .put("led_wake_kieu", c.ledWakeKieu)
+                .put("led_nghe", c.ledNghe)
+                .put("led_nghe_vet", String.valueOf(c.ledNgheVet))
+                .put("led_noi", c.ledNoi)
+                .put("led_noi_vet", String.valueOf(c.ledNoiVet))
                 .put("gcloud_sa_email", c.gcloudSa.isEmpty() ? "" : GoogleAuth.email(c.gcloudSa))
                 .put("ha_selected", c.haDevices.length())
                 .put("stt_engine", c.sttEngine)

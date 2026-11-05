@@ -134,6 +134,7 @@ public class BotService extends Service {
         // nhận thoát ra để nạp ngay.
         if (lastWakeKey != null && !wakeKey(cfg).equals(lastWakeKey)) recorder.requestReload();
         Led.setEnabled(cfg.led); // vòng chính có thể đang chờ từ đánh thức rất lâu -> áp dụng ngay ở đây
+        Led.daDoiCauHinh();      // kiểu đèn Nghe / Nói / Đánh thức đổi thì vẽ lại ngay
         Led.setMusicEnabled(cfg.musicLed, cfg.musicLedInner);
         if (!cfg.live) live.cancel();
     }
