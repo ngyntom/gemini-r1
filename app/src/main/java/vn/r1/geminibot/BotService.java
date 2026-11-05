@@ -256,6 +256,7 @@ public class BotService extends Service {
                         followUp = false;
                         wake.configure(cfg);
                         lastWakeKey = wakeKey(cfg);
+                        LiveVoice.taoSan(this, cfg); // câu chào / tạm biệt giọng Live còn thiếu thì tạo nền
                         BotLog.state = "idle";
                         if (!barged) {
                             PcmPlayer.keepAwake(false); // rảnh: cho ampli nghỉ
@@ -306,6 +307,15 @@ public class BotService extends Service {
                         }
                         if (cfg.live) {
                             live.run(cfg, recorder); // trò chuyện liên tục tới khi im lặng / tạm biệt
+                            // Tạm biệt: model chỉ gọi hàm, loa phát câu tạm biệt đã tạo sẵn bằng giọng Live (như Voicebot)
+                            if (live.endedByGoodbye()) {
+                                byte[] bye = LiveVoice.tamBiet(this, cfg);
+                                if (bye != null) {
+                                    BotLog.state = "speaking";
+                                    PcmPlayer.play(withLead(bye, LiveVoice.RATE), LiveVoice.RATE);
+                                    BotLog.state = "idle";
+                                }
+                            }
                             continue;
                         }
                         wav = recorder.recordUtterance(WAKE_LISTEN_MS);
@@ -469,8 +479,24 @@ public class BotService extends Service {
     private PcmPlayer.Pcm cueVoice;
 
     /** chime = "ding-dong", voice = đọc câu đáp (vd. "Dạ?") một lần rồi giữ lại, none = im lặng. */
+    /** Đệm im lặng đầu cho ampli thức dậy (mất ~0,5 s), không thì mất tiếng đầu câu. */
+    private static byte[] withLead(byte[] pcm, int rate) {
+        byte[] out = new byte[rate * 2 * CUE_LEAD_MS / 1000 + pcm.length];
+        System.arraycopy(pcm, 0, out, out.length - pcm.length, pcm.length);
+        return out;
+    }
+
     private void playWakeCue(Config cfg, String cue) throws InterruptedException {
         if ("none".equals(cue)) return;
+        if ("voice".equals(cue) && cfg.live) {
+            // Gemini Live: "Dạ" bằng CHÍNH giọng Live (câu tạo sẵn, xem LiveVoice) - bộ đọc thường nghe khác hẳn
+            // giọng Live ngay sau đó. Chưa tạo xong thì dùng câu đáp cũ bên dưới.
+            byte[] chao = LiveVoice.chao(this, cfg);
+            if (chao != null) {
+                PcmPlayer.play(withLead(chao, LiveVoice.RATE), LiveVoice.RATE);
+                return;
+            }
+        }
         if ("voice".equals(cue)) {
             try {
                 if (cueVoice == null || !cfg.wakeReply.equals(cueText)) {

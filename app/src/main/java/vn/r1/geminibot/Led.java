@@ -106,7 +106,7 @@ final class Led {
     /** Mức sáng trong cấu hình đổi thì dựng lại script (thử / đánh thức lần sau dùng ngay mức mới). */
     private static void capNhatSweep() {
         Config c = appCtx == null ? null : Config.load(appCtx);
-        if (c == null || (c.ledWakeLen + "," + c.ledWakeMs).equals(sweepLevels)) return;
+        if (c == null || (c.ledWakeLen + "," + c.ledWakeMs + "," + c.ledWakeVet).equals(sweepLevels)) return;
         try {
             sweep = writeSweep(appCtx);
         } catch (Exception e) {
@@ -327,10 +327,15 @@ final class Led {
     private static File writeSweep(Context ctx) throws Exception {
         Config c = Config.load(ctx);
         int buoc = c.ledWakeMs, chuyen = c.ledWakeLen * buoc;
+        // 2-3 vệt: mỗi khung bật cùng lúc các đèn cách đều nhau 24/vet vị trí -> các vệt xoay cùng nhau
+        int vet = c.ledWakeVet;
         StringBuilder lenh = new StringBuilder("1 ").append(buoc).append(" 1 24");
-        for (int b = 0; b < 24; b++) lenh.append(" 1 000000 ffffff ").append(chuyen).append(" 1 1 ").append(16 + b);
+        for (int b = 0; b < 24; b++) {
+            lenh.append(" 1 000000 ffffff ").append(chuyen).append(" 1 ").append(vet);
+            for (int j = 0; j < vet; j++) lenh.append(' ').append(16 + (b + j * 24 / vet) % 24);
+        }
         double cho = (24 * buoc + 2 * chuyen) / 1000.0;
-        sweepLevels = c.ledWakeLen + "," + c.ledWakeMs;
+        sweepLevels = c.ledWakeLen + "," + c.ledWakeMs + "," + c.ledWakeVet;
         String body = RING_OFF + "\necho '" + lenh + "' > " + RING_COLOR + "\n"
                 + String.format(java.util.Locale.US, "sleep %.2f\n", cho);
         return writeScript(ctx, "led_wake_sweep.sh", body);

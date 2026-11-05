@@ -15,7 +15,7 @@ public class Config {
     static final String[] KEYS = {"api_key", "model", "tts_model", "voice", "wake_engine",
             "mww_model", "mww_cutoff", "wake_word", "follow_up", "persona", "mic_gain",
             "tts_engine", "google_voice", "google_tts_key", "tts_rate", "led", "wake_sound", "wake_reply", "local_time",
-            "ha_url", "ha_token", "stt_engine", "live", "live_model", "live_idle", "gcloud_sa", "search", "city", "barge_in", "bot_self", "user_call", "group_members", "group_stereo", "music_led", "music_led_inner", "ha_dash_order", "ha_dash_icons", "ha_notify", "ten_hien_thi", "led_wake_len", "led_wake_ms"};
+            "ha_url", "ha_token", "stt_engine", "live", "live_model", "live_idle", "gcloud_sa", "search", "city", "barge_in", "bot_self", "user_call", "group_members", "group_stereo", "music_led", "music_led_inner", "ha_dash_order", "ha_dash_icons", "ha_notify", "ten_hien_thi", "led_wake_len", "led_wake_ms", "led_wake_vet"};
 
     public String apiKey;
     public String model;
@@ -68,7 +68,7 @@ public class Config {
     /** Tên hiển thị của loa (vd. "Loa phòng khách"): rỗng = tên Bluetooth. Xem Group.displayName. */
     public String tenHienThi;
     /** Lưỡi liềm đánh thức (trang Đèn LED, thử được ngay): số bước đèn giữ sáng (độ dài) và ms mỗi bước (tốc độ). */
-    public int ledWakeLen, ledWakeMs;
+    public int ledWakeLen, ledWakeMs, ledWakeVet;   // ledWakeVet: số vệt sáng cách đều nhau (1..3)
 
     /** "google" = Cloud Speech-to-Text rồi gửi chữ cho Gemini; "gemini" = gửi audio cho Gemini nghe. */
     public String sttEngine;
@@ -165,6 +165,7 @@ public class Config {
         c.tenHienThi = p.getString("ten_hien_thi", "").trim();
         c.ledWakeLen = Math.max(2, Math.min(10, parseIntOr(p.getString("led_wake_len", "4"), 4)));
         c.ledWakeMs = Math.max(20, Math.min(120, parseIntOr(p.getString("led_wake_ms", "40"), 40)));
+        c.ledWakeVet = Math.max(1, Math.min(3, parseIntOr(p.getString("led_wake_vet", "1"), 1)));
         c.gcloudSa = p.getString("gcloud_sa", "").trim();
         try {
             c.haDevices = new JSONObject(p.getString("ha_devices", "{}"));
@@ -238,6 +239,7 @@ public class Config {
                 .put("ten_hien_thi", c.tenHienThi)
                 .put("led_wake_len", String.valueOf(c.ledWakeLen))
                 .put("led_wake_ms", String.valueOf(c.ledWakeMs))
+                .put("led_wake_vet", String.valueOf(c.ledWakeVet))
                 .put("gcloud_sa_email", c.gcloudSa.isEmpty() ? "" : GoogleAuth.email(c.gcloudSa))
                 .put("ha_selected", c.haDevices.length())
                 .put("stt_engine", c.sttEngine)

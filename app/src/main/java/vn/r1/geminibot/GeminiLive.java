@@ -82,6 +82,11 @@ final class GeminiLive {
         p.flush();
     }
 
+    /** Phiên vừa rồi kết thúc vì người dùng chào tạm biệt (model gọi end_conversation). */
+    boolean endedByGoodbye() {
+        return endRequested;
+    }
+
     /** Chạy một phiên trò chuyện, trả về khi phiên kết thúc. */
     void run(Config cfg, VoiceRecorder rec) throws InterruptedException {
         this.cfg = cfg;
@@ -180,10 +185,9 @@ final class GeminiLive {
                     break;
                 }
             }
-            // Chào tạm biệt: audio câu chào có thể tới sau lệnh end_conversation -> chờ thêm rồi chờ nói hết
+            // Tạm biệt: model không còn tự chào (chỉ gọi hàm), chờ loa nói nốt phần đang phát (nếu có) rồi đóng
             long endAt = System.currentTimeMillis();
-            while (endRequested && !closed && System.currentTimeMillis() < endAt + 8000
-                    && (player.busy() || System.currentTimeMillis() < endAt + 1500)) {
+            while (endRequested && !closed && System.currentTimeMillis() < endAt + 8000 && player.busy()) {
                 BotLog.state = player.busy() ? "speaking" : "thinking";
                 Thread.sleep(100);
             }
@@ -272,8 +276,10 @@ final class GeminiLive {
                 .append("\n\nBạn đang trò chuyện bằng giọng nói qua một chiếc loa. Luôn nói tiếng Việt (trừ khi ")
                 .append("người dùng nói ngôn ngữ khác), câu ngắn, tự nhiên. Thời gian hiện tại (giờ Việt Nam): ")
                 .append(LocalAnswer.nowForPrompt())
-                .append(". Khi người dùng chào tạm biệt hoặc muốn dừng (\"tạm biệt\", \"thôi nhé\", \"xong rồi\"), ")
-                .append("chào lại thật ngắn rồi gọi hàm end_conversation.");
+                .append(". Khi người dùng chào tạm biệt hoặc muốn dừng (\"tạm biệt\", \"thôi nhé\", \"xong rồi\", ")
+                .append("\"cảm ơn em nhé\") HOẶC đáp \"không\", \"không cần nữa\", \"hết rồi\" sau khi bạn hỏi còn cần gì ")
+                .append("nữa không, thì CHỈ gọi hàm end_conversation, KHÔNG tự nói câu chào (loa tự phát câu chào ")
+                .append("sau khi gọi hàm).");
         if (!cfg.city.isEmpty()) {
             sb.append("\nBạn đang ở ").append(cfg.city)
               .append(" (Việt Nam); hỏi thời tiết hay \"ở đây\" thì hiểu là thành phố này.");
@@ -358,8 +364,10 @@ final class GeminiLive {
                 if (args == null) args = new JSONObject();
                 JSONObject result;
                 if ("end_conversation".equals(name)) {
+                    // KHÔNG gửi kết quả về: gửi về thì model nói tiếp 1 câu nữa (trả lời 2 lần, đã gặp trên loa;
+                    // Voicebot ghi có khi còn bằng giọng khác). Đóng phiên, loa tự phát câu tạm biệt có sẵn.
                     endRequested = true;
-                    result = new JSONObject().put("ok", true);
+                    continue;
                 } else if ("web_search".equals(name)) {
                     // Một lượt Gemini chữ kèm Google Search (GeminiClient.searchText); lỗi cũng gói vào
                     // câu trả lời vì ok:false bên Gemini thường bị coi là "lệnh lỗi" và lặp lại vòng hàm
@@ -386,7 +394,9 @@ final class GeminiLive {
                 }
                 out.put(new JSONObject().put("id", fc.optString("id")).put("name", name).put("response", result));
             }
-            ws.send(new JSONObject().put("toolResponse", new JSONObject().put("functionResponses", out)).toString());
+            if (out.length() > 0) {
+                ws.send(new JSONObject().put("toolResponse", new JSONObject().put("functionResponses", out)).toString());
+            }
         } catch (Exception e) {
             BotLog.w("Gemini Live: lỗi trả kết quả hàm: " + e.getMessage());
         }
