@@ -1085,10 +1085,14 @@ app.views.create('#view-music', { url: '/music/' });
 // biến riêng cập nhật NGAY trong handler bấm tab (như dangOTabCaiDat của Voicebot) - KHÔNG theo tab:show: F7 cũng
 // bắt click ở pha capture và chạy TRƯỚC, đổi tab + bắn tab:show rồi mới tới đây, nên bấm từ tab khác sang bị
 // hiểu nhầm là "bấm lại" và trang con bị đóng (đã gặp khi thử).
-let tabDangO = '#view-chat';
-document.addEventListener('click', e => {
+let tabDangO = '#view-chat', luotChamTab = 0;
+function bamTabLink(e) {
   const a = e.target.closest('.tab-link[href^="#view-"]');
   if (!a) return;
+  // Điện thoại: F7 tự xử lý cú chạm bằng sự kiện cảm ứng và CHẶN click -> phải bắt touchstart (như Voicebot);
+  // máy có cả hai thì click ngay sau touchstart là của cùng 1 cú chạm -> bỏ qua kẻo xử lý 2 lần
+  if (e.type === 'touchstart') luotChamTab = Date.now();
+  else if (Date.now() - luotChamTab < 800) return;
   const tab = a.getAttribute('href'), v = app.views.get(tab);
   if (tab !== tabDangO) { tabDangO = tab; return; }
   if (!v || v.router.history.length < 2) return;
@@ -1096,7 +1100,9 @@ document.addEventListener('click', e => {
   e.stopPropagation();
   rungNhe();
   v.router.back(v.router.history[0], { force: true });
-}, true);
+}
+document.addEventListener('touchstart', bamTabLink, { capture: true, passive: false });
+document.addEventListener('click', bamTabLink, true);
 ['#view-chat', '#view-music', '#view-devices', '#view-settings'].forEach(v => {
   if (v !== '#view-music') app.views.create(v); // view Nhạc đã tạo ở trên
   // F7 chỉ tô nút trong menu vừa bấm -> đồng bộ cả menu trái (máy tính) lẫn thanh tab dưới (điện thoại).
