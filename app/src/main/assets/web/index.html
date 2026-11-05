@@ -423,7 +423,7 @@ window.moManDangNhap = () => {
       <div class="page" data-name="speaker">
         <div class="navbar"><div class="navbar-bg"></div><div class="navbar-inner">
           <!-- Trang Loa nằm trong Cài đặt (không còn tab riêng): nút quay về Cài đặt -->
-          <div class="left"><a href="#" class="link back"><i class="icon icon-back"></i><span class="if-not-md">Cài đặt</span></a></div>
+          <div class="left"><a href="#" class="link back"><i class="icon icon-back"></i><span class="if-not-md"></span></a></div>
           <div class="title" id="speakerTitle">Loa này</div>
         </div></div>
         <div class="page-content"><div class="page-inner">
@@ -785,7 +785,7 @@ const list = (title, items, footer) => `<div class="card card-outline card-divid
 function subpage(name, title, body, opt = {}) {
   return `<div class="page" data-name="${name}">
     <div class="navbar"><div class="navbar-bg"></div><div class="navbar-inner">
-      <div class="left"><a href="#" class="link back"><i class="icon icon-back"></i><span class="if-not-md">Cài đặt</span></a></div>
+      <div class="left"><a href="#" class="link back"><i class="icon icon-back"></i><span class="if-not-md"></span></a></div>
       <div class="title">${title}</div>
       ${opt.noSave ? '' : '<div class="right"><a href="#" class="link icon-only save-btn" title="Lưu"><i class="icon f7-icons">floppy_disk</i></a></div>'}
     </div></div>
@@ -1080,6 +1080,23 @@ if (window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.is
 // Tab Nhạc: tải trang Nhạc ngay (ẩn) - mini player / trình phát mở rộng ở các tab khác nhận trạng thái
 // nhạc từ trang này (sự kiện "nhac-pi"), như Pi luôn có sẵn tab Nhạc
 app.views.create('#view-music', { url: '/music/' });
+// Như Voicebot (app.js xuLyBamTabLink): bấm lại tab ĐANG đứng mà đang ở trang con (vd Cài đặt > Đèn LED) thì lùi
+// về trang gốc của tab; bấm từ tab khác sang thì giữ nguyên trang con đang dở. "Tab đang đứng" cập nhật theo
+// biến riêng cập nhật NGAY trong handler bấm tab (như dangOTabCaiDat của Voicebot) - KHÔNG theo tab:show: F7 cũng
+// bắt click ở pha capture và chạy TRƯỚC, đổi tab + bắn tab:show rồi mới tới đây, nên bấm từ tab khác sang bị
+// hiểu nhầm là "bấm lại" và trang con bị đóng (đã gặp khi thử).
+let tabDangO = '#view-chat';
+document.addEventListener('click', e => {
+  const a = e.target.closest('.tab-link[href^="#view-"]');
+  if (!a) return;
+  const tab = a.getAttribute('href'), v = app.views.get(tab);
+  if (tab !== tabDangO) { tabDangO = tab; return; }
+  if (!v || v.router.history.length < 2) return;
+  e.preventDefault();
+  e.stopPropagation();
+  rungNhe();
+  v.router.back(v.router.history[0], { force: true });
+}, true);
 ['#view-chat', '#view-music', '#view-devices', '#view-settings'].forEach(v => {
   if (v !== '#view-music') app.views.create(v); // view Nhạc đã tạo ở trên
   // F7 chỉ tô nút trong menu vừa bấm -> đồng bộ cả menu trái (máy tính) lẫn thanh tab dưới (điện thoại).
