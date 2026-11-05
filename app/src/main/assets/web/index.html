@@ -572,6 +572,8 @@ window.moManDangNhap = () => {
                 <div class="item-inner"><div class="item-title">Giao diện</div><div class="item-subtitle">Sáng / tối, iOS / Material, cỡ chữ, màu chủ đề</div></div></a></li>
               <li><a href="#" class="item-link item-content" id="openAuth"><div class="item-media"><i class="icon f7-icons" style="color:#2f80ed">lock_shield_fill</i></div>
                 <div class="item-inner"><div class="item-title">Đăng nhập</div><div class="item-subtitle" id="authSub">Mật khẩu để mở loa ra Internet</div></div></a></li>
+              <li><a href="/sync/" class="item-link item-content"><div class="item-media"><i class="icon f7-icons" style="color:#2f80ed">arrow_2_circlepath</i></div>
+                <div class="item-inner"><div class="item-title">Đồng bộ sang loa khác</div><div class="item-subtitle">Chép cài đặt trợ lý, Home Assistant, đèn LED sang loa R1 khác</div></div></a></li>
               <li><a href="/update/" class="item-link item-content"><div class="item-media"><i class="icon f7-icons" style="color:#2f80ed">arrow_down_circle_fill</i></div>
                 <div class="item-inner"><div class="item-title">Cập nhật app</div><div class="item-subtitle" id="verSub">Cài APK / file zip từ GitHub</div></div></a></li>
             </ul></div></div>
@@ -794,6 +796,7 @@ function subpage(name, title, body, opt = {}) {
 const hint = (set, extra) => set ? `<span class="muted">${extra || '(đã đặt, để trống = giữ nguyên, gõ - để xoá)'}</span>` : '<span class="muted">(chưa đặt)</span>';
 
 // Trang Đèn LED: kiểu viền ngoài cho từng lúc (Led.java: vien() / writeSweep())
+let syncChonSan = '';   // trang Đồng bộ mở từ nút "Đồng bộ đèn" -> chọn sẵn nhóm Đèn LED
 const LED_KIEU = [['trang', 'Trắng đứng yên'], ['tho', 'Thở trắng'], ['xoay', 'Xoay liên tục'], ['tat', 'Tắt viền']];
 const LED_KIEU_THUC = [['xoay', 'Lưỡi liềm xoay 1 vòng'], ['chop', 'Chớp sáng 1 lần'], ['khong', 'Không (vào thẳng Đang nghe)']];
 const LED_VET = [['1', '1 vệt'], ['2', '2 vệt (đối diện)'], ['3', '3 vệt (cách đều)']];
@@ -931,7 +934,30 @@ const PAGES = {
         ${LED_TESTS.map(([v, t]) => `<a href="#" class="button button-tonal" data-led="${v}">${t}</a>`).join('')}
       </div>
       <p class="card-note">Bấm một kiểu để giữ đèn ở kiểu đó; "Theo bot" để đèn đổi theo trạng thái bot. Rời trang này thì tự về "Theo bot".
-        Nghĩ: sao chổi chạy vòng + nhịp xanh lá · Lỗi: đèn trong đỏ · Tắt mic: đèn trong đỏ mờ · Rảnh: tắt hết.</p></div></div>`),
+        Nghĩ: sao chổi chạy vòng + nhịp xanh lá · Lỗi: đèn trong đỏ · Tắt mic: đèn trong đỏ mờ · Rảnh: tắt hết.</p></div></div>`
+    + `<div class="block"><a href="#" class="button button-tonal" id="ledDongBo">Đồng bộ đèn sang loa khác</a></div>`),
+
+  // Như "Đồng bộ sang Pi khác" của Voicebot: chọn loa đích + nhóm cài đặt, loa này đăng nhập loa đích (nếu có
+  // mật khẩu) và gửi sang (Sync.java). Không chép tên loa, nhóm loa, mật khẩu.
+  sync: () => subpage('sync', 'Đồng bộ sang loa khác',
+    `<div class="card card-outline card-dividers"><div class="card-header">Loa đích</div>
+      <div class="card-content"><div class="list list-outline-ios list-strong-ios list-dividers-ios media-list" style="margin:0"><ul id="syncLoa">
+        ${loadingRow('Đang tìm loa R1 trong mạng…')}</ul></div></div></div>`
+    + list('Chép những gì', [
+      ['tro_ly', 'Trợ lý', 'API key, model, giọng đọc, nhận giọng nói, Gemini Live, từ đánh thức, tính cách'],
+      ['home_assistant', 'Home Assistant & thiết bị', 'Địa chỉ, token, dịch vụ thông báo, thiết bị đã thêm, thứ tự, icon'],
+      ['den', 'Đèn LED', 'Bật đèn, đèn theo nhạc, kiểu đèn Đánh thức / Nghe / Nói, độ dài và tốc độ xoay'],
+    ].map(([v, t, f]) => `<li><label class="item-checkbox item-content"><input type="checkbox" name="syncNhom" value="${v}">
+      <i class="icon icon-checkbox"></i><div class="item-inner"><div class="item-title">${t}<div class="item-footer">${f}</div></div></div></label></li>`),
+      'Ghi đè các cài đặt đó trên loa đích. Không chép tên loa, nhóm loa và mật khẩu đăng nhập.')
+    + `<div class="card card-outline card-dividers" id="syncDangNhap" style="display:none"><div class="card-header">Đăng nhập loa đích</div>
+      <div class="card-content"><div class="list list-outline-ios list-strong-ios list-dividers-ios" style="margin:0"><ul>
+        <li class="item-content item-input"><div class="item-inner"><div class="item-title item-label">Tên đăng nhập</div>
+          <div class="item-input-wrap"><input type="text" id="syncUser" autocapitalize="off" autocorrect="off" placeholder="admin" /></div></div></li>
+        <li class="item-content item-input"><div class="item-inner"><div class="item-title item-label">Mật khẩu</div>
+          <div class="item-input-wrap"><input type="password" id="syncPass" autocomplete="off" /></div></div></li>
+      </ul></div><p class="card-note">Loa đích đã đặt mật khẩu nên cần đăng nhập loa đó.</p></div></div>`
+    + `<div class="block"><a href="#" class="button button-fill button-large" id="syncGui">Đồng bộ</a></div>`, { noSave: true }),
 
   group: () => subpage('group', 'Nhóm loa',
     `<div class="card card-outline card-dividers"><div class="card-header">Loa trong nhóm</div>
@@ -1148,6 +1174,35 @@ function fillFields(el) {
 function initSubpage(page) {
   const el = page.el;
   fillFields(el);
+  if (page.name === 'sync') {
+    // Mở từ nút "Đồng bộ đèn" trang Đèn LED: chọn sẵn nhóm Đèn LED
+    el.querySelectorAll('[name="syncNhom"]').forEach(cb => cb.checked = cb.value === (syncChonSan || 'tro_ly'));
+    syncChonSan = '';
+    let chon = null;
+    fetch('/api/sync/devices').then(r => r.json()).then(j => {
+      const loa = j.loa || [], ul = el.querySelector('#syncLoa');
+      if (!loa.length) { ul.innerHTML = '<li class="item-content"><div class="item-inner muted">Không thấy loa R1 nào khác trong mạng</div></li>'; return; }
+      ul.innerHTML = loa.map(l => `<li><label class="item-radio item-content"><input type="radio" name="syncLoa" value="${esc(l.ip)}" data-dn="${l.can_dang_nhap ? 1 : 0}">
+        <i class="icon icon-radio"></i><div class="item-inner"><div class="item-title">${esc(l.ten || 'Loa R1')}
+        <div class="item-footer">${esc(l.ip)} · v${esc(l.version)}${l.can_dang_nhap ? ' · có mật khẩu' : ''}</div></div></div></label></li>`).join('');
+      ul.querySelectorAll('input').forEach(r => r.addEventListener('change', () => {
+        chon = r.value;
+        el.querySelector('#syncDangNhap').style.display = r.dataset.dn === '1' ? '' : 'none';
+      }));
+    }).catch(e => { el.querySelector('#syncLoa').innerHTML = '<li class="item-content"><div class="item-inner muted">Lỗi tìm loa: ' + esc(e.message) + '</div></li>'; });
+    el.querySelector('#syncGui').addEventListener('click', async e => {
+      e.preventDefault();
+      const nhom = [...el.querySelectorAll('[name="syncNhom"]:checked')].map(c => c.value);
+      if (!chon) return toast('Chọn loa đích');
+      if (!nhom.length) return toast('Chọn ít nhất 1 nhóm cài đặt');
+      const b = el.querySelector('#syncGui'); b.classList.add('disabled'); b.textContent = 'Đang đồng bộ…';
+      try {
+        const j = await post('/api/sync/push', { ip: chon, nhom, username: el.querySelector('#syncUser').value.trim(), password: el.querySelector('#syncPass').value });
+        rungThanhCong(); toast(j.message || 'Đã đồng bộ');
+      } catch (err) {}
+      b.classList.remove('disabled'); b.textContent = 'Đồng bộ';
+    });
+  }
   if (page.name === 'group') {
     // Tìm loa R1 khác (loa quét mạng /24, ~5 s); tích chọn = sửa ô IP bên dưới
     const ipBox = el.querySelector('[data-k="group_members"]');
@@ -1192,6 +1247,7 @@ function initSubpage(page) {
       el.querySelector(`[data-k="${v}"]`).closest('li').style.display = el.querySelector(`[data-k="${k}"]`).value === 'xoay' ? '' : 'none');
     anVet();
     ['led_wake_kieu', 'led_nghe', 'led_noi'].forEach(k => el.querySelector(`[data-k="${k}"]`).addEventListener('change', anVet));
+    el.querySelector('#ledDongBo').addEventListener('click', e => { e.preventDefault(); syncChonSan = 'den'; page.router.navigate('/sync/'); });
     el.querySelectorAll('[data-thu]').forEach(b => b.addEventListener('click', async e => {
       e.preventDefault();
       const data = {};

@@ -40,6 +40,9 @@ import java.util.zip.GZIPOutputStream;
  *   GET  /api/ha/devices[?all=1]  thiết bị đã lưu (all=1: mọi entity để chọn)
  *   POST /api/ha/selection {devices: {entity_id: tên gọi khác}}  lưu thiết bị cho bot
  *   POST /api/ha/service {entity_id, service}   bật / tắt thiết bị
+ *   GET  /api/sync/devices      loa R1 khác trong mạng (để đồng bộ cài đặt)
+ *   POST /api/sync/push {ip, nhom, username, password}   gửi cài đặt sang loa khác
+ *   POST /api/sync/import {nhom, data}                    nhận cài đặt từ loa khác
  */
 class WebServer {
     static final int PORT = 8088;
@@ -194,6 +197,11 @@ class WebServer {
             sendJson(s, 200, new JSONObject().put("loa", Group.scan()));
             return;
         }
+        // Đồng bộ cài đặt sang loa R1 khác (Sync): danh sách loa + loa đó có mật khẩu không
+        if (method.equals("GET") && path.equals("/api/sync/devices")) {
+            sendJson(s, 200, new JSONObject().put("loa", Sync.thietBi()));
+            return;
+        }
         if (method.equals("GET") && path.equals("/api/wifi/scan")) {
             sendJson(s, 200, new JSONObject().put("networks", Wifi.scan(bot)));
             return;
@@ -270,6 +278,26 @@ class WebServer {
                     return;
                 }
                 break;
+            }
+            case "/api/sync/push": // {ip, nhom: [tro_ly|home_assistant|den], username, password}: gửi sang loa ip
+                try {
+                    sendJson(s, 200, new JSONObject().put("ok", true).put("message", Sync.day(bot, req.optString("ip").trim(),
+                            req.optJSONArray("nhom"), req.optString("username").trim(), req.optString("password"))));
+                } catch (Exception e) {
+                    sendJson(s, 400, new JSONObject().put("error", String.valueOf(e.getMessage())));
+                }
+                return;
+            case "/api/sync/import": { // loa khác gửi sang (đã qua cổng đăng nhập nếu loa này có mật khẩu)
+                int n;
+                try {
+                    n = Sync.nhan(bot, req);
+                } catch (Exception e) {
+                    sendJson(s, 400, new JSONObject().put("error", String.valueOf(e.getMessage())));
+                    return;
+                }
+                bot.configChanged();
+                sendJson(s, 200, new JSONObject().put("ok", true).put("so_cai_dat", n));
+                return;
             }
             case "/api/led": // thử đèn: {state: listening|thinking|speaking|error|paused|idle}, rỗng = theo bot
                 if ("wake".equals(req.optString("state"))) { // chạy lưỡi liềm đánh thức 1 lần, không đổi kiểu đèn đang giữ
