@@ -15,7 +15,7 @@ public class Config {
     static final String[] KEYS = {"api_key", "model", "tts_model", "voice", "wake_engine",
             "mww_model", "mww_cutoff", "wake_word", "follow_up", "persona", "mic_gain",
             "tts_engine", "google_voice", "google_tts_key", "tts_rate", "led", "wake_sound", "wake_reply", "local_time",
-            "ha_url", "ha_token", "stt_engine", "live", "live_model", "live_idle", "gcloud_sa", "search", "city", "barge_in", "bot_self", "user_call", "group_members", "group_stereo", "music_led", "music_led_inner", "ha_dash_order", "ha_dash_icons", "ha_notify", "ten_hien_thi", "led_wake_len", "led_wake_ms", "led_wake_vet",
+            "ha_url", "ha_token", "stt_engine", "live", "live_model", "live_idle", "gcloud_sa", "search", "city", "barge_in", "bot_self", "user_call", "group_members", "group_stereo", "music_led", "music_led_inner", "ha_dash_order", "ha_dash_dev_order", "ha_dash_icons", "ha_notify", "ten_hien_thi", "led_wake_len", "led_wake_ms", "led_wake_vet",
             "led_wake_kieu", "led_nghe", "led_nghe_vet", "led_noi", "led_noi_vet"};
 
     public String apiKey;
@@ -232,6 +232,7 @@ public class Config {
                 .put("music_led_inner", c.musicLedInner ? "1" : "0")
                 // Trang Thiết bị (chỉ Web UI dùng): thứ tự nhóm "light,fan,…" và icon riêng {entity_id: tên icon F7}
                 .put("ha_dash_order", p(ctx).getString("ha_dash_order", ""))
+                .put("ha_dash_dev_order", p(ctx).getString("ha_dash_dev_order", "")) // thứ tự ô (kéo trong chế độ sửa)
                 .put("ha_dash_icons", p(ctx).getString("ha_dash_icons", "{}"))
                 .put("mic_gain", String.valueOf(c.micGain))
                 .put("tts_engine", c.ttsEngine)

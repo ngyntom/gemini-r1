@@ -1485,6 +1485,8 @@ const devBadge = d => d.domain === 'light' && d.brightness != null ? Math.round(
   : d.domain === 'fan' && d.percentage != null ? Math.round(d.percentage) + '%'
   : d.current || d.temp ? Math.round(parseFloat(d.current || d.temp)) + '°C' : null;
 const devOrder = () => String(S && S.config && S.config.ha_dash_order || '').split(',').filter(Boolean);
+// Thứ tự từng ô (kéo trong chế độ sửa, như Voicebot): ô chưa có trong danh sách giữ thứ tự cũ ở cuối
+const devTileOrder = () => String(S && S.config && S.config.ha_dash_dev_order || '').split(',').filter(Boolean);
 const devIcons = () => { try { return JSON.parse(S.config.ha_dash_icons || '{}'); } catch (e) { return {}; } };
 const devIcon = d => devIcons()[d.id] || (DOMAINS[d.domain] || [0, 'circle'])[1];
 function groupSorted(list) {
@@ -1505,6 +1507,17 @@ const ICONS = [['lightbulb_fill', 'đèn bóng'], ['lightbulb', 'đèn'], ['ligh
   ['tree', 'cây vườn'], ['circle_grid_hex_fill', 'robot hút bụi'], ['gauge', 'cảm biến đồng hồ'], ['cloud_sun_fill', 'thời tiết'],
   ['person_fill', 'người'], ['location_fill', 'vị trí'], ['heart_fill', 'yêu thích'], ['star_fill', 'sao'], ['square_grid_2x2_fill', 'khác']];
 
+function sapTheoO(list) {
+  const ord = devTileOrder(), vt = d => { const i = ord.indexOf(d.id); return i < 0 ? 1e6 : i; };
+  return list.slice().sort((a, b) => vt(a) - vt(b));
+}
+// Lưu thứ tự ô sau khi kéo: thứ tự mọi ô đang vẽ (mọi nhóm, từ trên xuống)
+async function luuThuTuO() {
+  const ord = [...document.querySelectorAll('#devices .ha-dash-card[data-id]')].map(c => c.dataset.id).join(',');
+  S.config.ha_dash_dev_order = ord;
+  try { await post('/api/config', { ha_dash_dev_order: ord }); } catch (e) {}
+}
+
 function renderDevices() {
   const root = $('devices');
   if (!devices.length) {
@@ -1521,8 +1534,8 @@ function renderDevices() {
     return `<div class="card card-outline card-dividers">
       <div class="card-header"><span>${esc(title)} (${list.length})</span>
         <a href="#" class="link icon-only ha-dash-edit-btn" data-sua="${esc(dom)}" title="${sua ? 'Xong' : 'Sửa'}"><i class="icon f7-icons">${sua ? 'checkmark_alt' : 'pencil'}</i></a></div>
-      <div class="card-content"><div class="ha-dash-grid">` +
-      list.map(d => {
+      <div class="card-content"><div class="ha-dash-grid${sua ? ' ha-dash-dang-sua' : ''}">` +
+      sapTheoO(list).map(d => {
         const hh = devBadge(d);
         const goc = sua ? '<div class="ha-dash-delete-badge" title="Bỏ khỏi bot"><i class="icon f7-icons">xmark</i></div>'
           : devBusy.has(d.id) ? `<div class="ha-dash-loader"><div class="preloader" style="--f7-preloader-size:30px">${htmlPreloader()}</div></div>`
@@ -1541,11 +1554,16 @@ function renderDevices() {
     renderDevices();
     if (!devEditing.size) loadDevices();
   }));
+  // Chế độ sửa: ô lắc nhẹ (CSS .ha-dash-dang-sua trong app.css) và kéo được để sắp xếp (keo-sap-xep.js), thả xong tự lưu
+  root.querySelectorAll('.ha-dash-dang-sua').forEach(g => window.ganKeoSapXep && ganKeoSapXep(g,
+    { chon: '.ha-dash-card', boQua: '.ha-dash-delete-badge', xong: luuThuTuO }));
   root.querySelectorAll('.ha-dash-card').forEach(t => {
-    // Như Pi: giữ lâu (~0,5 s) trên một ô -> đổi tên gọi; nuốt luôn cú click ngay sau để không bật/tắt nhầm
-    let hold = null, held = false;
+    // Như Pi: giữ lâu (~0,5 s) trên một ô -> đổi tên gọi; nuốt luôn cú click ngay sau để không bật/tắt nhầm.
+    // Nhích ngón tay (đang kéo sắp xếp) thì huỷ giữ lâu.
+    let hold = null, held = false, x0 = 0, y0 = 0;
     const cancel = () => { clearTimeout(hold); hold = null; };
-    t.addEventListener('pointerdown', () => { held = false; cancel();
+    t.addEventListener('pointermove', e => { if (hold && Math.hypot(e.clientX - x0, e.clientY - y0) > 8) cancel(); });
+    t.addEventListener('pointerdown', e => { held = false; cancel(); x0 = e.clientX; y0 = e.clientY;
       hold = setTimeout(() => { held = true; hold = null; rungNhe(); editDevice(t.dataset.id); }, 500); });
     ['pointerup', 'pointerleave', 'pointercancel'].forEach(ev => t.addEventListener(ev, cancel));
     t.addEventListener('contextmenu', e => e.preventDefault());
@@ -1909,5 +1927,7 @@ setInterval(refresh, 1500);
 </script>
 <script src="/static/js/ghim.js"></script>
 <script src="/static/js/mini-player.js"></script>
+<!-- Kéo sắp xếp ô trong chế độ sửa trang Thiết bị (file chung với Voicebot) -->
+<script src="/static/js/keo-sap-xep.js"></script>
 </body>
 </html>

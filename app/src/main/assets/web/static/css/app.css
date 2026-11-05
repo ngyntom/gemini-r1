@@ -487,6 +487,32 @@ html.dark #view-devices .ha-dash-card.ha-dash-on {
   height: 14px;
   border-radius: 4px;
 }
+/* Chế độ sửa (bút chì trên tiêu đề nhóm): các ô lắc nhẹ như màn hình chính iOS và kéo được để sắp xếp
+   (static/js/keo-sap-xep.js). touch-action:none để trình duyệt không giành cú vuốt làm cuộn trang - lúc sửa
+   cuộn trang bằng vùng ngoài các ô. Lệch nhịp từng ô cho tự nhiên; ô đang kéo nổi lên, thôi lắc. */
+@keyframes ha-dash-lac {
+  0% { transform: rotate(-1.2deg); }
+  50% { transform: rotate(1.2deg); }
+  100% { transform: rotate(-1.2deg); }
+}
+#view-devices .ha-dash-dang-sua .ha-dash-card {
+  touch-action: none;
+  animation: ha-dash-lac 0.32s ease-in-out infinite;
+}
+#view-devices .ha-dash-dang-sua .ha-dash-card:nth-child(2n) { animation-delay: -0.11s; animation-duration: 0.36s; }
+#view-devices .ha-dash-dang-sua .ha-dash-card:nth-child(3n) { animation-delay: -0.2s; }
+#view-devices .ha-dash-dang-sua .ha-dash-card.dang-keo {
+  animation: none;
+  position: relative;
+  z-index: 50;
+  pointer-events: none;
+  opacity: 1;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.28);
+  transition: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  #view-devices .ha-dash-dang-sua .ha-dash-card { animation: none; }
+}
 #view-devices .ha-dash-empty {
   text-align: center;
   padding: 60px 24px;
