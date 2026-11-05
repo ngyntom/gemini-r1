@@ -514,7 +514,7 @@ window.moManDangNhap = () => {
     </div>
 
     <!-- ===== Cài đặt ===== -->
-    <div id="view-settings" class="view tab" data-url="/">
+    <div id="view-settings" class="view tab" data-url="/cai-dat/">
       <div class="page" data-name="settings">
         <div class="navbar"><div class="navbar-bg"></div><div class="navbar-inner">
           <div class="title">Cài đặt</div>
@@ -1004,7 +1004,12 @@ const DARK_MODE_KEY = 'voicebot_dark_mode';     // 'light' | 'dark' | 'auto'
 const COLOR_THEME_KEY = 'voicebot_color_theme'; // mã hex
 const FONT_SCALE_KEY = 'voicebot_font_scale';   // Cỡ chữ (trang Giao diện) - áp lúc tải trang ở <head>
 function docCaiDat(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
-routes.push({ path: '/speaker/', el: SPEAKER_PAGE }); // trang Loa, mở từ Cài đặt có hiệu ứng trượt như trang con
+routes.push({ path: '/speaker/', el: SPEAKER_PAGE });
+// Trang Cài đặt gốc viết sẵn trong index.html, nút gắn 1 lần lúc mở (Đổi địa chỉ, thẻ tên loa, công tắc...). Route
+// trỏ vào ĐÚNG phần tử đó (như trang Loa) để F7 dùng lại khi lùi về: không có route này thì vào sâu 2 cấp
+// (Cài đặt > Đèn LED > Đồng bộ) F7 gỡ trang gốc rồi dựng bản mới khi quay lại -> mất nút "Đổi địa chỉ" của app iOS
+// và mọi xử lý bấm (đã gặp). Voicebot không bị vì gắn nút trong pageInit mỗi lần trang được tạo.
+routes.push({ path: '/cai-dat/', el: document.querySelector('#view-settings .page[data-name="settings"]') }); // trang Loa, mở từ Cài đặt có hiệu ứng trượt như trang con
 
 // ---------- Hàm chung mà trang Nhạc của Pi (music.html) gọi - bản rút gọn của static/js/common.js trên Pi ----------
 async function api(path, opts) {
@@ -1124,13 +1129,26 @@ function bamTabLink(e) {
   if (!v || v.router.history.length < 2) return;
   e.preventDefault();
   e.stopPropagation();
-  rungNhe();
-  v.router.back(v.router.history[0], { force: true });
+  veGocTab(v);
+}
+// Lùi TỪNG trang về trang gốc của tab (trang giữa lùi ngay không hiệu ứng, bước cuối trượt như nút ‹). KHÔNG dùng
+// router.back(url, { force: true }): F7 dựng lại trang gốc từ đầu -> mất mọi thứ code đã gắn vào trang cũ (nút
+// "Đổi địa chỉ" của app iOS biến mất, các nút trên trang Cài đặt không bấm được nữa - đã gặp).
+function veGocTab(v) {
+  const conLai = v.router.history.length - 1;
+  if (conLai < 1) return;
+  // Router còn đang chuyển trang thì lệnh back bị bỏ qua -> chờ xong rồi lùi tiếp
+  if (!v.router.allowPageChange) { setTimeout(() => veGocTab(v), 30); return; }
+  v.router.back({ animate: conLai === 1 });
+  if (conLai > 1) setTimeout(() => veGocTab(v), 30);
 }
 document.addEventListener('touchstart', bamTabLink, { capture: true, passive: false });
 document.addEventListener('click', bamTabLink, true);
 ['#view-chat', '#view-music', '#view-devices', '#view-settings'].forEach(v => {
-  if (v !== '#view-music') app.views.create(v); // view Nhạc đã tạo ở trên
+  // stackPages: giữ trang trước trong DOM khi vào sâu nhiều cấp (Cài đặt > Đèn LED > Đồng bộ). Mặc định F7 gỡ trang
+  // cách 2 cấp rồi dựng lại khi lùi về -> trang Cài đặt gốc (viết sẵn trong index.html, nút gắn 1 lần lúc mở) mất
+  // nút "Đổi địa chỉ" của app iOS và mọi xử lý bấm (đã gặp).
+  if (v !== '#view-music') app.views.create(v, { stackPages: true, url: document.querySelector(v).dataset.url }); // view Nhạc đã tạo ở trên
   // F7 chỉ tô nút trong menu vừa bấm -> đồng bộ cả menu trái (máy tính) lẫn thanh tab dưới (điện thoại).
   // Trang Loa nằm trong Cài đặt (không có tab riêng) -> vẫn tô Cài đặt.
   const tab = v;
@@ -1173,6 +1191,14 @@ function fillFields(el) {
 
 function initSubpage(page) {
   const el = page.el;
+  // Sửa lỗi F7: vào trang con -> bấm icon tab (về gốc) -> vào lại, nút Lưu (navbar right) đôi khi mất
+  const nbInner = el.querySelector('.navbar .navbar-inner');
+  if (nbInner && !nbInner.querySelector('.save-btn')) {
+    const right = nbInner.querySelector('.right');
+    if (right && !right.textContent.trim()) {
+      right.innerHTML = '<a href="#" class="link icon-only save-btn" title="Lưu"><i class="icon f7-icons">floppy_disk</i></a>';
+    }
+  }
   fillFields(el);
   if (page.name === 'sync') {
     // Mở từ nút "Đồng bộ đèn" trang Đèn LED: chọn sẵn nhóm Đèn LED
