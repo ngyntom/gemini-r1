@@ -490,8 +490,10 @@ final class Led {
         String vienKieu = c != null && "mot_phan".equals(c.musicLedVienKieu) ? "mot_phan" : "hai_ben";
         int[] order = new int[MusicLight.RING];
         if ("mot_phan".equals(vienKieu)) {
+            // Sweep chiều kim đồng hồ từ LED 16 (trước) quanh vòng
             for (int i = 0; i < order.length; i++) order[i] = 16 + i;
         } else {
+            // hai_ben: xen kẽ 2 đầu (16↔39, 17↔38...) hội tụ về giữa sau (27/28)
             for (int i = 0, a = 0, b = 23; i < order.length; i++) order[i] = 16 + (i % 2 == 0 ? a++ : b--);
         }
         // Driver đèn xếp lệnh vào hàng rồi chạy dần (~100 ms mỗi lệnh, ghi thì trả về ngay - đo trên loa):
@@ -545,16 +547,20 @@ final class Led {
                 .append("p=0\nwhile [ ! -f ").append(STOPF).append(" ]; do\n")
                 .append("  read l < ").append(level.getAbsolutePath()).append("\n")
                 .append("  if [ -n \"$l\" ] && [ \"$l\" -gt \"$p\" ]; then\n    case \"$l\" in\n");
+        // hai_ben: luôn thắp theo cặp đối xứng (level lẻ làm tròn lên chẵn) để tránh lệch 1 bên
         for (int n = 1; n <= MusicLight.RING; n++) {
+            int show = "hai_ben".equals(vienKieu) ? Math.min(((n + 1) / 2) * 2, MusicLight.RING) : n;
             StringBuilder on = new StringBuilder();
-            for (int i = 0; i < n; i++) on.append(' ').append(order[i]);
-            sb.append("      ").append(n).append(") ").append(setColor(RING_COLOR, n + on.toString(), vienMau)).append(" ;;\n");
+            for (int i = 0; i < show; i++) on.append(' ').append(order[i]);
+            sb.append("      ").append(n).append(") ").append(setColor(RING_COLOR, show + on.toString(), vienMau)).append(" ;;\n");
         }
         sb.append("    esac\n    p=$l\n  elif [ -n \"$l\" ] && [ \"$l\" -lt \"$p\" ]; then\n    case \"$l\" in\n");
         for (int n = 0; n < MusicLight.RING; n++) {
+            int keep = "hai_ben".equals(vienKieu) ? (n / 2 * 2) : n;
+            int offCount = order.length - keep;
             StringBuilder off = new StringBuilder();
-            for (int i = n; i < order.length; i++) off.append(' ').append(order[i]);
-            sb.append("      ").append(n).append(") ").append(blackAll(RING_COLOR, (order.length - n) + off.toString())).append(" ;;\n");
+            for (int i = keep; i < order.length; i++) off.append(' ').append(order[i]);
+            sb.append("      ").append(n).append(") ").append(blackAll(RING_COLOR, offCount + off.toString())).append(" ;;\n");
         }
         sb.append("    esac\n    p=$l\n  fi\n");
         // Đèn trong (tham số $1 = 1): đổi màu theo nấc to, chỉ ghi khi sang nấc khác
