@@ -35,6 +35,8 @@ import java.util.zip.GZIPOutputStream;
  *   POST /api/volume {level}    âm lượng 0..max
  *   POST /api/upload?name=x.tflite   (body = file) tải model microWakeWord lên loa
  *   POST /api/install           (body = file APK) cập nhật app
+ *   POST /api/restart           khởi động lại app (BotService)
+ *   POST /api/reboot            khởi động lại loa (Android reboot)
  *   POST /api/led    {state}    thử đèn LED
  *   POST /api/ha_test           kiểm tra kết nối Home Assistant
  *   GET  /api/ha/devices[?all=1]  thiết bị đã lưu (all=1: mọi entity để chọn)
@@ -329,6 +331,12 @@ class WebServer {
                 break;
             case "/api/reset":
                 bot.resetHistory();
+                break;
+            case "/api/restart":
+                new android.os.Handler(bot.getMainLooper()).postDelayed(bot::restart, 300);
+                break;
+            case "/api/reboot":
+                new Thread(LocalAdb::reboot, "reboot").start();
                 break;
             case "/api/volume": {
                 AudioManager am = (AudioManager) bot.getSystemService(Context.AUDIO_SERVICE);

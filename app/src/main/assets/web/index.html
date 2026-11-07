@@ -491,6 +491,14 @@ window.moManDangNhap = () => {
           </div>
 
           <div class="card card-outline card-dividers">
+            <div class="card-header">Khởi động</div>
+            <div class="card-content card-content-padding" style="display:flex;gap:8px;padding:12px 16px">
+              <a href="#" class="button button-tonal" id="btnRestart" style="flex:1"><i class="icon f7-icons" style="font-size:17px">arrow_counterclockwise</i>&nbsp;Khởi động lại app</a>
+              <a href="#" class="button button-tonal" id="btnReboot" style="flex:1;--f7-button-bg-color:rgba(255,59,48,.12);--f7-button-text-color:#ff3b30"><i class="icon f7-icons" style="font-size:17px">power</i>&nbsp;Khởi động lại loa</a>
+            </div>
+          </div>
+
+          <div class="card card-outline card-dividers">
             <div class="card-header">Micro</div>
             <div class="card-content card-content-padding">
               <a href="#" class="button button-tonal" id="btnMic"><i class="icon f7-icons" style="font-size:18px">play_fill</i>&nbsp;Nghe lại 5 giây mic</a>
@@ -1549,6 +1557,8 @@ $('btnListen').addEventListener('click', listen);
 // ---------- Loa ----------
 $('btnReset').addEventListener('click', e => { e.preventDefault(); post('/api/reset').then(() => toast('Đã xoá trí nhớ hội thoại')); });
 $('btnMic').addEventListener('click', e => { e.preventDefault(); $('micAudio').src = '/api/mic.wav?t=' + Date.now(); $('micAudio').play(); });
+$('btnRestart').addEventListener('click', e => { e.preventDefault(); app.dialog.confirm('Khởi động lại app trên loa?', 'Khởi động lại app', () => post('/api/restart').then(() => toast('Đang khởi động lại app…'))); });
+$('btnReboot').addEventListener('click', e => { e.preventDefault(); app.dialog.confirm('Khởi động lại toàn bộ loa? Mất khoảng 1–2 phút.', 'Khởi động lại loa', () => post('/api/reboot').then(() => toast('Đang khởi động lại loa…'))); });
 ['runToggle', 'runToggle2'].forEach(id => $(id).addEventListener('change', e => post('/api/pause', { paused: !e.target.checked }).then(refresh)));
 // Âm lượng hiện theo % ở mọi nơi (trang Loa, popover Chat, trình phát nhạc) - cùng công thức Music.volume() của loa
 const phanTramAmLuong = (v, max) => max ? Math.round(v * 100 / max) : 0;

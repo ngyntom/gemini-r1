@@ -77,6 +77,12 @@ public class BotService extends Service {
 
     // ---- Điều khiển từ Web UI ----
 
+    void restart() {
+        new android.os.Handler(getMainLooper()).postDelayed(
+                () -> startService(new Intent(this, BotService.class)), 1200);
+        stopSelf();
+    }
+
     void sayAsync(final String text) {
         if (text == null || text.trim().isEmpty()) return;
         new Thread(() -> speak(Config.load(this), text)).start();
