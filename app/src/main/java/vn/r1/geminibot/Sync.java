@@ -37,7 +37,10 @@ final class Sync {
                 "ha_dash_dev_order", "ha_dash_icons"});
         NHOM.put("den", new String[]{"led", "music_led", "music_led_inner", "music_led_inner_kieu",
                 "led_wake_kieu", "led_wake_vet", "led_wake_len",
-                "led_wake_ms", "led_nghe", "led_nghe_vet", "led_noi", "led_noi_vet"});
+                "led_wake_ms", "led_nghe", "led_nghe_vet", "led_noi", "led_noi_vet",
+                "led_nghe_inner_kieu", "led_nghe_inner_mau",
+                "led_nghi_inner_kieu", "led_nghi_inner_mau",
+                "led_noi_inner_kieu", "led_noi_inner_mau"});
     }
 
     private static final OkHttpClient HTTP = new OkHttpClient.Builder()

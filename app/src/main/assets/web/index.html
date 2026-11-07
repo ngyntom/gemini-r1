@@ -800,6 +800,13 @@ let syncChonSan = '';   // trang Đồng bộ mở từ nút "Đồng bộ đèn
 const LED_KIEU = [['trang', 'Trắng đứng yên'], ['tho', 'Thở trắng'], ['xoay', 'Xoay liên tục'], ['tat', 'Tắt viền']];
 const LED_KIEU_THUC = [['xoay', 'Lưỡi liềm xoay 1 vòng'], ['chop', 'Chớp sáng 1 lần'], ['khong', 'Không (vào thẳng Đang nghe)']];
 const LED_VET = [['1', '1 vệt'], ['2', '2 vệt (đối diện)'], ['3', '3 vệt (cách đều)']];
+const LED_KIEU_INNER = [['tho', 'Thở'], ['sang', 'Sáng'], ['tat', 'Tắt']];
+const LED_KIEU_INNER_NGHI = [['nhay', 'Nhấp nháy'], ['tho', 'Thở'], ['sang', 'Sáng'], ['tat', 'Tắt']];
+const MAU_TRONG = [['0030ff','#0030ff'],['00b0ff','#00b0ff'],['00ff30','#00ff30'],['ffcc00','#ffcc00'],['ff8800','#ff8800'],['ff0000','#ff0000'],['8800ff','#8800ff'],['ff00b0','#ff00b0'],['ffffff','#ffffff']];
+function mauRow(k) {
+  const dots = MAU_TRONG.map(([m, c]) => `<button data-mau="${m}" data-for="${k}" title="${m}" style="width:28px;height:28px;border-radius:50%;background:${c};border:none;padding:0;cursor:pointer;flex-shrink:0;outline:2px solid transparent;outline-offset:2px"></button>`).join('');
+  return `<li style="padding:8px 16px 4px"><input type="hidden" data-k="${k}"><div style="display:flex;gap:7px;flex-wrap:wrap;align-items:center"><span style="font-size:13px;color:var(--f7-list-item-subtitle-text-color,#aaa);min-width:76px">Màu</span>${dots}</div></li>`;
+}
 const theDen = (title, items, thu, note) => `<div class="card card-outline card-dividers"><div class="card-header">${title}</div>
   <div class="card-content"><div class="list list-outline-ios list-strong-ios list-dividers-ios" style="margin:0"><ul>${items.join('')}</ul></div>
   <div class="block" style="margin:12px 0 4px"><a href="#" class="button button-tonal" data-thu="${thu}">Lưu và thử</a></div>
@@ -921,11 +928,19 @@ const PAGES = {
     + theDen('Đang nghe', [
       sel('led_nghe', 'Viền ngoài', LED_KIEU),
       sel('led_nghe_vet', 'Số vệt', LED_VET),
-    ], 'listening', 'Đèn trong: thở xanh dương.')
+      sel('led_nghe_inner_kieu', 'Đèn trong', LED_KIEU_INNER),
+      mauRow('led_nghe_inner_mau'),
+    ], 'listening')
+    + theDen('Đang nghĩ', [
+      sel('led_nghi_inner_kieu', 'Đèn trong', LED_KIEU_INNER_NGHI),
+      mauRow('led_nghi_inner_mau'),
+    ], 'thinking', 'Viền ngoài: sao chổi trắng (cố định).')
     + theDen('Đang nói', [
       sel('led_noi', 'Viền ngoài', LED_KIEU),
       sel('led_noi_vet', 'Số vệt', LED_VET),
-    ], 'speaking', 'Đèn trong: xanh lá.')
+      sel('led_noi_inner_kieu', 'Đèn trong', LED_KIEU_INNER),
+      mauRow('led_noi_inner_mau'),
+    ], 'speaking')
     + list('Hiệu ứng xoay', [
       sel('led_wake_len', 'Độ dài vệt', [['3', 'Ngắn'], ['4', 'Vừa'], ['6', 'Dài'], ['8', 'Rất dài']]),
       sel('led_wake_ms', 'Tốc độ', [['30', 'Nhanh (~0,8 s / vòng)'], ['40', 'Vừa (~1 s / vòng)'], ['60', 'Chậm (~1,5 s / vòng)']]),
@@ -1280,12 +1295,39 @@ function initSubpage(page) {
     el.querySelector('[data-k="music_led_inner"]').addEventListener('change', anKieuTrong);
     // Lưu mọi lựa chọn đèn rồi chạy thử ngay trên loa: Đánh thức chạy 1 lần; Nghe / Nói giữ kiểu đó tới khi bấm
     // "Theo bot" hoặc rời trang (như nút Thử đèn)
-    const KHOA_DEN = ['led_wake_kieu', 'led_wake_vet', 'led_nghe', 'led_nghe_vet', 'led_noi', 'led_noi_vet', 'led_wake_len', 'led_wake_ms'];
+    const KHOA_DEN = ['led_wake_kieu', 'led_wake_vet', 'led_nghe', 'led_nghe_vet', 'led_noi', 'led_noi_vet', 'led_wake_len', 'led_wake_ms',
+      'led_nghe_inner_kieu', 'led_nghe_inner_mau', 'led_nghi_inner_kieu', 'led_nghi_inner_mau', 'led_noi_inner_kieu', 'led_noi_inner_mau'];
     // "Số vệt" chỉ có nghĩa với kiểu xoay
     const anVet = () => [['led_wake_kieu', 'led_wake_vet'], ['led_nghe', 'led_nghe_vet'], ['led_noi', 'led_noi_vet']].forEach(([k, v]) =>
       el.querySelector(`[data-k="${v}"]`).closest('li').style.display = el.querySelector(`[data-k="${k}"]`).value === 'xoay' ? '' : 'none');
     anVet();
     ['led_wake_kieu', 'led_nghe', 'led_noi'].forEach(k => el.querySelector(`[data-k="${k}"]`).addEventListener('change', anVet));
+    // Ẩn / hiện hàng màu khi kiểu đèn trong là "Tắt"
+    const anKieuInner = k => {
+      const kieu = el.querySelector(`[data-k="${k}"]`).value;
+      const mauLi = el.querySelector(`[data-k="${k.replace('_kieu', '_mau')}"]`).closest('li');
+      if (mauLi) mauLi.style.display = kieu === 'tat' ? 'none' : '';
+    };
+    // Đánh dấu màu đang chọn bằng outline
+    const syncMau = k => {
+      const v = el.querySelector(`[data-k="${k}"]`).value;
+      el.querySelectorAll(`[data-for="${k}"]`).forEach(d => {
+        d.style.outline = d.dataset.mau === v ? '2px solid var(--f7-theme-color,#007aff)' : '2px solid transparent';
+        d.style.outlineOffset = '2px';
+      });
+    };
+    ['led_nghe_inner_kieu', 'led_nghi_inner_kieu', 'led_noi_inner_kieu'].forEach(k => {
+      anKieuInner(k);
+      el.querySelector(`[data-k="${k}"]`).addEventListener('change', () => anKieuInner(k));
+    });
+    ['led_nghe_inner_mau', 'led_nghi_inner_mau', 'led_noi_inner_mau'].forEach(k => {
+      syncMau(k);
+      el.querySelectorAll(`[data-for="${k}"]`).forEach(d => d.addEventListener('click', e => {
+        e.preventDefault();
+        el.querySelector(`[data-k="${k}"]`).value = d.dataset.mau;
+        syncMau(k);
+      }));
+    });
     el.querySelector('#ledDongBo').addEventListener('click', e => { e.preventDefault(); syncChonSan = 'den'; page.router.navigate('/sync/'); });
     el.querySelectorAll('[data-thu]').forEach(b => b.addEventListener('click', async e => {
       e.preventDefault();

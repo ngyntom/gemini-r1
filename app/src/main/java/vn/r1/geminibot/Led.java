@@ -261,16 +261,22 @@ final class Led {
     /** Lệnh shell chuyển sang kiểu đèn mới; luôn dừng sao chổi cũ trước. wake = quét sáng viền trước hiệu ứng nghe. */
     private static String command(String mode, boolean wake) {
         String stop = STOP;
-        Config c = appCtx != null && ("listening".equals(mode) || "speaking".equals(mode)) ? Config.load(appCtx) : null;
+        Config c = appCtx != null && ("listening".equals(mode) || "speaking".equals(mode) || "thinking".equals(mode)) ? Config.load(appCtx) : null;
         // Quét đánh thức: script tự dừng sau đúng 1 vòng (~1 s) nên không cần PID/STOPF như sao chổi;
         // chỉ ghi từng đèn vào viền (multi_leds1) nên không đụng đèn trong, INNER_OFF đã tắt đèn trong trước.
         String sweepCmd = wake && sweep != null ? "; sh " + sweep.getAbsolutePath() : "";
         switch (mode) {
             // Viền trước, đèn trong sau (giữ thứ tự an toàn của bản cũ dù 2 nhóm là 2 file riêng).
-            case "listening":
-                return stop + INNER_OFF + sweepCmd + "; " + (c == null ? RING_WHITE : vien(c, c.ledNghe, c.ledNgheVet)) + "; lights_test show 203";
-            case "speaking":
-                return stop + INNER_OFF + "; " + (c == null ? RING_WHITE : vien(c, c.ledNoi, c.ledNoiVet)) + "; " + INNER_GREEN;
+            case "listening": {
+                String inner = c == null ? "lights_test show 203" : innerCmd(c.ledNgheInnerKieu, c.ledNgheInnerMau);
+                return stop + INNER_OFF + sweepCmd + "; " + (c == null ? RING_WHITE : vien(c, c.ledNghe, c.ledNgheVet))
+                        + (inner.isEmpty() ? "" : "; " + inner);
+            }
+            case "speaking": {
+                String inner = c == null ? INNER_GREEN : innerCmd(c.ledNoiInnerKieu, c.ledNoiInnerMau);
+                return stop + INNER_OFF + "; " + (c == null ? RING_WHITE : vien(c, c.ledNoi, c.ledNoiVet))
+                        + (inner.isEmpty() ? "" : "; " + inner);
+            }
             case "error":
                 return stop + INNER_OFF + "; " + RING_OFF + "; " + INNER_RED;
             case "muted":
@@ -287,8 +293,11 @@ final class Led {
                 if (comet != null) {
                     // Ghi PID ngay ở đây chứ không để script tự ghi khi chạy: bấm "về rảnh" liền sau "nghĩ" thì
                     // lệnh dừng tới trước khi script kịp ghi PID, bỏ qua, và sao chổi chạy mãi (thử trên loa).
+                    String nghiKieu = c != null ? c.ledNghiInnerKieu : "nhay";
+                    String nghiMau = c != null ? c.ledNghiInnerMau : "00ff00";
                     return stop + INNER_OFF + "; " + RING_OFF + "; rm -f " + STOPF + "; trap '' HUP; sh "
-                            + comet.getAbsolutePath() + " </dev/null >/dev/null 2>&1 & echo $! > " + PID;
+                            + comet.getAbsolutePath() + " " + nghiKieu + " " + nghiMau
+                            + " </dev/null >/dev/null 2>&1 & echo $! > " + PID;
                 }
                 return stop + INNER_OFF + "; " + RING_WHITE;
             default:
@@ -302,14 +311,25 @@ final class Led {
      * Tự dừng sau ~200 vòng (~4 phút) phòng khi app chết mà không kịp tắt.
      */
     private static File writeComet(Context ctx) throws Exception {
+        // $1 = kieu đèn trong (nhay|tho|sang|tat), $2 = màu rrggbb; mặc định nhay/00ff00 (giữ nguyên nếu không có)
+        // Dùng $mau (không dùng $2 trực tiếp) để shell không tạo lỗi khi $2 rỗng
+        String setInner  = "echo '0 100 1 1 1 000000 '$mau' 100 0 " + INNER_IDS + "' > " + INNER_COLOR;
+        String thoInner  = "echo '1 3000 99999999 1 1 000000 '$mau' 1400 1 " + INNER_IDS + "' > " + INNER_COLOR;
         // Mở đầu xoá viền cho sạch (command("thinking") đã xoá nhưng script tự xoá phòng bị gọi rơi)
-        StringBuilder sb = new StringBuilder(RING_OFF).append("\nn=0\ng=0\nwhile [ $n -lt 200 ]; do\n");
+        StringBuilder sb = new StringBuilder(RING_OFF)
+                .append("\nmau=\"${2:-00ff00}\"\n")
+                .append("case \"$1\" in\n")
+                .append("  sang) ").append(setInner).append(" ;;\n")
+                .append("  tho) ").append(thoInner).append(" ;;\n")
+                .append("esac\n") // nhay: bật tắt trong vòng lặp; tat: INNER_OFF đã tắt rồi
+                .append("n=0\ng=0\nwhile [ $n -lt 200 ]; do\n");
         for (int k = 0; k < 24; k++) {
-            // Đèn trong nhịp xanh lá (~0,5 s sáng / 0,5 s tắt): không có hiệu ứng thở xanh lá
+            // Đèn trong nhịp ($1 = nhay hoặc rỗng để tương thích ngược): ~0,5 s sáng / 0,5 s tắt
             if (k % 6 == 0) {
-                sb.append("if [ $g = 0 ]; then ").append(setColor(INNER_COLOR, INNER_IDS, "00ff00"))
+                sb.append("if [ \"$1\" = \"nhay\" ] || [ -z \"$1\" ]; then\n")
+                  .append("  if [ $g = 0 ]; then ").append(setInner)
                   .append("; g=1; else ").append(setColor(INNER_COLOR, INNER_IDS, "000000"))
-                  .append("; g=0; fi\n");
+                  .append("; g=0; fi\nfi\n");
             }
             sb.append(setLed(RING_COLOR, 16 + k, "ffffff")).append('\n');
             sb.append(setLed(RING_COLOR, 16 + (k + 23) % 24, "606060")).append('\n');
@@ -376,6 +396,19 @@ final class Led {
         return lenh.toString();
     }
 
+    /** Đèn trong theo kiểu và màu: "tho" = thở, "sang" = sáng, "tat" = tắt (đã tắt bởi INNER_OFF). */
+    private static String innerCmd(String kieu, String mau) {
+        String safeMau = (mau == null || !mau.matches("[0-9a-fA-F]{6}")) ? "ffffff" : mau;
+        switch (kieu == null ? "" : kieu) {
+            case "sang":
+                return setColor(INNER_COLOR, INNER_IDS, safeMau);
+            case "tat":
+                return "";
+            default: // tho
+                return "echo '1 3000 99999999 1 1 000000 " + safeMau + " 1400 1 " + INNER_IDS + "' > " + INNER_COLOR;
+        }
+    }
+
     /** Viền ngoài lúc Nghe / Nói theo cấu hình: trắng đứng yên, thở trắng, xoay liên tục, tắt. */
     private static String vien(Config c, String kieu, int vet) {
         if (c == null || kieu == null || "trang".equals(kieu)) return RING_WHITE;
@@ -394,7 +427,10 @@ final class Led {
     /** Khoá các thông số hiệu ứng: đổi thì dựng lại script đánh thức và vẽ lại kiểu đèn đang hiện. */
     private static String khoaHieuUng(Config c) {
         return c.ledWakeKieu + "," + c.ledWakeLen + "," + c.ledWakeMs + "," + c.ledWakeVet + ","
-                + c.ledNghe + c.ledNgheVet + "," + c.ledNoi + c.ledNoiVet;
+                + c.ledNghe + c.ledNgheVet + "," + c.ledNoi + c.ledNoiVet + ","
+                + c.ledNgheInnerKieu + c.ledNgheInnerMau + ","
+                + c.ledNghiInnerKieu + c.ledNghiInnerMau + ","
+                + c.ledNoiInnerKieu + c.ledNoiInnerMau;
     }
 
     /**

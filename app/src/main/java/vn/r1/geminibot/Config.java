@@ -17,7 +17,10 @@ public class Config {
             "tts_engine", "google_voice", "google_tts_key", "tts_rate", "led", "wake_sound", "wake_reply", "local_time",
             "ha_url", "ha_token", "stt_engine", "live", "live_model", "live_idle", "gcloud_sa", "search", "city", "barge_in", "bot_self", "user_call", "group_members", "group_stereo", "music_led", "music_led_inner", "ha_dash_order", "ha_dash_dev_order", "ha_dash_icons", "ha_notify", "ten_hien_thi", "led_wake_len", "led_wake_ms", "led_wake_vet",
             "led_wake_kieu", "led_nghe", "led_nghe_vet", "led_noi", "led_noi_vet",
-            "music_led_inner_kieu"};
+            "music_led_inner_kieu",
+            "led_nghe_inner_kieu", "led_nghe_inner_mau",
+            "led_nghi_inner_kieu", "led_nghi_inner_mau",
+            "led_noi_inner_kieu", "led_noi_inner_mau"};
 
     public String apiKey;
     public String model;
@@ -76,6 +79,10 @@ public class Config {
     /** Viền ngoài theo từng lúc (trang Đèn LED): đánh thức xoay | chop | khong; nghe / nói trang | tho | xoay | tat. */
     public String ledWakeKieu, ledNghe, ledNoi;
     public int ledNgheVet, ledNoiVet;
+    /** Kiểu và màu đèn trong khi Đang nghe / Đang nghĩ / Đang nói: "tho"|"sang"|"tat"; nghĩ thêm "nhay". */
+    public String ledNgheInnerKieu, ledNgheInnerMau;
+    public String ledNghiInnerKieu, ledNghiInnerMau;
+    public String ledNoiInnerKieu, ledNoiInnerMau;
 
     /** "google" = Cloud Speech-to-Text rồi gửi chữ cho Gemini; "gemini" = gửi audio cho Gemini nghe. */
     public String sttEngine;
@@ -178,6 +185,12 @@ public class Config {
         c.ledNoi = p.getString("led_noi", "trang").trim();
         c.ledNgheVet = Math.max(1, Math.min(3, parseIntOr(p.getString("led_nghe_vet", "1"), 1)));
         c.ledNoiVet = Math.max(1, Math.min(3, parseIntOr(p.getString("led_noi_vet", "1"), 1)));
+        c.ledNgheInnerKieu = p.getString("led_nghe_inner_kieu", "tho").trim();
+        c.ledNgheInnerMau = p.getString("led_nghe_inner_mau", "0030ff").trim();
+        c.ledNghiInnerKieu = p.getString("led_nghi_inner_kieu", "nhay").trim();
+        c.ledNghiInnerMau = p.getString("led_nghi_inner_mau", "00ff00").trim();
+        c.ledNoiInnerKieu = p.getString("led_noi_inner_kieu", "sang").trim();
+        c.ledNoiInnerMau = p.getString("led_noi_inner_mau", "00ff00").trim();
         c.gcloudSa = p.getString("gcloud_sa", "").trim();
         try {
             c.haDevices = new JSONObject(p.getString("ha_devices", "{}"));
@@ -260,6 +273,12 @@ public class Config {
                 .put("led_nghe_vet", String.valueOf(c.ledNgheVet))
                 .put("led_noi", c.ledNoi)
                 .put("led_noi_vet", String.valueOf(c.ledNoiVet))
+                .put("led_nghe_inner_kieu", c.ledNgheInnerKieu)
+                .put("led_nghe_inner_mau", c.ledNgheInnerMau)
+                .put("led_nghi_inner_kieu", c.ledNghiInnerKieu)
+                .put("led_nghi_inner_mau", c.ledNghiInnerMau)
+                .put("led_noi_inner_kieu", c.ledNoiInnerKieu)
+                .put("led_noi_inner_mau", c.ledNoiInnerMau)
                 .put("gcloud_sa_email", c.gcloudSa.isEmpty() ? "" : GoogleAuth.email(c.gcloudSa))
                 .put("ha_selected", c.haDevices.length())
                 .put("stt_engine", c.sttEngine)
