@@ -185,11 +185,15 @@ final class GeminiLive {
                     break;
                 }
             }
-            // Tạm biệt: model không còn tự chào (chỉ gọi hàm), chờ loa nói nốt phần đang phát (nếu có) rồi đóng
-            long endAt = System.currentTimeMillis();
-            while (endRequested && !closed && System.currentTimeMillis() < endAt + 8000 && player.busy()) {
-                BotLog.state = player.busy() ? "speaking" : "thinking";
-                Thread.sleep(100);
+            // Chờ loa phát hết phần audio đã nhận trước khi đóng (kể cả khi server đã đóng WebSocket):
+            // vòng lặp chính thoát ngay khi closed=true, nhưng queue của player còn data chưa phát.
+            // Giới hạn 8 s; bỏ qua nếu bị cancel hoặc lỗi.
+            if (!cancelled && error == null) {
+                long endAt = System.currentTimeMillis();
+                while (player.busy() && System.currentTimeMillis() < endAt + 8000) {
+                    BotLog.state = "speaking";
+                    Thread.sleep(100);
+                }
             }
             if (error != null) BotLog.w(error);
         } catch (InterruptedException e) {
@@ -451,9 +455,10 @@ final class GeminiLive {
         synchronized void write(byte[] pcm) {
             long now = System.currentTimeMillis();
             if (busyUntil < now) {
-                // Ampli của R1 tắt sau một lúc im lặng và mất ~0.5 s để bật: đệm khoảng lặng trước câu mới
-                if (now - busyUntil > 2000) {
-                    queue.offer(new byte[OUT_RATE / 2 * 2]);
+                // Ampli R1 tắt sau ~0.8 s im lặng, cần ~0.5 s để bật lại: thêm khoảng lặng warmup.
+                // Ngưỡng 800 ms (thay vì 2000 ms cũ): bắt được kịch bản Gemini trả lời sau ~1 s nghỉ.
+                if (now - busyUntil > 800) {
+                    queue.offer(new byte[OUT_RATE / 2 * 2]); // 0.5 s khoảng lặng
                     busyUntil = now + 500;
                 } else {
                     busyUntil = now;
