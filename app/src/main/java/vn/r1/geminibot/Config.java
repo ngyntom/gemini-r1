@@ -22,7 +22,7 @@ public class Config {
             "led_nghi_inner_kieu", "led_nghi_inner_mau",
             "led_noi_inner_kieu", "led_noi_inner_mau",
             "led_nghi_comet_mau", "led_nghi_comet_ms",
-            "music_led_inner_mau", "music_led_vien_mau"};
+            "music_led_inner_mau", "music_led_vien_mau", "music_led_vien_kieu"};
 
     public String apiKey;
     public String model;
@@ -93,6 +93,8 @@ public class Config {
     public String musicLedInnerMau;
     /** Màu viền (outer ring) khi phát nhạc (hex rrggbb, mặc định trắng). */
     public String musicLedVienMau;
+    /** Kiểu hiệu ứng viền khi phát nhạc: "hai_ben" (đối xứng 2 đầu gom giữa) | "mot_phan" (tuần tự từ LED 16). */
+    public String musicLedVienKieu;
 
     /** "google" = Cloud Speech-to-Text rồi gửi chữ cho Gemini; "gemini" = gửi audio cho Gemini nghe. */
     public String sttEngine;
@@ -205,6 +207,7 @@ public class Config {
         c.ledNghiCometMs = p.getString("led_nghi_comet_ms", "vua").trim();
         c.musicLedInnerMau = p.getString("music_led_inner_mau", "0030ff").trim();
         c.musicLedVienMau = p.getString("music_led_vien_mau", "ffffff").trim();
+        c.musicLedVienKieu = p.getString("music_led_vien_kieu", "hai_ben").trim();
         c.gcloudSa = p.getString("gcloud_sa", "").trim();
         try {
             c.haDevices = new JSONObject(p.getString("ha_devices", "{}"));
@@ -297,6 +300,7 @@ public class Config {
                 .put("led_nghi_comet_ms", c.ledNghiCometMs)
                 .put("music_led_inner_mau", c.musicLedInnerMau)
                 .put("music_led_vien_mau", c.musicLedVienMau)
+                .put("music_led_vien_kieu", c.musicLedVienKieu)
                 .put("gcloud_sa_email", c.gcloudSa.isEmpty() ? "" : GoogleAuth.email(c.gcloudSa))
                 .put("ha_selected", c.haDevices.length())
                 .put("stt_engine", c.sttEngine)

@@ -478,7 +478,7 @@ final class Led {
 
     /**
      * Script đèn theo nhạc: đọc số đèn (0..24, MusicLight ghi) mỗi 40 ms, đổi thì bật đúng chừng ấy đèn
-     * viền tính đối xứng từ đèn 16 sang hai bên, tắt phần còn lại. Dừng bằng STOPF như sao chổi.
+     * viền theo kiểu được chọn, tắt phần còn lại. Dừng bằng STOPF như sao chổi.
      */
     private static File writeMusic(Context ctx) throws Exception {
         return writeMusic(ctx, appCtx != null ? Config.load(appCtx) : null);
@@ -487,8 +487,13 @@ final class Led {
     private static File writeMusic(Context ctx, Config c) throws Exception {
         File level = MusicLight.levelFile();
         if (level == null) throw new Exception("không có bộ nhớ ngoài");
+        String vienKieu = c != null && "mot_phan".equals(c.musicLedVienKieu) ? "mot_phan" : "hai_ben";
         int[] order = new int[MusicLight.RING];
-        for (int i = 0, a = 0, b = 23; i < order.length; i++) order[i] = 16 + (i % 2 == 0 ? a++ : b--);
+        if ("mot_phan".equals(vienKieu)) {
+            for (int i = 0; i < order.length; i++) order[i] = 16 + i;
+        } else {
+            for (int i = 0, a = 0, b = 23; i < order.length; i++) order[i] = 16 + (i % 2 == 0 ? a++ : b--);
+        }
         // Driver đèn xếp lệnh vào hàng rồi chạy dần (~100 ms mỗi lệnh, ghi thì trả về ngay - đo trên loa):
         // ghi nhanh hơn thế thì hàng dồn lại, đèn chạy lệch / như không sáng (lỗi bản đầu, 2 lệnh mỗi 40 ms).
         // Nên mỗi lần đổi chỉ MỘT lệnh: tăng thì bật đèn 1..l (đèn đã sáng ghi lại không sao), giảm thì tắt

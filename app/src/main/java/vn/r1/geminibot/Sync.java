@@ -42,7 +42,7 @@ final class Sync {
                 "led_nghi_inner_kieu", "led_nghi_inner_mau",
                 "led_noi_inner_kieu", "led_noi_inner_mau",
                 "led_nghi_comet_mau", "led_nghi_comet_ms",
-                "music_led_inner_mau", "music_led_vien_mau"});
+                "music_led_inner_mau", "music_led_vien_mau", "music_led_vien_kieu"});
     }
 
     private static final OkHttpClient HTTP = new OkHttpClient.Builder()

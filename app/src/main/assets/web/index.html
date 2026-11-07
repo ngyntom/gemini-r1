@@ -939,6 +939,7 @@ const PAGES = {
       sel('music_led_inner_kieu', 'Kiểu màu', [['4buc','4 bước màu'],['min','Chuyển màu mượt'],['cau_vong','Cầu vồng thở']]),
     ])
     + denCard('Phát nhạc', 'music', [
+        dcRow('Viền', selEl('music_led_vien_kieu',[['hai_ben','2 bên gom giữa'],['mot_phan','Từ trước ra sau']])),
         dcRowMau('Màu viền', 'music_led_vien_mau'),
         dcRowMau('Màu trong', 'music_led_inner_mau'),
       ], 'Màu viền = màu thanh âm lượng; màu trong áp dụng cho kiểu "4 bước màu" (4 độ sáng).')
@@ -1315,7 +1316,7 @@ function initSubpage(page) {
     const KHOA_DEN = ['led_wake_kieu','led_wake_vet','led_wake_len','led_wake_ms',
       'led_nghe','led_nghe_vet','led_noi','led_noi_vet',
       'led_nghe_inner_kieu','led_nghe_inner_mau','led_nghi_inner_kieu','led_nghi_inner_mau','led_noi_inner_kieu','led_noi_inner_mau',
-      'led_nghi_comet_mau','led_nghi_comet_ms','music_led_inner_mau','music_led_vien_mau'];
+      'led_nghi_comet_mau','led_nghi_comet_ms','music_led_inner_mau','music_led_vien_mau','music_led_vien_kieu'];
     // "Số vệt" chỉ có nghĩa với kiểu xoay viền
     const anVet = () => [['led_wake_kieu','led_wake_vet'],['led_nghe','led_nghe_vet'],['led_noi','led_noi_vet']].forEach(([k,v]) => {
       const s = el.querySelector(`[data-k="${v}"]`); if (s) s.style.display = el.querySelector(`[data-k="${k}"]`).value === 'xoay' ? '' : 'none';
