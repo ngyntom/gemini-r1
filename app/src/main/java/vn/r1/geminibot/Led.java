@@ -316,11 +316,16 @@ final class Led {
         String setInner  = "echo '0 100 1 1 1 000000 '$mau' 100 0 " + INNER_IDS + "' > " + INNER_COLOR;
         String thoInner  = "echo '1 3000 99999999 1 1 000000 '$mau' 1400 1 " + INNER_IDS + "' > " + INNER_COLOR;
         // Mở đầu xoá viền cho sạch (command("thinking") đã xoá nhưng script tự xoá phòng bị gọi rơi)
+        // Xoay cho comet script: 15 frame, mỗi frame sáng 1 đèn rồi tắt tự động
+        StringBuilder xoayCmd = new StringBuilder("echo \"1 150 99999999 15");
+        for (int i = 1; i <= 15; i++) xoayCmd.append(" 1 000000 $mau 400 1 1 ").append(i);
+        xoayCmd.append("\" > ").append(INNER_COLOR);
         StringBuilder sb = new StringBuilder(RING_OFF)
                 .append("\nmau=\"${2:-00ff00}\"\n")
                 .append("case \"$1\" in\n")
                 .append("  sang) ").append(setInner).append(" ;;\n")
                 .append("  tho) ").append(thoInner).append(" ;;\n")
+                .append("  xoay) ").append(xoayCmd).append(" ;;\n")
                 .append("esac\n") // nhay: bật tắt trong vòng lặp; tat: INNER_OFF đã tắt rồi
                 .append("n=0\ng=0\nwhile [ $n -lt 200 ]; do\n");
         for (int k = 0; k < 24; k++) {
@@ -396,7 +401,7 @@ final class Led {
         return lenh.toString();
     }
 
-    /** Đèn trong theo kiểu và màu: "tho" = thở, "sang" = sáng, "tat" = tắt (đã tắt bởi INNER_OFF). */
+    /** Đèn trong theo kiểu và màu: "tho" = thở, "sang" = sáng, "xoay" = quét vòng, "tat" = tắt. */
     private static String innerCmd(String kieu, String mau) {
         String safeMau = (mau == null || !mau.matches("[0-9a-fA-F]{6}")) ? "ffffff" : mau;
         switch (kieu == null ? "" : kieu) {
@@ -404,6 +409,11 @@ final class Led {
                 return setColor(INNER_COLOR, INNER_IDS, safeMau);
             case "tat":
                 return "";
+            case "xoay": {
+                StringBuilder cmd = new StringBuilder("echo \"1 150 99999999 15");
+                for (int i = 1; i <= 15; i++) cmd.append(" 1 000000 ").append(safeMau).append(" 400 1 1 ").append(i);
+                return cmd.append("\" > ").append(INNER_COLOR).toString();
+            }
             default: // tho
                 return "echo '1 3000 99999999 1 1 000000 " + safeMau + " 1400 1 " + INNER_IDS + "' > " + INNER_COLOR;
         }

@@ -327,8 +327,8 @@
     }
     volPopover.open('#mps-am-luong-nut');
   });
-  bam('mps-vol-tang', () => datAmLuong(Math.round(amLuongHienTai / 10) * 10 + 10));
-  bam('mps-vol-giam', () => datAmLuong(Math.round(amLuongHienTai / 10) * 10 - 10));
+  bam('mps-vol-tang', () => datAmLuong(amLuongHienTai + Math.round(100 / (window.volMax || 15))));
+  bam('mps-vol-giam', () => datAmLuong(amLuongHienTai - Math.round(100 / (window.volMax || 15))));
   bam('mps-vol-mute', () => {
     if (amLuongHienTai > 0) { amLuongTruocMute = amLuongHienTai; datAmLuong(0); }
     else datAmLuong(amLuongTruocMute || 50);
