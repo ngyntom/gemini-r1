@@ -215,10 +215,12 @@ final class Group {
 
     /** Một loa thành viên: hàng gửi riêng + luồng gửi riêng, mất kết nối thì tự nối lại. */
     private static final class Peer {
+        static final class Msg { final byte type; final long playAt; final byte[] pcm; final int rate, ch;
+            Msg(byte t, long p, byte[] d, int r, int c) { type=t; playAt=p; pcm=d; rate=r; ch=c; } }
         final Context ctx;
         final String ip;
         final int role;
-        final LinkedBlockingQueue<Object[]> q = new LinkedBlockingQueue<>();
+        final LinkedBlockingQueue<Msg> q = new LinkedBlockingQueue<>();
         volatile boolean closed;
         private boolean warned;
 
@@ -231,12 +233,12 @@ final class Group {
 
         void send(byte type, long playAt, byte[] pcm, int rate, int ch) {
             if (q.size() > 400) q.clear(); // loa này tắt / mất mạng lâu: đừng giữ âm thanh cũ
-            q.offer(new Object[]{type, playAt, pcm, rate, ch});
+            q.offer(new Msg(type, playAt, pcm, rate, ch));
         }
 
         void close() {
             closed = true;
-            q.offer(new Object[]{END, 0L, null, 0, 0});
+            q.offer(new Msg(END, 0L, null, 0, 0));
         }
 
         private void run() {
@@ -264,32 +266,29 @@ final class Group {
                                 sentVol = vol;
                             }
                         }
-                        Object[] m = q.poll(300, TimeUnit.MILLISECONDS);
+                        Msg m = q.poll(300, TimeUnit.MILLISECONDS);
                         if (closed && m == null) break;
                         if (m == null) {
                             out.writeByte(0); // giữ kết nối
                             out.flush();
                             continue;
                         }
-                        byte type = (Byte) m[0];
-                        int rate = (Integer) m[3], ch = (Integer) m[4];
-                        if (type != END && (rate != sentRate || ch != sentCh)) {
+                        if (m.type != END && (m.rate != sentRate || m.ch != sentCh)) {
                             out.writeByte(HELLO);
-                            out.writeInt(rate);
-                            out.writeByte(ch);
+                            out.writeInt(m.rate);
+                            out.writeByte(m.ch);
                             out.writeByte(role);
-                            sentRate = rate;
-                            sentCh = ch;
+                            sentRate = m.rate;
+                            sentCh = m.ch;
                         }
-                        out.writeByte(type);
-                        if (type == AUDIO) {
-                            byte[] pcm = (byte[]) m[2];
-                            out.writeLong((Long) m[1]);
-                            out.writeInt(pcm.length);
-                            out.write(pcm);
+                        out.writeByte(m.type);
+                        if (m.type == AUDIO) {
+                            out.writeLong(m.playAt);
+                            out.writeInt(m.pcm.length);
+                            out.write(m.pcm);
                         }
                         if (q.isEmpty()) out.flush();
-                        if (type == END && closed) break;
+                        if (m.type == END && closed) break;
                     }
                     out.flush();
                 } catch (Exception e) {
