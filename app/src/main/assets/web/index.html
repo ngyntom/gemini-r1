@@ -818,6 +818,14 @@ function dcRowInner(kieuK, mauK, kieuOpts) {
   const dots = MAU_TRONG.map(([m,c])=>`<button class="dc-dot" data-mau="${m}" data-for="${mauK}" style="background:${c}"></button>`).join('');
   return `<div class="dc-row"><span class="dc-lbl">Đèn trong</span>${selEl(kieuK,kieuOpts)}<input type="hidden" data-k="${mauK}"><div class="dc-mau" data-mau-wrap="${mauK}">${dots}<input type="color" class="dc-custom" data-for-custom="${mauK}" title="Màu tuỳ chỉnh"></div></div>`;
 }
+function dcRowMau(lbl, mauK) {
+  const dots = MAU_TRONG.map(([m,c])=>`<button class="dc-dot" data-mau="${m}" data-for="${mauK}" style="background:${c}"></button>`).join('');
+  return `<div class="dc-row"><span class="dc-lbl">${lbl}</span><input type="hidden" data-k="${mauK}"><div class="dc-mau" data-mau-wrap="${mauK}">${dots}<input type="color" class="dc-custom" data-for-custom="${mauK}" title="Màu tuỳ chỉnh"></div></div>`;
+}
+function dcRowMauSel(lbl, mauK, selHtml) {
+  const dots = MAU_TRONG.map(([m,c])=>`<button class="dc-dot" data-mau="${m}" data-for="${mauK}" style="background:${c}"></button>`).join('');
+  return `<div class="dc-row"><span class="dc-lbl">${lbl}</span>${selHtml}<input type="hidden" data-k="${mauK}"><div class="dc-mau" data-mau-wrap="${mauK}">${dots}<input type="color" class="dc-custom" data-for-custom="${mauK}" title="Màu tuỳ chỉnh"></div></div>`;
+}
 const denCard = (title, thuKey, rows, note) => `<div class="card card-outline card-dividers"><div class="card-header">${title}</div>
   <div class="card-content" style="padding:0">${rows.join('')}${note?`<p class="card-note">${note}</p>`:''}
   <div class="block" style="margin:8px 0"><a href="#" class="button button-tonal" data-thu="${thuKey}">Lưu và thử</a></div></div></div>`;
@@ -930,6 +938,10 @@ const PAGES = {
       tog('music_led_inner', 'Đèn trong theo nhạc', 'Đèn nhỏ ở giữa đổi màu khi đang phát nhạc.'),
       sel('music_led_inner_kieu', 'Kiểu màu', [['4buc','4 bước màu'],['min','Chuyển màu mượt'],['cau_vong','Cầu vồng thở']]),
     ])
+    + denCard('Phát nhạc', 'music', [
+        dcRowMau('Màu viền', 'music_led_vien_mau'),
+        dcRowMau('Màu trong', 'music_led_inner_mau'),
+      ], 'Màu viền = màu thanh âm lượng; màu trong áp dụng cho kiểu "4 bước màu" (4 độ sáng).')
     + denCard('Đánh thức', 'wake', [
         dcRow('Viền', selEl('led_wake_kieu', LED_KIEU_THUC), selEl('led_wake_vet', LED_VET)),
         dcRow('Xoay', selEl('led_wake_len',[['3','Vệt ngắn'],['4','Vệt vừa'],['6','Vệt dài'],['8','Vệt rất dài']]),
@@ -940,8 +952,9 @@ const PAGES = {
         dcRowInner('led_nghe_inner_kieu','led_nghe_inner_mau', LED_KIEU_INNER),
       ])
     + denCard('Đang nghĩ', 'thinking', [
+        dcRowMauSel('Sao chổi', 'led_nghi_comet_mau', selEl('led_nghi_comet_ms',[['nhanh','Nhanh'],['vua','Vừa'],['cham','Chậm']])),
         dcRowInner('led_nghi_inner_kieu','led_nghi_inner_mau', LED_KIEU_INNER_NGHI),
-      ], 'Viền ngoài: sao chổi trắng (cố định).')
+      ])
     + denCard('Đang nói', 'speaking', [
         dcRow('Viền', selEl('led_noi', LED_KIEU), selEl('led_noi_vet', LED_VET)),
         dcRowInner('led_noi_inner_kieu','led_noi_inner_mau', LED_KIEU_INNER),
@@ -1288,8 +1301,12 @@ function initSubpage(page) {
     el.addEventListener('page:beforeremove', () => { if (cur) post('/api/led', { state: '' }); });
     // Ẩn / hiện selector kiểu màu đèn trong theo trạng thái toggle
     const anKieuTrong = () => {
-      el.querySelector('[data-k="music_led_inner_kieu"]').closest('li').style.display =
-        el.querySelector('[data-k="music_led_inner"]').checked ? '' : 'none';
+      const on = el.querySelector('[data-k="music_led_inner"]').checked;
+      el.querySelector('[data-k="music_led_inner_kieu"]').closest('li').style.display = on ? '' : 'none';
+      const wrapInner = el.querySelector('[data-mau-wrap="music_led_inner_mau"]');
+      const hiddenInner = el.querySelector('[data-k="music_led_inner_mau"]');
+      if (wrapInner) wrapInner.closest('.dc-row').style.display = on ? '' : 'none';
+      else if (hiddenInner) hiddenInner.closest('.dc-row').style.display = on ? '' : 'none';
     };
     anKieuTrong();
     el.querySelector('[data-k="music_led_inner"]').addEventListener('change', anKieuTrong);
@@ -1297,7 +1314,8 @@ function initSubpage(page) {
     // "Theo bot" hoặc rời trang (như nút Thử đèn)
     const KHOA_DEN = ['led_wake_kieu','led_wake_vet','led_wake_len','led_wake_ms',
       'led_nghe','led_nghe_vet','led_noi','led_noi_vet',
-      'led_nghe_inner_kieu','led_nghe_inner_mau','led_nghi_inner_kieu','led_nghi_inner_mau','led_noi_inner_kieu','led_noi_inner_mau'];
+      'led_nghe_inner_kieu','led_nghe_inner_mau','led_nghi_inner_kieu','led_nghi_inner_mau','led_noi_inner_kieu','led_noi_inner_mau',
+      'led_nghi_comet_mau','led_nghi_comet_ms','music_led_inner_mau','music_led_vien_mau'];
     // "Số vệt" chỉ có nghĩa với kiểu xoay viền
     const anVet = () => [['led_wake_kieu','led_wake_vet'],['led_nghe','led_nghe_vet'],['led_noi','led_noi_vet']].forEach(([k,v]) => {
       const s = el.querySelector(`[data-k="${v}"]`); if (s) s.style.display = el.querySelector(`[data-k="${k}"]`).value === 'xoay' ? '' : 'none';
@@ -1320,7 +1338,8 @@ function initSubpage(page) {
       anKieuInner(k);
       el.querySelector(`[data-k="${k}"]`)?.addEventListener('change', () => anKieuInner(k));
     });
-    ['led_nghe_inner_mau','led_nghi_inner_mau','led_noi_inner_mau'].forEach(k => {
+    ['led_nghe_inner_mau','led_nghi_inner_mau','led_noi_inner_mau',
+     'led_nghi_comet_mau','music_led_inner_mau','music_led_vien_mau'].forEach(k => {
       syncMau(k);
       el.querySelectorAll(`[data-for="${k}"]`).forEach(d => d.addEventListener('click', e => {
         e.preventDefault(); el.querySelector(`[data-k="${k}"]`).value = d.dataset.mau; syncMau(k);

@@ -120,6 +120,16 @@ final class Led {
         } catch (Exception e) {
             BotLog.w("Không tạo được hiệu ứng đánh thức: " + e.getMessage());
         }
+        try {
+            comet = writeComet(appCtx, c);
+        } catch (Exception e) {
+            BotLog.w("Không tạo được hiệu ứng sao chổi: " + e.getMessage());
+        }
+        try {
+            music = writeMusic(appCtx, c);
+        } catch (Exception e) {
+            BotLog.w("Không tạo được hiệu ứng đèn theo nhạc: " + e.getMessage());
+        }
     }
     private static File music;
     /** Đèn theo nhạc (Cài đặt → Đèn LED), xem MusicLight. */
@@ -129,13 +139,16 @@ final class Led {
     private static volatile boolean musicInner = true;
     /** Kiểu màu đèn trong theo nhạc: "4buc" | "min" | "cau_vong". */
     private static volatile String musicInnerKieu = "4buc";
+    private static volatile String musicInnerMau = "0030ff";
 
-    static void setMusicEnabled(boolean on, boolean inner, String kieu) {
+    static void setMusicEnabled(boolean on, boolean inner, String kieu, String mau) {
         musicEnabled = on;
         String safeKieu = kieu == null || kieu.isEmpty() ? "4buc" : kieu;
-        if (inner != musicInner || !safeKieu.equals(musicInnerKieu)) {
+        String safeMauM = mau == null || mau.isEmpty() ? "0030ff" : mau;
+        if (inner != musicInner || !safeKieu.equals(musicInnerKieu) || !safeMauM.equals(musicInnerMau)) {
             musicInner = inner;
             musicInnerKieu = safeKieu;
+            musicInnerMau = safeMauM;
             if ("music".equals(shown)) shown = ""; // đang chạy hiệu ứng nhạc: chạy lại với tuỳ chọn mới
         }
     }
@@ -285,7 +298,7 @@ final class Led {
                 if (music != null) {
                     return stop + INNER_OFF + "; " + RING_OFF + "; rm -f " + STOPF + "; trap '' HUP; sh "
                             + music.getAbsolutePath() + " " + (musicInner ? 1 : 0)
-                            + " " + musicInnerKieu
+                            + " " + musicInnerKieu + " " + musicInnerMau
                             + " </dev/null >/dev/null 2>&1 & echo $! > " + PID;
                 }
                 return stop + INNER_OFF + "; " + RING_OFF;
@@ -311,11 +324,29 @@ final class Led {
      * Tự dừng sau ~200 vòng (~4 phút) phòng khi app chết mà không kịp tắt.
      */
     private static File writeComet(Context ctx) throws Exception {
+        return writeComet(ctx, appCtx != null ? Config.load(appCtx) : null);
+    }
+
+    private static File writeComet(Context ctx, Config c) throws Exception {
         // $1 = kieu đèn trong (nhay|tho|sang|tat), $2 = màu rrggbb; mặc định nhay/00ff00 (giữ nguyên nếu không có)
         // Dùng $mau (không dùng $2 trực tiếp) để shell không tạo lỗi khi $2 rỗng
         String setInner  = "echo '0 100 1 1 1 000000 '$mau' 100 0 " + INNER_IDS + "' > " + INNER_COLOR;
         String thoInner  = "echo '1 3000 99999999 1 1 000000 '$mau' 1400 1 " + INNER_IDS + "' > " + INNER_COLOR;
-        // Mở đầu xoá viền cho sạch (command("thinking") đã xoá nhưng script tự xoá phòng bị gọi rơi)
+        // Màu đầu sao chổi và đuôi mờ dần (tính từ cấu hình)
+        String cometMau = c != null && c.ledNghiCometMau != null && !c.ledNghiCometMau.isEmpty()
+                ? c.ledNghiCometMau : "ffffff";
+        int cr, cg, cb;
+        try {
+            cr = Integer.parseInt(cometMau.substring(0, 2), 16);
+            cg = Integer.parseInt(cometMau.substring(2, 4), 16);
+            cb = Integer.parseInt(cometMau.substring(4, 6), 16);
+        } catch (Exception ignored) { cr = 255; cg = 255; cb = 255; }
+        String tail1 = String.format("%02x%02x%02x", cr * 40 / 100, cg * 40 / 100, cb * 40 / 100);
+        String tail2 = String.format("%02x%02x%02x", cr * 10 / 100, cg * 10 / 100, cb * 10 / 100);
+        // Tốc độ sao chổi: thay đổi số vòng spin delay
+        int paceCount = c != null && "nhanh".equals(c.ledNghiCometMs) ? 5
+                : c != null && "cham".equals(c.ledNghiCometMs) ? 20 : 10;
+        String pace = "p=0; while [ $p -lt " + paceCount + " ]; do p=$((p+1)); cat /proc/uptime >/dev/null; done";
         // Xoay cho comet script: 15 frame, mỗi frame sáng 1 đèn rồi tắt tự động
         StringBuilder xoayCmd = new StringBuilder("echo \"1 150 99999999 15");
         for (int i = 1; i <= 15; i++) xoayCmd.append(" 1 000000 $mau 400 1 1 ").append(i);
@@ -336,11 +367,11 @@ final class Led {
                   .append("; g=1; else ").append(setColor(INNER_COLOR, INNER_IDS, "000000"))
                   .append("; g=0; fi\nfi\n");
             }
-            sb.append(setLed(RING_COLOR, 16 + k, "ffffff")).append('\n');
-            sb.append(setLed(RING_COLOR, 16 + (k + 23) % 24, "606060")).append('\n');
-            sb.append(setLed(RING_COLOR, 16 + (k + 22) % 24, "181818")).append('\n');
+            sb.append(setLed(RING_COLOR, 16 + k, cometMau)).append('\n');
+            sb.append(setLed(RING_COLOR, 16 + (k + 23) % 24, tail1)).append('\n');
+            sb.append(setLed(RING_COLOR, 16 + (k + 22) % 24, tail2)).append('\n');
             sb.append(setLed(RING_COLOR, 16 + (k + 21) % 24, "000000")).append('\n');
-            sb.append(PACE).append('\n');
+            sb.append(pace).append('\n');
             sb.append("[ -f ").append(STOPF).append(" ] && break\n"); // app báo dừng: thoát sau khung này
         }
         sb.append("n=$((n+1))\ndone\n")
@@ -440,7 +471,9 @@ final class Led {
                 + c.ledNghe + c.ledNgheVet + "," + c.ledNoi + c.ledNoiVet + ","
                 + c.ledNgheInnerKieu + c.ledNgheInnerMau + ","
                 + c.ledNghiInnerKieu + c.ledNghiInnerMau + ","
-                + c.ledNoiInnerKieu + c.ledNoiInnerMau;
+                + c.ledNoiInnerKieu + c.ledNoiInnerMau + ","
+                + c.ledNghiCometMau + c.ledNghiCometMs + ","
+                + c.musicLedInnerMau + c.musicLedVienMau;
     }
 
     /**
@@ -448,6 +481,10 @@ final class Led {
      * viền tính đối xứng từ đèn 16 sang hai bên, tắt phần còn lại. Dừng bằng STOPF như sao chổi.
      */
     private static File writeMusic(Context ctx) throws Exception {
+        return writeMusic(ctx, appCtx != null ? Config.load(appCtx) : null);
+    }
+
+    private static File writeMusic(Context ctx, Config c) throws Exception {
         File level = MusicLight.levelFile();
         if (level == null) throw new Exception("không có bộ nhớ ngoài");
         int[] order = new int[MusicLight.RING];
@@ -477,6 +514,25 @@ final class Led {
             smoothColors[i] = String.format("%02x%02x%02x", r, g, b);
         }
 
+        // Màu viền khi phát nhạc (mặc định trắng)
+        String vienMau = c != null && c.musicLedVienMau != null && !c.musicLedVienMau.isEmpty()
+                ? c.musicLedVienMau : "ffffff";
+        // Màu đèn trong 4buc: 4 độ sáng (20/40/70/100%) của màu được chọn
+        String innerBaseMau = c != null && c.musicLedInnerMau != null && !c.musicLedInnerMau.isEmpty()
+                ? c.musicLedInnerMau : "0030ff";
+        int mr, mg, mb;
+        try {
+            mr = Integer.parseInt(innerBaseMau.substring(0, 2), 16);
+            mg = Integer.parseInt(innerBaseMau.substring(2, 4), 16);
+            mb = Integer.parseInt(innerBaseMau.substring(4, 6), 16);
+        } catch (Exception ignored) { mr = 0; mg = 0x30; mb = 0xff; }
+        String[] buc4 = {
+            String.format("%02x%02x%02x", Math.max(1, mr*20/100), Math.max(1, mg*20/100), Math.max(1, mb*20/100)),
+            String.format("%02x%02x%02x", Math.max(1, mr*40/100), Math.max(1, mg*40/100), Math.max(1, mb*40/100)),
+            String.format("%02x%02x%02x", Math.max(1, mr*70/100), Math.max(1, mg*70/100), Math.max(1, mb*70/100)),
+            innerBaseMau
+        };
+
         StringBuilder sb = new StringBuilder(RING_OFF)
                 // Khởi động cầu vồng TRƯỚC loop: 1 lệnh, driver tự chạy vòng mãi
                 .append("\nif [ \"$1\" = 1 ] && [ \"$2\" = \"cau_vong\" ]; then\n  echo '")
@@ -487,7 +543,7 @@ final class Led {
         for (int n = 1; n <= MusicLight.RING; n++) {
             StringBuilder on = new StringBuilder();
             for (int i = 0; i < n; i++) on.append(' ').append(order[i]);
-            sb.append("      ").append(n).append(") ").append(setColor(RING_COLOR, n + on.toString(), "ffffff")).append(" ;;\n");
+            sb.append("      ").append(n).append(") ").append(setColor(RING_COLOR, n + on.toString(), vienMau)).append(" ;;\n");
         }
         sb.append("    esac\n    p=$l\n  elif [ -n \"$l\" ] && [ \"$l\" -lt \"$p\" ]; then\n    case \"$l\" in\n");
         for (int n = 0; n < MusicLight.RING; n++) {
@@ -496,8 +552,7 @@ final class Led {
             sb.append("      ").append(n).append(") ").append(blackAll(RING_COLOR, (order.length - n) + off.toString())).append(" ;;\n");
         }
         sb.append("    esac\n    p=$l\n  fi\n");
-        // Đèn trong (tham số $1 = 1): đổi màu theo nấc to (xanh dương / xanh ngọc / xanh lá / hồng tím),
-        // chỉ ghi khi sang nấc khác - đèn trong là file driver riêng, thêm tối đa 1 lệnh mỗi vòng
+        // Đèn trong (tham số $1 = 1): đổi màu theo nấc to, chỉ ghi khi sang nấc khác
         // Đèn trong theo kiểu ($2): bỏ qua khi cau_vong (driver tự chạy animation)
         sb.append("  if [ \"$1\" = 1 ] && [ \"$2\" != \"cau_vong\" ] && [ -n \"$l\" ]; then\n");
         sb.append("    if [ \"$2\" = \"min\" ]; then\n");
@@ -508,13 +563,13 @@ final class Led {
               .append(setColor(INNER_COLOR, INNER_IDS, smoothColors[i])).append(" ;;\n");
         }
         sb.append("        esac\n        c=$l\n      fi\n    else\n");
-        // 4buc (mặc định): 4 dải màu, theo dõi dải
+        // 4buc (mặc định): 4 dải độ sáng của màu được chọn
         sb.append("      if [ \"$l\" -le 6 ]; then b=1; elif [ \"$l\" -le 12 ]; then b=2; elif [ \"$l\" -le 18 ]; then b=3; else b=4; fi\n")
           .append("      if [ \"$b\" != \"$c\" ]; then\n        case $b in\n")
-          .append("          1) ").append(setColor(INNER_COLOR, INNER_IDS, "0030ff")).append(" ;;\n")
-          .append("          2) ").append(setColor(INNER_COLOR, INNER_IDS, "00b0ff")).append(" ;;\n")
-          .append("          3) ").append(setColor(INNER_COLOR, INNER_IDS, "00ff30")).append(" ;;\n")
-          .append("          4) ").append(setColor(INNER_COLOR, INNER_IDS, "ff00b0")).append(" ;;\n")
+          .append("          1) ").append(setColor(INNER_COLOR, INNER_IDS, buc4[0])).append(" ;;\n")
+          .append("          2) ").append(setColor(INNER_COLOR, INNER_IDS, buc4[1])).append(" ;;\n")
+          .append("          3) ").append(setColor(INNER_COLOR, INNER_IDS, buc4[2])).append(" ;;\n")
+          .append("          4) ").append(setColor(INNER_COLOR, INNER_IDS, buc4[3])).append(" ;;\n")
           .append("        esac\n        c=$b\n      fi\n    fi\n  fi\n");
         sb.append("  sleep 0.2\ndone\n")
           .append(RING_OFF).append('\n')

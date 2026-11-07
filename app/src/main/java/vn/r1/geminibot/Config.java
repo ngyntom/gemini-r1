@@ -20,7 +20,9 @@ public class Config {
             "music_led_inner_kieu",
             "led_nghe_inner_kieu", "led_nghe_inner_mau",
             "led_nghi_inner_kieu", "led_nghi_inner_mau",
-            "led_noi_inner_kieu", "led_noi_inner_mau"};
+            "led_noi_inner_kieu", "led_noi_inner_mau",
+            "led_nghi_comet_mau", "led_nghi_comet_ms",
+            "music_led_inner_mau", "music_led_vien_mau"};
 
     public String apiKey;
     public String model;
@@ -83,6 +85,14 @@ public class Config {
     public String ledNgheInnerKieu, ledNgheInnerMau;
     public String ledNghiInnerKieu, ledNghiInnerMau;
     public String ledNoiInnerKieu, ledNoiInnerMau;
+    /** Màu đầu sao chổi khi đang nghĩ (hex rrggbb). */
+    public String ledNghiCometMau;
+    /** Tốc độ sao chổi: "nhanh" | "vua" | "cham". */
+    public String ledNghiCometMs;
+    /** Màu đèn trong theo nhạc (hex rrggbb, áp dụng cho kiểu 4buc: 4 độ sáng của màu này). */
+    public String musicLedInnerMau;
+    /** Màu viền (outer ring) khi phát nhạc (hex rrggbb, mặc định trắng). */
+    public String musicLedVienMau;
 
     /** "google" = Cloud Speech-to-Text rồi gửi chữ cho Gemini; "gemini" = gửi audio cho Gemini nghe. */
     public String sttEngine;
@@ -191,6 +201,10 @@ public class Config {
         c.ledNghiInnerMau = p.getString("led_nghi_inner_mau", "00ff00").trim();
         c.ledNoiInnerKieu = p.getString("led_noi_inner_kieu", "sang").trim();
         c.ledNoiInnerMau = p.getString("led_noi_inner_mau", "00ff00").trim();
+        c.ledNghiCometMau = p.getString("led_nghi_comet_mau", "ffffff").trim();
+        c.ledNghiCometMs = p.getString("led_nghi_comet_ms", "vua").trim();
+        c.musicLedInnerMau = p.getString("music_led_inner_mau", "0030ff").trim();
+        c.musicLedVienMau = p.getString("music_led_vien_mau", "ffffff").trim();
         c.gcloudSa = p.getString("gcloud_sa", "").trim();
         try {
             c.haDevices = new JSONObject(p.getString("ha_devices", "{}"));
@@ -279,6 +293,10 @@ public class Config {
                 .put("led_nghi_inner_mau", c.ledNghiInnerMau)
                 .put("led_noi_inner_kieu", c.ledNoiInnerKieu)
                 .put("led_noi_inner_mau", c.ledNoiInnerMau)
+                .put("led_nghi_comet_mau", c.ledNghiCometMau)
+                .put("led_nghi_comet_ms", c.ledNghiCometMs)
+                .put("music_led_inner_mau", c.musicLedInnerMau)
+                .put("music_led_vien_mau", c.musicLedVienMau)
                 .put("gcloud_sa_email", c.gcloudSa.isEmpty() ? "" : GoogleAuth.email(c.gcloudSa))
                 .put("ha_selected", c.haDevices.length())
                 .put("stt_engine", c.sttEngine)
