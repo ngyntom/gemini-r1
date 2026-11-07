@@ -401,6 +401,7 @@ final class Group {
         private AudioTrack track;
         private int rate;
         private long written;
+        private short[] monoBuf = new short[0]; // tái dùng, tránh cấp phát mỗi gói
 
         Player(String name) {
             this.name = name;
@@ -430,7 +431,8 @@ final class Group {
                     if ((Integer) m[5] != flushes) continue; // gói của bài / chỗ tua cũ
                     long playAt = (Long) m[0];
                     int r = (Integer) m[2], ch = (Integer) m[3], role = (Integer) m[4];
-                    short[] mono = toMono((byte[]) m[1], ch, role);
+                    monoBuf = toMono((byte[]) m[1], ch, role, monoBuf);
+                    short[] mono = monoBuf;
                     if (track == null || r != rate) open(r);
                     // Ghi trước ~280 ms: trừ trễ ra loa còn ~240 ms chờ trong đệm AudioTrack (~250 ms) - đủ dày
                     // để CPU loa bận một lúc (giải mã, Wi-Fi) không làm hụt dữ liệu, giật tiếng
@@ -527,7 +529,7 @@ final class Group {
             dropped += start;
             if (start < pcm.length) {
                 if (!ducked) MusicLight.feed(pcm, playAt); // đèn theo nhạc đúng lúc tiếng ra loa này
-                if (ducked) pcm = new short[pcm.length];
+                if (ducked) java.util.Arrays.fill(pcm, (short) 0); // tránh cấp phát mảng mới
                 track.write(pcm, start, pcm.length - start);
                 written += pcm.length - start;
             }
@@ -549,18 +551,20 @@ final class Group {
             inserted += frames;
         }
 
-        private static short[] toMono(byte[] pcm, int ch, int role) {
-            ByteBuffer b = ByteBuffer.wrap(pcm).order(ByteOrder.LITTLE_ENDIAN);
+        private static short[] toMono(byte[] pcm, int ch, int role, short[] buf) {
             int frames = pcm.length / (2 * Math.max(1, ch));
-            short[] out = new short[frames];
-            for (int i = 0; i < frames; i++) {
-                if (ch < 2) {
-                    out[i] = b.getShort();
-                    continue;
+            short[] out = buf.length == frames ? buf : new short[frames];
+            if (ch < 2) {
+                for (int i = 0; i < frames; i++)
+                    out[i] = (short) ((pcm[i * 2] & 0xff) | (pcm[i * 2 + 1] << 8));
+            } else {
+                int stride = 2 * ch;
+                for (int i = 0; i < frames; i++) {
+                    int p = i * stride;
+                    short l = (short) ((pcm[p] & 0xff) | (pcm[p + 1] << 8));
+                    short r = (short) ((pcm[p + 2] & 0xff) | (pcm[p + 3] << 8));
+                    out[i] = role == ROLE_LEFT ? l : role == ROLE_RIGHT ? r : (short) ((l + r) >> 1);
                 }
-                short l = b.getShort(), r = b.getShort();
-                for (int k = 2; k < ch; k++) b.getShort();
-                out[i] = role == ROLE_LEFT ? l : role == ROLE_RIGHT ? r : (short) ((l + r) / 2);
             }
             return out;
         }
