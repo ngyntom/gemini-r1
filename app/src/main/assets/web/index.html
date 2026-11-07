@@ -910,7 +910,8 @@ const PAGES = {
     list('', [
       tog('led', 'Bật đèn LED', 'Đèn đổi theo trạng thái bot. Tắt = tắt hết đèn của loa (có tác dụng ngay).'),
       tog('music_led', 'Đèn theo nhạc', 'Đang phát nhạc thì viền sáng nhiều / ít theo độ to của nhạc (cả nhạc nhóm loa).'),
-      tog('music_led_inner', 'Đèn trong theo nhạc', 'Đèn nhỏ ở giữa đổi màu theo độ to: xanh dương → xanh ngọc → xanh lá → hồng tím.'),
+      tog('music_led_inner', 'Đèn trong theo nhạc', 'Đèn nhỏ ở giữa đổi màu theo độ to của nhạc.'),
+      sel('music_led_inner_kieu', 'Kiểu màu đèn trong', [['4buc', '4 bước màu'], ['min', 'Chuyển màu mượt'], ['cau_vong', 'Cầu vồng thở']]),
     ])
     // Viền ngoài gán cho từng lúc; mỗi thẻ có nút "Lưu và thử" chạy ngay trên loa
     + theDen('Đánh thức', [
@@ -1264,7 +1265,19 @@ function initSubpage(page) {
         const v = e.target.checked ? '1' : '0';
         post('/api/config', { [k]: v }).then(() => { S.config[k] = v; toast((v === '1' ? 'Đã bật ' : 'Đã tắt ') + ten); });
       }));
+    // Kiểu màu đèn trong áp dụng ngay khi đổi (cần restart script nhạc)
+    el.querySelector('[data-k="music_led_inner_kieu"]').addEventListener('change', e => {
+      const v = e.target.value;
+      post('/api/config', { music_led_inner_kieu: v }).then(() => { S.config.music_led_inner_kieu = v; });
+    });
     el.addEventListener('page:beforeremove', () => { if (cur) post('/api/led', { state: '' }); });
+    // Ẩn / hiện selector kiểu màu đèn trong theo trạng thái toggle
+    const anKieuTrong = () => {
+      el.querySelector('[data-k="music_led_inner_kieu"]').closest('li').style.display =
+        el.querySelector('[data-k="music_led_inner"]').checked ? '' : 'none';
+    };
+    anKieuTrong();
+    el.querySelector('[data-k="music_led_inner"]').addEventListener('change', anKieuTrong);
     // Lưu mọi lựa chọn đèn rồi chạy thử ngay trên loa: Đánh thức chạy 1 lần; Nghe / Nói giữ kiểu đó tới khi bấm
     // "Theo bot" hoặc rời trang (như nút Thử đèn)
     const KHOA_DEN = ['led_wake_kieu', 'led_wake_vet', 'led_nghe', 'led_nghe_vet', 'led_noi', 'led_noi_vet', 'led_wake_len', 'led_wake_ms'];

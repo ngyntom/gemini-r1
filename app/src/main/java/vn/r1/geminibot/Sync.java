@@ -35,7 +35,8 @@ final class Sync {
                 "search", "city", "barge_in", "bot_self", "user_call"});
         NHOM.put("home_assistant", new String[]{"ha_url", "ha_token", "ha_notify", "ha_devices", "ha_dash_order",
                 "ha_dash_dev_order", "ha_dash_icons"});
-        NHOM.put("den", new String[]{"led", "music_led", "music_led_inner", "led_wake_kieu", "led_wake_vet", "led_wake_len",
+        NHOM.put("den", new String[]{"led", "music_led", "music_led_inner", "music_led_inner_kieu",
+                "led_wake_kieu", "led_wake_vet", "led_wake_len",
                 "led_wake_ms", "led_nghe", "led_nghe_vet", "led_noi", "led_noi_vet"});
     }
 

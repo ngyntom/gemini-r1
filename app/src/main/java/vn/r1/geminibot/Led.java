@@ -127,11 +127,15 @@ final class Led {
 
     /** Đèn trong đổi màu theo nhạc (cùng lúc với viền). */
     private static volatile boolean musicInner = true;
+    /** Kiểu màu đèn trong theo nhạc: "4buc" | "min" | "cau_vong". */
+    private static volatile String musicInnerKieu = "4buc";
 
-    static void setMusicEnabled(boolean on, boolean inner) {
+    static void setMusicEnabled(boolean on, boolean inner, String kieu) {
         musicEnabled = on;
-        if (inner != musicInner) {
+        String safeKieu = kieu == null || kieu.isEmpty() ? "4buc" : kieu;
+        if (inner != musicInner || !safeKieu.equals(musicInnerKieu)) {
             musicInner = inner;
+            musicInnerKieu = safeKieu;
             if ("music".equals(shown)) shown = ""; // đang chạy hiệu ứng nhạc: chạy lại với tuỳ chọn mới
         }
     }
@@ -275,6 +279,7 @@ final class Led {
                 if (music != null) {
                     return stop + INNER_OFF + "; " + RING_OFF + "; rm -f " + STOPF + "; trap '' HUP; sh "
                             + music.getAbsolutePath() + " " + (musicInner ? 1 : 0)
+                            + " " + musicInnerKieu
                             + " </dev/null >/dev/null 2>&1 & echo $! > " + PID;
                 }
                 return stop + INNER_OFF + "; " + RING_OFF;
@@ -405,7 +410,32 @@ final class Led {
         // ghi nhanh hơn thế thì hàng dồn lại, đèn chạy lệch / như không sáng (lỗi bản đầu, 2 lệnh mỗi 40 ms).
         // Nên mỗi lần đổi chỉ MỘT lệnh: tăng thì bật đèn 1..l (đèn đã sáng ghi lại không sao), giảm thì tắt
         // đèn l+1..24; nhiều nhất ~5 lần mỗi giây.
-        StringBuilder sb = new StringBuilder(RING_OFF).append("\np=0\nwhile [ ! -f ").append(STOPF).append(" ]; do\n")
+        // Cầu vồng thở: 6 màu chuyển lần lượt qua driver animation (1 lệnh, chạy mãi cho đến khi bị force-off).
+        // Mỗi màu thở: interval 2000ms giữa các frame; transition 1800ms + reverse=1 → sáng lên rồi mờ dần.
+        String rainbowCmd = "1 2000 99999999 6"
+                + " 1 000000 ff0000 1800 1 " + INNER_IDS  // đỏ
+                + " 1 000000 ff8800 1800 1 " + INNER_IDS  // cam
+                + " 1 000000 aaff00 1800 1 " + INNER_IDS  // vàng-xanh
+                + " 1 000000 00ffaa 1800 1 " + INNER_IDS  // xanh ngọc
+                + " 1 000000 0088ff 1800 1 " + INNER_IDS  // xanh dương
+                + " 1 000000 8800ff 1800 1 " + INNER_IDS; // tím
+        // Smooth: bảng màu 25 bước (level 0..24) nội suy giữa 5 điểm dừng.
+        int[][] stops = {{0,0x30,0xff},{0,0xb0,0xff},{0,0xff,0x30},{0xff,0xa0,0},{0xff,0,0x80}};
+        String[] smoothColors = new String[25];
+        for (int i = 0; i <= 24; i++) {
+            int seg = Math.min(i / 6, 3);
+            int t6 = (i == 24) ? 6 : i % 6;
+            int r = stops[seg][0] + (stops[seg+1][0] - stops[seg][0]) * t6 / 6;
+            int g = stops[seg][1] + (stops[seg+1][1] - stops[seg][1]) * t6 / 6;
+            int b = stops[seg][2] + (stops[seg+1][2] - stops[seg][2]) * t6 / 6;
+            smoothColors[i] = String.format("%02x%02x%02x", r, g, b);
+        }
+
+        StringBuilder sb = new StringBuilder(RING_OFF)
+                // Khởi động cầu vồng TRƯỚC loop: 1 lệnh, driver tự chạy vòng mãi
+                .append("\nif [ \"$1\" = 1 ] && [ \"$2\" = \"cau_vong\" ]; then\n  echo '")
+                .append(rainbowCmd).append("' > ").append(INNER_COLOR).append("\nfi\n")
+                .append("p=0\nwhile [ ! -f ").append(STOPF).append(" ]; do\n")
                 .append("  read l < ").append(level.getAbsolutePath()).append("\n")
                 .append("  if [ -n \"$l\" ] && [ \"$l\" -gt \"$p\" ]; then\n    case \"$l\" in\n");
         for (int n = 1; n <= MusicLight.RING; n++) {
@@ -422,14 +452,24 @@ final class Led {
         sb.append("    esac\n    p=$l\n  fi\n");
         // Đèn trong (tham số $1 = 1): đổi màu theo nấc to (xanh dương / xanh ngọc / xanh lá / hồng tím),
         // chỉ ghi khi sang nấc khác - đèn trong là file driver riêng, thêm tối đa 1 lệnh mỗi vòng
-        sb.append("  if [ \"$1\" = 1 ] && [ -n \"$l\" ]; then\n")
-          .append("    if [ \"$l\" -le 6 ]; then b=1; elif [ \"$l\" -le 12 ]; then b=2; elif [ \"$l\" -le 18 ]; then b=3; else b=4; fi\n")
-          .append("    if [ \"$b\" != \"$c\" ]; then\n      case $b in\n")
-          .append("        1) ").append(setColor(INNER_COLOR, INNER_IDS, "0030ff")).append(" ;;\n")
-          .append("        2) ").append(setColor(INNER_COLOR, INNER_IDS, "00b0ff")).append(" ;;\n")
-          .append("        3) ").append(setColor(INNER_COLOR, INNER_IDS, "00ff30")).append(" ;;\n")
-          .append("        4) ").append(setColor(INNER_COLOR, INNER_IDS, "ff00b0")).append(" ;;\n")
-          .append("      esac\n      c=$b\n    fi\n  fi\n");
+        // Đèn trong theo kiểu ($2): bỏ qua khi cau_vong (driver tự chạy animation)
+        sb.append("  if [ \"$1\" = 1 ] && [ \"$2\" != \"cau_vong\" ] && [ -n \"$l\" ]; then\n");
+        sb.append("    if [ \"$2\" = \"min\" ]; then\n");
+        // Smooth: 25 bước, theo dõi từng mức chính xác
+        sb.append("      if [ \"$l\" != \"$c\" ]; then\n        case \"$l\" in\n");
+        for (int i = 0; i <= 24; i++) {
+            sb.append("          ").append(i).append(") ")
+              .append(setColor(INNER_COLOR, INNER_IDS, smoothColors[i])).append(" ;;\n");
+        }
+        sb.append("        esac\n        c=$l\n      fi\n    else\n");
+        // 4buc (mặc định): 4 dải màu, theo dõi dải
+        sb.append("      if [ \"$l\" -le 6 ]; then b=1; elif [ \"$l\" -le 12 ]; then b=2; elif [ \"$l\" -le 18 ]; then b=3; else b=4; fi\n")
+          .append("      if [ \"$b\" != \"$c\" ]; then\n        case $b in\n")
+          .append("          1) ").append(setColor(INNER_COLOR, INNER_IDS, "0030ff")).append(" ;;\n")
+          .append("          2) ").append(setColor(INNER_COLOR, INNER_IDS, "00b0ff")).append(" ;;\n")
+          .append("          3) ").append(setColor(INNER_COLOR, INNER_IDS, "00ff30")).append(" ;;\n")
+          .append("          4) ").append(setColor(INNER_COLOR, INNER_IDS, "ff00b0")).append(" ;;\n")
+          .append("        esac\n        c=$b\n      fi\n    fi\n  fi\n");
         sb.append("  sleep 0.2\ndone\n")
           .append(RING_OFF).append('\n')
           .append(blackAll(INNER_COLOR, INNER_IDS)).append('\n')

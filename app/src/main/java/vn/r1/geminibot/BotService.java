@@ -54,7 +54,8 @@ public class BotService extends Service {
         web.start();
         local = new LocalAnswer(this);
         Led.setEnabled(Config.load(this).led);
-        Led.setMusicEnabled(Config.load(this).musicLed, Config.load(this).musicLedInner);
+        Config cfgInit = Config.load(this);
+        Led.setMusicEnabled(cfgInit.musicLed, cfgInit.musicLedInner, cfgInit.musicLedInnerKieu);
         Led.start(this);
         Button.start(this);
         Music.get(this); // dựng trình phát nhạc sẵn (hàng chờ cũ đọc lại từ file)
@@ -135,7 +136,7 @@ public class BotService extends Service {
         if (lastWakeKey != null && !wakeKey(cfg).equals(lastWakeKey)) recorder.requestReload();
         Led.setEnabled(cfg.led); // vòng chính có thể đang chờ từ đánh thức rất lâu -> áp dụng ngay ở đây
         Led.daDoiCauHinh();      // kiểu đèn Nghe / Nói / Đánh thức đổi thì vẽ lại ngay
-        Led.setMusicEnabled(cfg.musicLed, cfg.musicLedInner);
+        Led.setMusicEnabled(cfg.musicLed, cfg.musicLedInner, cfg.musicLedInnerKieu);
         if (!cfg.live) live.cancel();
     }
 
